@@ -1,0 +1,100 @@
+/*首頁css樣式*/
+/* 讓整個首頁區塊佔滿螢幕高 */
+#home {
+  min-height: 100vh;               /* vh = viewport height, 100vh 代表 100% 視窗高度 */
+  display: flex;               /* 讓內容可以置中對齊 */
+  flex-direction: column;      
+  justify-content: center;     /* 垂直置中 */
+  align-items: center;         /* 水平置中 */
+  position: relative;
+  overflow: hidden;            /* 避免背景動畫超出邊界 */
+}
+
+#home .container {
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 60px 24px 50px;
+  text-align: center;
+  position: relative;
+  z-index: 1;
+}
+
+/*一個幫你省下時間的整合平台*/
+#home .subtitle {
+  font-size: 18px;
+  color: rgba(243, 103, 241, 0.7);
+  letter-spacing: 6px;
+  margin-top: -40px;
+  margin-bottom: 16px;
+  text-transform: uppercase;
+  /* 🎨 核心：文字漸層設定 */
+  background: linear-gradient(to right, #d8b9ff 0%, #ff77b7 100%);
+  -webkit-background-clip: text;      /* 將背景裁切到文字形狀 */
+  -webkit-text-fill-color: transparent; /* 讓文字本身透明，顯示背景漸層 */
+  background-clip: text;               /* 新瀏覽器標準支援 */
+  color: transparent;                  /* 保險用 */
+
+  /* 💫 額外細節：柔光陰影提升亮度層次 */
+  text-shadow: 0 2px 12px rgba(255, 120, 200, 0.25);
+}
+
+
+/* 主標題：懂才抱 */
+#home h1{
+  font-size: 70px;  /*字體大小 */
+  line-height: 1.05;   /* 行高（控制文字上下間距） */
+  letter-spacing: 8px;       /* 字距（每個字之間的間隔） */
+  font-weight: 800;/* 字體粗細（400是正常，700是粗體，800更粗） */
+  margin-bottom: 20px;   /* 與下方元素的距離 */
+  margin-top: 0px;
+  color: rgba(255,255,255,.96); /* 顏色（這裡是接近純白） */
+  text-shadow: 0 6px 28px rgba(171, 125, 170, 0.25);/* 文字陰影（製造立體亮感） */
+  /* 🎨 垂直漸層：上亮下深 */
+  background: linear-gradient(to bottom, #e6e0ff 0%, #b6a8e8 50%, #8b7ccc 100%);
+  -webkit-background-clip: text;      /* 把背景限制在文字內 */
+  -webkit-text-fill-color: transparent;/* 讓文字顏色透明以顯示漸層 */
+  background-clip: text;               /* 支援新瀏覽器 */
+  color: transparent;                  /* 保險設定 */
+
+  /* ✨ 柔光陰影，讓字體有立體亮感 */
+  text-shadow: 0 4px 20px rgba(171, 125, 170, 0.25);
+}
+
+/* 內文段落 */
+#home .content{
+  font-size: 17px;
+  line-height: 1.45;
+  color: rgba(255,255,255,.86);
+  margin: 0 auto 60px;
+}
+#home .content p{ margin-bottom: 0px; }
+#home .content br {
+  line-height: 0.6;
+  display: block;
+  margin: 0;   /* 移除瀏覽器可能自動加的外距 */
+  padding: 0;  /* 避免某些瀏覽器對 <br> 有預設縮排或空白 */
+}
+
+#home .highlight{ color:#fff; font-weight: 600; }
+
+
+
+
+/* 底部圓形 CTA 按鈕（向下箭頭） */
+#home .cta-button{
+  width: 52px; height: 52px; /*按鈕大小*/
+  border: 0; border-radius: 9999px;  /*移除預設邊框*/
+  display: inline-flex; align-items: center; justify-content: center; /*置中箭頭*/
+  background: radial-gradient(120% 120% at 30% 20%, #ff77b7 0%, #a78bfa 60%, #7c6ef6 100%);  /*放射漸層*/
+  box-shadow: 0 12px 36px rgba(135,110,255,.45);  /*模糊陰影*/
+  cursor: pointer; /*手指圖示*/
+  transition: transform .25s ease, box-shadow .25s ease, filter .25s ease;  /*滑鼠移入有平滑過度*/
+  margin-top: -20px;
+}
+#home .cta-button:hover{
+  transform: translateY(-3px) scale(1.06); /*滑鼠移去浮動變大*/
+  box-shadow: 0 18px 48px rgba(135,110,255,.6);  /*陰影變身*/
+  filter: brightness(1.05);  /*變亮*/
+}
+#home .cta-button:active{ transform: scale(0.98); }   /*點下去縮小*/
+#home .cta-button svg{ width: 34px; height: 34px; fill: #fff; }  /*按鈕大小*/

@@ -1,0 +1,80 @@
+/* --- 全域設定 --- */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Microsoft JhengHei', 'PingFang TC', sans-serif;
+  background: linear-gradient(135deg, #2d2d44 0%, #3d3d5c 100%);
+  min-height: 100vh;
+  position: relative;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+/* --- 移動網格線（背景動畫） --- */
+body::before {
+  content: '';
+  position: absolute;
+  width: 200%;
+  height: 200%;
+  background-image: 
+      linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 50px 50px;
+  animation: moveGrid 20s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes moveGrid {
+  0% {
+    transform: translate(0, 0) rotate(-15deg);
+  }
+  100% {
+    transform: translate(50px, 50px) rotate(-15deg);
+  }
+}
+
+/* --- 粒子效果 --- */
+.particle {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: rgba(255, 120, 150, 0.6);
+  border-radius: 50%;
+  animation: float 8s infinite;
+}
+
+/* 粒子位置與延遲 */
+.particle:nth-child(1) { left: 10%; top: 20%; animation-delay: 0s; }
+.particle:nth-child(2) { left: 80%; top: 40%; animation-delay: 2s; }
+.particle:nth-child(3) { left: 30%; top: 60%; animation-delay: 4s; }
+.particle:nth-child(4) { left: 90%; top: 80%; animation-delay: 6s; background: rgba(160, 120, 255, 0.6); }
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0) translateX(0);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-100px) translateX(30px);
+    opacity: 0;
+  }
+}
+html {
+  scroll-behavior: smooth; /* 平滑滾動 */
+  scroll-snap-type: y mandatory; /* 可選，增加一頁一頁感覺 */
+}
+
+section {
+  scroll-snap-align: start; /* 每頁貼齊頂部 */
+  min-height: 100vh;        /* 確保每頁都是滿版 */
+}
