@@ -39,7 +39,7 @@
   border-radius: 20px;                 /* 圓角邊框 */
   padding: 20px 20px 20px;             /* 內距，上右下左 */
   width: 340px;                        /* 卡片寬度 */
-  min-height: 400px;                   /* 卡片最小高度（確保一致） */
+  min-height: 370px;                   /* 卡片最小高度（確保一致） */
   box-shadow: 0 10px 25px rgba(0,0,0,0.2); /* 陰影（浮起感） */
   transition: transform 0.3s ease, box-shadow 0.3s ease; /* 平滑的 hover 動畫 */
 }
@@ -69,13 +69,14 @@
 
 /* 底部圓形 CTA 按鈕（向下箭頭） */
 #differ .cta-button{
-  width: 52px; height: 52px; /*按鈕大小*/
+  width: 40px; height: 40px; /*按鈕大小*/
   border: 0; border-radius: 9999px;  /*移除預設邊框*/
   display: inline-flex; align-items: center; justify-content: center; /*置中箭頭*/
   background: radial-gradient(120% 120% at 30% 20%, #ff77b7 0%, #a78bfa 60%, #7c6ef6 100%);  /*放射漸層*/
   box-shadow: 0 12px 36px rgba(135,110,255,.45);  /*模糊陰影*/
   cursor: pointer; /*手指圖示*/
   transition: transform .25s ease, box-shadow .25s ease, filter .25s ease;  /*滑鼠移入有平滑過度*/
+  margin-top: 60px;
 }
 #differ .cta-button:hover{
   transform: translateY(-3px) scale(1.06); /*滑鼠移去浮動變大*/

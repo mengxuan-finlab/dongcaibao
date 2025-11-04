@@ -73,7 +73,7 @@
 
 /* 底部圓形 CTA 按鈕（向下箭頭） */
 #news .cta-button{
-  width: 52px; height: 52px; /*按鈕大小*/
+  width: 40px; height: 40px; /*按鈕大小*/
   border: 0; border-radius: 9999px;  /*移除預設邊框*/
   display: inline-flex; align-items: center; justify-content: center; /*置中箭頭*/
   background: radial-gradient(120% 120% at 30% 20%, #ff77b7 0%, #a78bfa 60%, #7c6ef6 100%);  /*放射漸層*/
