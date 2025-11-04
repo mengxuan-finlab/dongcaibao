@@ -21,7 +21,7 @@
 
 /*一個幫你省下時間的整合平台*/
 #home .subtitle {
-  font-size: 18px;
+  font-size: 16.2px;
   color: rgba(243, 103, 241, 0.7);
   letter-spacing: 6px;
   margin-top: -40px;
@@ -41,7 +41,7 @@
 
 /* 主標題：懂才抱 */
 #home h1{
-  font-size: 70px;  /*字體大小 */
+  font-size: 63px;  /*字體大小 */
   line-height: 1.05;   /* 行高（控制文字上下間距） */
   letter-spacing: 8px;       /* 字距（每個字之間的間隔） */
   font-weight: 800;/* 字體粗細（400是正常，700是粗體，800更粗） */
@@ -62,7 +62,7 @@
 
 /* 內文段落 */
 #home .content{
-  font-size: 17px;
+  font-size: 15.3px;
   line-height: 1.45;
   color: rgba(255,255,255,.86);
   margin: 0 auto 60px;
