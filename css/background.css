@@ -72,6 +72,7 @@ body::before {
 html {
   scroll-behavior: smooth; /* 平滑滾動 */
   scroll-snap-type: y mandatory; /* 可選，增加一頁一頁感覺 */
+  zoom: 0.9; /*網頁校正*/
 }
 
 section {
