@@ -21,7 +21,7 @@
 
 /*一個幫你省下時間的整合平台*/
 #home .subtitle {
-  font-size: 16.2px;
+  font-size: 17.1px;
   color: rgba(243, 103, 241, 0.7);
   letter-spacing: 6px;
   margin-top: -40px;
@@ -41,7 +41,7 @@
 
 /* 主標題：懂才抱 */
 #home h1{
-  font-size: 63px;  /*字體大小 */
+  font-size: 66.5px;  /*字體大小 */
   line-height: 1.05;   /* 行高（控制文字上下間距） */
   letter-spacing: 8px;       /* 字距（每個字之間的間隔） */
   font-weight: 800;/* 字體粗細（400是正常，700是粗體，800更粗） */
@@ -62,10 +62,10 @@
 
 /* 內文段落 */
 #home .content{
-  font-size: 15.3px;
+  font-size: 16.15px;
   line-height: 1.45;
   color: rgba(255,255,255,.86);
-  margin: 0 auto 60px;
+  margin: 0 auto 40px;
 }
 #home .content p{ margin-bottom: 0px; }
 #home .content br {
@@ -89,7 +89,7 @@
   box-shadow: 0 12px 36px rgba(135,110,255,.45);  /*模糊陰影*/
   cursor: pointer; /*手指圖示*/
   transition: transform .25s ease, box-shadow .25s ease, filter .25s ease;  /*滑鼠移入有平滑過度*/
-  margin-top: -20px;
+  margin-top: -50px;
 }
 #home .cta-button:hover{
   transform: translateY(-3px) scale(1.06); /*滑鼠移去浮動變大*/
