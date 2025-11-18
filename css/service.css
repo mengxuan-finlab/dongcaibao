@@ -62,7 +62,7 @@
   font-size: 18px;
   line-height: 2.05;
   color: rgba(255,255,255,.86);
-  margin: 0 auto 72px;
+  margin: 0 auto 0px;
 }
 #home .content p{ margin-bottom: 18px; }
 #home .content br{ line-height: 1; }
@@ -88,3 +88,32 @@
 }
 #service .cta-button:active{ transform: scale(0.98); }   /*點下去縮小*/
 #service .cta-button svg{ width: 34px; height: 34px; fill: #fff; }  /*按鈕大小*/
+
+/*三大財報估值按鈕 、股票資訊與產業報告*/
+#service .sample-button {
+  width: 300px; 
+  height: 60px; 
+  border: 1px solid rgba(255,255,255,0.5);
+  background: transparent;             
+  border-radius: 9999px;
+  color: #cefcdf;
+  font-size: 18px;
+  display: inline-flex; 
+  align-items: center; 
+  justify-content: center; 
+  gap: 6px;
+  cursor: pointer;
+  transition: transform .25s ease, box-shadow .25s ease, filter .25s ease;
+  margin-bottom: 30px;
+  margin-top: -20px;
+}
+
+#service .sample-button:hover {
+  transform: translateY(-3px) scale(1.06);
+  border-color: rgba(255,255,255,0.9);
+  filter: brightness(1.1);
+}
+
+#service .sample-button:active {
+  transform: scale(0.97);
+}
