@@ -75,10 +75,10 @@
 #home .btn {
   width: 230px; 
   height: 45px; 
-  border: 1px solid rgba(114, 241, 248, 0.5);
+  border: 1px solid #bcd6f1;
   background: transparent;             
   border-radius: 9999px;
-  color: #a6f3ea;
+  color: #bcd6f1;
   font-size: 18px;
   display: inline-flex; 
   align-items: center; 
