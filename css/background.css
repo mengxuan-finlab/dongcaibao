@@ -11,22 +11,25 @@ body {
   min-height: 100vh;
   position: relative;
   overflow-x: hidden;
-  overflow-y: auto;
+  /* 不特別指定 overflow-y，交給瀏覽器自動算就好 */
 }
 
 /* --- 移動網格線（背景動畫） --- */
 body::before {
   content: '';
-  position: absolute;
-  width: 200%;
-  height: 200%;
+  position: fixed;     /* 🚩 改成 fixed，貼在視窗上 */
+  inset: 0;            /* 等於 top:0; right:0; bottom:0; left:0; */
+  width: 100%;
+  height: 100%;
   background-image: 
       linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
       linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
   background-size: 50px 50px;
   animation: moveGrid 20s linear infinite;
   pointer-events: none;
+  z-index: -1;         /* 如果需要，讓它永遠在內容後面 */
 }
+
 
 @keyframes moveGrid {
   0% {
@@ -71,10 +74,10 @@ body::before {
 }
 html {
   scroll-behavior: smooth; /* 平滑滾動 */
-  scroll-snap-type: y mandatory; /* 可選，增加一頁一頁感覺 */
+  scroll-snap-type: y mandatory; 
 }
 
 section {
-  scroll-snap-align: start; /* 每頁貼齊頂部 */
+  scroll-snap-align: start; 
   min-height: 100vh;        /* 確保每頁都是滿版 */
 }
