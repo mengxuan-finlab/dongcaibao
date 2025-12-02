@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <title>懂才抱．核心指標選股器</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- Supabase JS v2 -->
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <link rel="stylesheet" href="css/core_screener.css" />
+</head>
+<body>
+  <div class="container">
+    <h1>懂才抱核心指標選股器</h1>
+    <p class="subtitle">資料來自 core_metrics：市值、ROA、ROE、FCF Yield、現金轉換週期。</p>
+
+    <div class="filters">
+      <div class="filter-group">
+        <label for="capFilter">市值</label>
+        <select id="capFilter">
+          <option value="all">全部</option>
+          <option value="mega">超大型 ≥ 300B</option>
+          <option value="large">大型 ≥ 100B</option>
+          <option value="mid">中型 ≥ 10B</option>
+          <option value="small">小型 &lt; 10B</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label for="roeFilter">ROE ≥</label>
+        <select id="roeFilter">
+          <option value="0">0%</option>
+          <option value="10">10%</option>
+          <option value="15">15%</option>
+          <option value="20">20%</option>
+          <option value="30">30%</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label for="roicFilter">ROIC ≥</label>
+        <select id="roicFilter">
+          <option value="0">0%</option>
+          <option value="0.10">10%</option>
+          <option value="0.15">15%</option>
+          <option value="0.20">20%</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label for="fcfFilter">FCF Yield ≥</label>
+        <select id="fcfFilter">
+          <option value="0">0%</option>
+          <option value="0.02">2%</option>
+          <option value="0.04">4%</option>
+          <option value="0.06">6%</option>
+        </select>
+      </div>
+
+      
+      <div class="filter-group">
+        <label for="eyFilter">Earnings Yield ≥</label>
+        <select id="eyFilter">
+          <option value="0">0%</option>
+          <option value="0.04">4%</option>
+          <option value="0.06">6%</option>
+          <option value="0.08">8%</option>
+        </select>
+      </div>
+
+    
+      <div class="filter-group">
+        <label for="crFilter">流動比率 ≥</label>
+        <select id="crFilter">
+          <option value="0">不限</option>
+          <option value="1">1.0</option>
+          <option value="1.5">1.5</option>
+          <option value="2">2.0</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label for="ndFilter">Net debt / EBITDA ≤</label>
+        <select id="ndFilter">
+          <option value="all">全部</option>
+          <option value="4">4x</option>
+          <option value="3">3x</option>
+          <option value="2">2x</option>
+          <option value="1">1x</option>
+        </select>
+      </div>
+
+
+      <div class="filter-group">
+        <label for="cccFilter">CCC</label>
+        <select id="cccFilter">
+          <option value="all">全部</option>
+          <option value="neg">小於 0（優勢）</option>
+          <option value="pos">大於等於 0</option>
+        </select>
+      </div>
+
+
+      <div class="filter-group">
+        <label for="peFilter">PE ≤</label>
+        <select id="peFilter">
+          <option value="all">不限</option>
+          <option value="40">40</option>
+          <option value="30">30</option>
+          <option value="20">20</option>
+          <option value="15">15</option>
+          <option value="10">10</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label for="pegFilter">PEG ≤</label>
+        <select id="pegFilter">
+          <option value="all">不限</option>
+          <option value="2">2.0</option>
+          <option value="1.5">1.5</option>
+          <option value="1">1.0</option>
+          <option value="0.5">0.5</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label for="psFilter">PS ≤</label>
+        <select id="psFilter">
+          <option value="all">不限</option>
+          <option value="10">10</option>
+          <option value="5">5</option>
+          <option value="3">3</option>
+          <option value="2">2</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label for="pbFilter">PB ≤</label>
+        <select id="pbFilter">
+          <option value="all">不限</option>
+          <option value="10">10</option>
+          <option value="5">5</option>
+          <option value="3">3</option>
+          <option value="2">2</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label for="pfcfFilter">P/FCF ≤</label>
+        <select id="pfcfFilter">
+          <option value="all">不限</option>
+          <option value="40">40</option>
+          <option value="30">30</option>
+          <option value="20">20</option>
+          <option value="15">15</option>
+          <option value="10">10</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label for="deFilter">Debt/Equity ≤</label>
+        <select id="deFilter">
+          <option value="all">不限</option>
+          <option value="2">2.0</option>
+          <option value="1.5">1.5</option>
+          <option value="1">1.0</option>
+          <option value="0.5">0.5</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label for="daFilter">Debt/Asset ≤</label>
+        <select id="daFilter">
+          <option value="all">不限</option>
+          <option value="0.8">0.8</option>
+          <option value="0.6">0.6</option>
+          <option value="0.4">0.4</option>
+          <option value="0.2">0.2</option>
+        </select>
+      </div>
+
+    </div>
+
+    <div class="summary" id="summaryText">載入中...</div>
+
+    <table>
+      <thead>
+        <tr>
+          <th data-sort="symbol">Symbol</th>
+          <th data-sort="market_cap">市值</th>
+          <th data-sort="roa">ROA</th>
+          <th data-sort="roe">ROE</th>
+          <th data-sort="roic">ROIC</th>
+          <th data-sort="fcf_yield">FCF Yield</th>
+          <th data-sort="earnings_yield">Earnings Yield</th>
+          <th data-sort="current_ratio">流動比率</th>
+          <th data-sort="net_debt_to_ebitda">Net debt/EBITDA</th>
+          <th data-sort="ccc">CCC</th>
+          <th data-sort="pe">PE</th>
+          <th data-sort="peg">PEG</th>
+          <th data-sort="ps">PS</th>
+          <th data-sort="pb">PB</th>
+          <th data-sort="p_fcf">P/FCF</th>
+          <th data-sort="debt_to_equity">Debt/Equity</th>
+          <th data-sort="debt_to_asset">Debt/Asset</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+
+  <script>
+    // === TODO: 換成你的 URL & anon 公鑰（不是 service_role） ===
+    const SUPABASE_URL = "https://ojeirmqxborwxhuwuems.supabase.co";
+    const SUPABASE_ANON_KEY = "sb_publishable_wur9F2qRW0NFyZpijPub2A__IsGlpgZ";
+
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    let allRows = [];
+    let sortState = { key: "market_cap", dir: "desc" };
+
+    function formatCap(x) {
+      if (x == null) return "-";
+      if (x >= 1e12) return (x / 1e12).toFixed(2) + " T";
+      if (x >= 1e9)  return (x / 1e9 ).toFixed(2) + " B";
+      if (x >= 1e6)  return (x / 1e6 ).toFixed(2) + " M";
+      return x.toLocaleString();
+    }
+    function pct(x) {
+      if (x == null) return "-";
+      return (x * 100).toFixed(2) + "%";
+    }
+
+    async function loadData() {
+      const { data, error } = await supabase
+        .from("core_metrics")
+        .select("symbol,market_cap,roa,roe,roic,fcf_yield,earnings_yield,current_ratio,net_debt_to_ebitda,ccc,pe,peg,ps,pb,p_fcf,debt_to_equity,debt_to_asset");
+
+      if (error) {
+        console.error(error);
+        document.getElementById("summaryText").textContent = "載入失敗";
+        return;
+      }
+
+      allRows = data;
+      applyFiltersAndRender();
+    }
+
+    function applyFiltersAndRender() {
+      const capMode = document.getElementById("capFilter").value;
+      const roeMin = Number(document.getElementById("roeFilter").value) / 100; // 轉成 ratio
+      const fcfMin = Number(document.getElementById("fcfFilter").value);       // 已是 ratio
+      const roicMin = Number(document.getElementById("roicFilter").value);
+      const eyMin = Number(document.getElementById("eyFilter").value);   
+      const crMin = Number(document.getElementById("crFilter").value);  
+      const ndMode = document.getElementById("ndFilter").value;   
+      const cccMode = document.getElementById("cccFilter").value;
+      const peMode   = document.getElementById("peFilter").value;
+      const pegMode  = document.getElementById("pegFilter").value;
+      const psMode   = document.getElementById("psFilter").value;
+      const pbMode   = document.getElementById("pbFilter").value;
+      const pfcfMode = document.getElementById("pfcfFilter").value;
+      const deMode   = document.getElementById("deFilter").value;
+      const daMode   = document.getElementById("daFilter").value;
+
+      let rows = allRows.filter(r => {
+        if (capMode !== "all") {
+          const cap = r.market_cap || 0;
+          if (capMode === "mega" && !(cap >= 3e11)) return false;        // ≥ 300B
+          if (capMode === "large" && !(cap >= 1e11)) return false;       // ≥ 100B
+          if (capMode === "mid" && !(cap >= 1e10 && cap < 1e11)) return false; // 10B–100B
+          if (capMode === "small" && !(cap < 1e10)) return false;        // < 10B
+        }
+        if (r.roe == null || r.roe < roeMin) return false;
+        if (r.fcf_yield == null || r.fcf_yield < fcfMin) return false;
+        if (r.roic == null || r.roic < roicMin) return false;
+         // ★ Earnings Yield
+        if (r.earnings_yield == null || r.earnings_yield < eyMin) return false;
+
+        // ★ Current Ratio（crMin=0 就當作不限）
+        if (crMin > 0 && (r.current_ratio == null || r.current_ratio < crMin)) return false;
+
+        // ★ Net debt / EBITDA（ndMode=all 就不限，其他視為「上限」）
+        if (ndMode !== "all") {
+          const ndMax = Number(ndMode);
+          if (r.net_debt_to_ebitda == null || r.net_debt_to_ebitda > ndMax) return false;
+        }
+
+        if (cccMode === "neg" && !(r.ccc < 0)) return false;
+        if (cccMode === "pos" && !(r.ccc >= 0)) return false;
+
+        if (peMode !== "all") {
+          const maxPE = Number(peMode);
+          if (r.pe == null || r.pe > maxPE) return false;
+        }
+
+        if (pegMode !== "all") {
+          const maxPEG = Number(pegMode);
+          if (r.peg == null || r.peg > maxPEG) return false;
+        }
+
+        if (psMode !== "all") {
+          const maxPS = Number(psMode);
+          if (r.ps == null || r.ps > maxPS) return false;
+        }
+
+        if (pbMode !== "all") {
+          const maxPB = Number(pbMode);
+          if (r.pb == null || r.pb > maxPB) return false;
+        }
+
+        if (pfcfMode !== "all") {
+          const maxPFCF = Number(pfcfMode);
+          if (r.p_fcf == null || r.p_fcf > maxPFCF) return false;
+        }
+
+        // ⭐ 槓桿相關
+        if (deMode !== "all") {
+          const maxDE = Number(deMode);
+          if (r.debt_to_equity == null || r.debt_to_equity > maxDE) return false;
+        }
+
+        if (daMode !== "all") {
+          const maxDA = Number(daMode);
+          if (r.debt_to_asset == null || r.debt_to_asset > maxDA) return false;
+        }
+
+        return true;
+
+        return true;
+      });
+
+      // sorting
+      rows.sort((a, b) => {
+        const k = sortState.key;
+        const va = a[k], vb = b[k];
+        if (va == null) return 1;
+        if (vb == null) return -1;
+        return sortState.dir === "asc" ? va - vb : vb - va;
+      });
+
+      renderTable(rows);
+    }
+
+    function renderTable(rows) {
+      const tbody = document.getElementById("tableBody");
+      const summary = document.getElementById("summaryText");
+      tbody.innerHTML = "";
+      summary.textContent = `符合條件的股票：${rows.length} 檔`;
+
+      rows.forEach(r => {
+        const cccClass = r.ccc != null && r.ccc < 0 ? "pill-pos" : "";
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td><span class="badge">${r.symbol}</span></td>
+          <td>${formatCap(r.market_cap)}</td>
+          <td>${pct(r.roa)}</td>
+          <td>${pct(r.roe)}</td>
+          <td>${pct(r.roic)}</td> 
+          <td>${pct(r.fcf_yield)}</td>
+          <td>${pct(r.earnings_yield)}</td>
+          <td>${r.current_ratio != null ? r.current_ratio.toFixed(2) : "-"}</td>
+          <td>${r.net_debt_to_ebitda != null ? r.net_debt_to_ebitda.toFixed(2) : "-"}</td>
+          <td class="${cccClass}">${r.ccc != null ? r.ccc.toFixed(2) : "-"}</td>
+          <td>${r.pe != null ? r.pe.toFixed(2) : "-"}</td>
+          <td>${r.peg != null ? r.peg.toFixed(2) : "-"}</td>
+          <td>${r.ps != null ? r.ps.toFixed(2) : "-"}</td>
+          <td>${r.pb != null ? r.pb.toFixed(2) : "-"}</td>
+          <td>${r.p_fcf != null ? r.p_fcf.toFixed(2) : "-"}</td>
+          <td>${r.debt_to_equity != null ? r.debt_to_equity.toFixed(2) : "-"}</td>
+          <td>${r.debt_to_asset != null ? r.debt_to_asset.toFixed(2) : "-"}</td>
+          `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // 綁定 filter 事件
+    document.getElementById("capFilter").addEventListener("change", applyFiltersAndRender); 
+    document.getElementById("roeFilter").addEventListener("change", applyFiltersAndRender);
+    document.getElementById("roicFilter").addEventListener("change", applyFiltersAndRender);
+    document.getElementById("fcfFilter").addEventListener("change", applyFiltersAndRender);
+    document.getElementById("eyFilter").addEventListener("change", applyFiltersAndRender);   
+    document.getElementById("crFilter").addEventListener("change", applyFiltersAndRender);   
+    document.getElementById("ndFilter").addEventListener("change", applyFiltersAndRender); 
+    document.getElementById("cccFilter").addEventListener("change", applyFiltersAndRender);
+    document.getElementById("peFilter").addEventListener("change", applyFiltersAndRender);
+    document.getElementById("pegFilter").addEventListener("change", applyFiltersAndRender);
+    document.getElementById("psFilter").addEventListener("change", applyFiltersAndRender);
+    document.getElementById("pbFilter").addEventListener("change", applyFiltersAndRender);
+    document.getElementById("pfcfFilter").addEventListener("change", applyFiltersAndRender);
+    document.getElementById("deFilter").addEventListener("change", applyFiltersAndRender);
+    document.getElementById("daFilter").addEventListener("change", applyFiltersAndRender);
+
+
+    // 排序事件
+    document.querySelectorAll("th[data-sort]").forEach(th => {
+      th.addEventListener("click", () => {
+        const key = th.dataset.sort;
+        if (sortState.key === key) {
+          sortState.dir = sortState.dir === "asc" ? "desc" : "asc";
+        } else {
+          sortState.key = key;
+          sortState.dir = "desc";
+        }
+        applyFiltersAndRender();
+      });
+    });
+
+    loadData();
+  </script>
+</body>
+</html>
