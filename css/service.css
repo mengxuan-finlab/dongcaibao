@@ -39,7 +39,7 @@
 
 /* 服務內容及範例 */
 #service h1{
-  font-size: 100px;  /*字體大小 */
+  font-size: 80px;  /*字體大小 */
   line-height: 1.05;   /* 行高（控制文字上下間距） */
   letter-spacing: 10px;       /* 字距（每個字之間的間隔） */
   font-weight: 800;/* 字體粗細（400是正常，700是粗體，800更粗） */
