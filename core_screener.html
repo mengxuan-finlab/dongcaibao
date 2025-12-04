@@ -11,24 +11,24 @@
 <body>
   <div class="container">
     <h1>懂才抱核心指標選股器</h1>
-    <p class="subtitle">資料來自 core_metrics：市值、ROA、ROE、FCF Yield、現金轉換週期。</p>
+    <p class="subtitle">資料來自 core_metrics：市值、ROA、ROE、FCF 殖利率、現金轉換週期等關鍵財務指標。</p>
 
     <div class="filters">
       <div class="filter-group">
-        <label for="capFilter">市值</label>
+        <label for="capFilter">市值篩選</label>
         <select id="capFilter">
-          <option value="all">全部</option>
-          <option value="mega">超大型 ≥ 300B</option>
-          <option value="large">大型 ≥ 100B</option>
-          <option value="mid">中型 ≥ 10B</option>
-          <option value="small">小型 &lt; 10B</option>
+          <option value="all">全部市值</option>
+          <option value="mega">超大型 ≥ 3000 億美元</option>
+          <option value="large">大型 ≥ 1000 億美元</option>
+          <option value="mid">中型 ≥ 100 億美元</option>
+          <option value="small">小型 &lt; 100 億美元</option>
         </select>
       </div>
 
       <div class="filter-group">
-        <label for="roeFilter">ROE ≥</label>
+        <label for="roeFilter">ROE（股東權益報酬率）≥</label>
         <select id="roeFilter">
-          <option value="0">0%</option>
+          <option value="0">不限</option>
           <option value="10">10%</option>
           <option value="15">15%</option>
           <option value="20">20%</option>
@@ -37,9 +37,9 @@
       </div>
 
       <div class="filter-group">
-        <label for="roicFilter">ROIC ≥</label>
+        <label for="roicFilter">ROIC（投入資本報酬率）≥</label>
         <select id="roicFilter">
-          <option value="0">0%</option>
+          <option value="0">不限</option>
           <option value="0.10">10%</option>
           <option value="0.15">15%</option>
           <option value="0.20">20%</option>
@@ -47,27 +47,25 @@
       </div>
 
       <div class="filter-group">
-        <label for="fcfFilter">FCF Yield ≥</label>
+        <label for="fcfFilter">FCF 殖利率 ≥</label>
         <select id="fcfFilter">
-          <option value="0">0%</option>
+          <option value="0">不限</option>
           <option value="0.02">2%</option>
           <option value="0.04">4%</option>
           <option value="0.06">6%</option>
         </select>
       </div>
 
-      
       <div class="filter-group">
-        <label for="eyFilter">Earnings Yield ≥</label>
+        <label for="eyFilter">盈餘殖利率（Earnings Yield）≥</label>
         <select id="eyFilter">
-          <option value="0">0%</option>
+          <option value="0">不限</option>
           <option value="0.04">4%</option>
           <option value="0.06">6%</option>
           <option value="0.08">8%</option>
         </select>
       </div>
 
-    
       <div class="filter-group">
         <label for="crFilter">流動比率 ≥</label>
         <select id="crFilter">
@@ -79,29 +77,27 @@
       </div>
 
       <div class="filter-group">
-        <label for="ndFilter">Net debt / EBITDA ≤</label>
+        <label for="ndFilter">淨負債 / EBITDA ≤</label>
         <select id="ndFilter">
-          <option value="all">全部</option>
-          <option value="4">4x</option>
-          <option value="3">3x</option>
-          <option value="2">2x</option>
-          <option value="1">1x</option>
+          <option value="all">不限</option>
+          <option value="4">4 倍</option>
+          <option value="3">3 倍</option>
+          <option value="2">2 倍</option>
+          <option value="1">1 倍</option>
         </select>
       </div>
 
-
       <div class="filter-group">
-        <label for="cccFilter">CCC</label>
+        <label for="cccFilter">現金轉換週期（CCC）</label>
         <select id="cccFilter">
-          <option value="all">全部</option>
-          <option value="neg">小於 0（優勢）</option>
+          <option value="all">不限</option>
+          <option value="neg">小於 0（現金週期優勢）</option>
           <option value="pos">大於等於 0</option>
         </select>
       </div>
 
-
       <div class="filter-group">
-        <label for="peFilter">PE ≤</label>
+        <label for="peFilter">本益比（PE）≤</label>
         <select id="peFilter">
           <option value="all">不限</option>
           <option value="40">40</option>
@@ -113,7 +109,7 @@
       </div>
 
       <div class="filter-group">
-        <label for="pegFilter">PEG ≤</label>
+        <label for="pegFilter">本益成長比（PEG）≤</label>
         <select id="pegFilter">
           <option value="all">不限</option>
           <option value="2">2.0</option>
@@ -124,7 +120,7 @@
       </div>
 
       <div class="filter-group">
-        <label for="psFilter">PS ≤</label>
+        <label for="psFilter">股價營收比（P/S）≤</label>
         <select id="psFilter">
           <option value="all">不限</option>
           <option value="10">10</option>
@@ -135,7 +131,7 @@
       </div>
 
       <div class="filter-group">
-        <label for="pbFilter">PB ≤</label>
+        <label for="pbFilter">股價淨值比（P/B）≤</label>
         <select id="pbFilter">
           <option value="all">不限</option>
           <option value="10">10</option>
@@ -146,7 +142,7 @@
       </div>
 
       <div class="filter-group">
-        <label for="pfcfFilter">P/FCF ≤</label>
+        <label for="pfcfFilter">股價 / 自由現金流（P/FCF）≤</label>
         <select id="pfcfFilter">
           <option value="all">不限</option>
           <option value="40">40</option>
@@ -158,7 +154,7 @@
       </div>
 
       <div class="filter-group">
-        <label for="deFilter">Debt/Equity ≤</label>
+        <label for="deFilter">負債 / 股東權益（D/E）≤</label>
         <select id="deFilter">
           <option value="all">不限</option>
           <option value="2">2.0</option>
@@ -169,7 +165,7 @@
       </div>
 
       <div class="filter-group">
-        <label for="daFilter">Debt/Asset ≤</label>
+        <label for="daFilter">負債 / 資產（D/A）≤</label>
         <select id="daFilter">
           <option value="all">不限</option>
           <option value="0.8">0.8</option>
@@ -179,9 +175,9 @@
         </select>
       </div>
 
-            <!-- ★ 股利相關 -->
+      <!-- ★ 股利相關 -->
       <div class="filter-group">
-        <label for="dyFilter">Div Yield ≥</label>
+        <label for="dyFilter">股息殖利率 ≥</label>
         <select id="dyFilter">
           <option value="0">不限</option>
           <option value="0.02">2%</option>
@@ -192,7 +188,7 @@
       </div>
 
       <div class="filter-group">
-        <label for="dpFilter">Payout ≤</label>
+        <label for="dpFilter">配息率（Payout Ratio）≤</label>
         <select id="dpFilter">
           <option value="all">不限</option>
           <option value="0.8">80%</option>
@@ -203,7 +199,7 @@
 
       <!-- ★ 獲利結構 -->
       <div class="filter-group">
-        <label for="gmFilter">Gross% ≥</label>
+        <label for="gmFilter">毛利率（Gross Margin）≥</label>
         <select id="gmFilter">
           <option value="0">不限</option>
           <option value="0.3">30%</option>
@@ -213,7 +209,7 @@
       </div>
 
       <div class="filter-group">
-        <label for="omFilter">Opm% ≥</label>
+        <label for="omFilter">營業利益率（Operating Margin）≥</label>
         <select id="omFilter">
           <option value="0">不限</option>
           <option value="0.1">10%</option>
@@ -223,7 +219,7 @@
       </div>
 
       <div class="filter-group">
-        <label for="evFilter">EV/EBITDA ≤</label>
+        <label for="evFilter">EV / EBITDA ≤</label>
         <select id="evFilter">
           <option value="all">不限</option>
           <option value="20">20</option>
@@ -234,7 +230,7 @@
 
       <!-- ★ 成長率 -->
       <div class="filter-group">
-        <label for="rgFilter">Rev YoY ≥</label>
+        <label for="rgFilter">營收年增率（Rev YoY）≥</label>
         <select id="rgFilter">
           <option value="0">不限</option>
           <option value="0.05">5%</option>
@@ -244,7 +240,7 @@
       </div>
 
       <div class="filter-group">
-        <label for="egFilter">EPS YoY ≥</label>
+        <label for="egFilter">EPS 年增率 ≥</label>
         <select id="egFilter">
           <option value="0">不限</option>
           <option value="0.05">5%</option>
@@ -254,7 +250,7 @@
       </div>
 
       <div class="filter-group">
-        <label for="fgFilter">FCF YoY ≥</label>
+        <label for="fgFilter">FCF 年增率 ≥</label>
         <select id="fgFilter">
           <option value="0">不限</option>
           <option value="0.05">5%</option>
@@ -264,7 +260,7 @@
       </div>
 
       <div class="filter-group">
-        <label for="dgFilter">Div YoY ≥</label>
+        <label for="dgFilter">股息年增率 ≥</label>
         <select id="dgFilter">
           <option value="0">不限</option>
           <option value="0.03">3%</option>
@@ -273,27 +269,28 @@
         </select>
       </div>
 
-
+      <!-- 產業 -->
       <div class="filter-group">
-        <label for="sectorFilter">Sector</label>
+        <label for="sectorFilter">產業（Sector）</label>
         <select id="sectorFilter">
-          <option value="all">全部</option>
-          <option value="Basic Materials">Basic Materials</option>
-          <option value="Communication Services">Communication Services</option>
-          <option value="Consumer Cyclical">Consumer Cyclical</option>
-          <option value="Consumer Defensive">Consumer Defensive</option>
-          <option value="Energy">Energy</option>
-          <option value="Financial Services">Financial Services</option>
-          <option value="Healthcare">Healthcare</option>
-          <option value="Industrials">Industrials</option>
-          <option value="Real Estate">Real Estate</option>
-          <option value="Technology">Technology</option>
-          <option value="Utilities">Utilities</option>
+          <option value="all">全部產業</option>
+          <option value="Basic Materials">基礎原物料（Basic Materials）</option>
+          <option value="Communication Services">通訊服務（Communication Services）</option>
+          <option value="Consumer Cyclical">景氣循環消費（Consumer Cyclical）</option>
+          <option value="Consumer Defensive">防禦性消費（Consumer Defensive）</option>
+          <option value="Energy">能源（Energy）</option>
+          <option value="Financial Services">金融服務（Financial Services）</option>
+          <option value="Healthcare">醫療保健（Healthcare）</option>
+          <option value="Industrials">工業（Industrials）</option>
+          <option value="Real Estate">不動產（Real Estate）</option>
+          <option value="Technology">科技（Technology）</option>
+          <option value="Utilities">公用事業（Utilities）</option>
         </select>
       </div>
 
+      <!-- Beta -->
       <div class="filter-group">
-        <label for="betaFilter">Beta ≤</label>
+        <label for="betaFilter">β（市場波動）≤</label>
         <select id="betaFilter">
           <option value="all">不限</option>
           <option value="1.5">1.5</option>
@@ -303,15 +300,13 @@
         </select>
       </div>
 
-          <!-- 一鍵策略按鈕列 -->
+      <!-- 一鍵策略按鈕列 -->
       <div class="preset-bar">
-          <button class="preset-btn" data-preset="buffett">Buffett 指標</button>
-          <button class="preset-btn" data-preset="dividend">高股息策略</button>
-          <button class="preset-btn" data-preset="growth">高成長策略</button>
-          <button class="preset-btn" data-preset="value">價值股策略</button>
+        <button class="preset-btn" data-preset="buffett">一鍵套用：巴菲特風格</button>
+        <button class="preset-btn" data-preset="dividend">一鍵套用：高股息策略</button>
+        <button class="preset-btn" data-preset="growth">一鍵套用：高成長策略</button>
+        <button class="preset-btn" data-preset="value">一鍵套用：價值股策略</button>
       </div>
-
-
     </div>
 
     <div class="summary" id="summaryText">載入中...</div>
@@ -319,35 +314,35 @@
     <table>
       <thead>
         <tr>
-          <th data-sort="symbol">Symbol</th>
+          <th data-sort="symbol">股票代號</th>
           <th data-sort="market_cap">市值</th>
-          <th data-sort="sector">Sector</th>
-          <th data-sort="beta">Beta</th>
-          <th data-sort="roa">ROA</th>
-          <th data-sort="roe">ROE</th>
-          <th data-sort="roic">ROIC</th>
-          <th data-sort="fcf_yield">FCF Yield</th>
-          <th data-sort="earnings_yield">Earnings Yield</th>
+          <th data-sort="sector">產業</th>
+          <th data-sort="beta">β</th>
+          <th data-sort="roa">ROA（資產報酬率）</th>
+          <th data-sort="roe">ROE（股東權益報酬率）</th>
+          <th data-sort="roic">ROIC（投入資本報酬率）</th>
+          <th data-sort="fcf_yield">FCF 殖利率</th>
+          <th data-sort="earnings_yield">盈餘殖利率</th>
           <th data-sort="current_ratio">流動比率</th>
-          <th data-sort="net_debt_to_ebitda">Net debt/EBITDA</th>
-          <th data-sort="ccc">CCC</th>
-          <th data-sort="pe">PE</th>
-          <th data-sort="peg">PEG</th>
-          <th data-sort="ps">PS</th>
-          <th data-sort="pb">PB</th>
-          <th data-sort="p_fcf">P/FCF</th>
-          <th data-sort="debt_to_equity">Debt/Equity</th>
-          <th data-sort="debt_to_asset">Debt/Asset</th>
-          <th data-sort="dividendyield">Div Yield</th>          
-          <th data-sort="dividendpershare">Div / Share</th>    
-          <th data-sort="dividendpayoutratio">Payout%</th>     
-          <th data-sort="grossmargin">Gross%</th>      
-          <th data-sort="operatingmargin">Opm%</th>         
-          <th data-sort="evtoebitda">EV/EBITDA</th>         
-          <th data-sort="revenue_growth">Rev YoY%</th>        
-          <th data-sort="eps_growth">EPS YoY%</th>            
-          <th data-sort="fcf_growth">FCF YoY%</th>            
-          <th data-sort="dividend_growth">Div YoY%</th>        
+          <th data-sort="net_debt_to_ebitda">淨負債 / EBITDA</th>
+          <th data-sort="ccc">現金轉換週期（CCC）</th>
+          <th data-sort="pe">本益比（PE）</th>
+          <th data-sort="peg">本益成長比（PEG）</th>
+          <th data-sort="ps">股價營收比（P/S）</th>
+          <th data-sort="pb">股價淨值比（P/B）</th>
+          <th data-sort="p_fcf">股價 / FCF</th>
+          <th data-sort="debt_to_equity">負債 / 股東權益</th>
+          <th data-sort="debt_to_asset">負債 / 資產</th>
+          <th data-sort="dividendyield">股息殖利率</th>
+          <th data-sort="dividendpershare">每股股息</th>
+          <th data-sort="dividendpayoutratio">配息率</th>
+          <th data-sort="grossmargin">毛利率</th>
+          <th data-sort="operatingmargin">營業利益率</th>
+          <th data-sort="evtoebitda">EV / EBITDA</th>
+          <th data-sort="revenue_growth">營收年增率</th>
+          <th data-sort="eps_growth">EPS 年增率</th>
+          <th data-sort="fcf_growth">FCF 年增率</th>
+          <th data-sort="dividend_growth">股息年增率</th>
         </tr>
       </thead>
       <tbody id="tableBody"></tbody>
@@ -366,9 +361,9 @@
 
   function formatCap(x) {
     if (x == null) return "-";
-    if (x >= 1e12) return (x / 1e12).toFixed(2) + " T";
-    if (x >= 1e9)  return (x / 1e9 ).toFixed(2) + " B";
-    if (x >= 1e6)  return (x / 1e6 ).toFixed(2) + " M";
+    if (x >= 1e12) return (x / 1e12).toFixed(2) + " 兆";
+    if (x >= 1e9)  return (x / 1e9 ).toFixed(2) + " 億";
+    if (x >= 1e6)  return (x / 1e6 ).toFixed(2) + " 百萬";
     return x.toLocaleString();
   }
   function pct(x) {
@@ -415,43 +410,43 @@
     setSelect("betaFilter",  "all");
 
     if (name === "buffett") {
-      // Buffett 指標
+      // 巴菲特風格（高品質＋穩健）
       setSelect("roeFilter",  "15");    // ROE ≥ 15%
       setSelect("roicFilter", "0.10");  // ROIC ≥ 10%
-      setSelect("fcfFilter",  "0.04");  // FCF Yield ≥ 4%
-      setSelect("eyFilter",   "0.06");  // Earnings Yield ≥ 6%
-      setSelect("gmFilter",   "0.4");   // Gross ≥ 40%
-      setSelect("omFilter",   "0.1");   // Opm ≥ 10%
-      setSelect("dpFilter",   "0.6");   // Payout ≤ 60%
+      setSelect("fcfFilter",  "0.04");  // FCF 殖利率 ≥ 4%
+      setSelect("eyFilter",   "0.06");  // 盈餘殖利率 ≥ 6%
+      setSelect("gmFilter",   "0.4");   // 毛利率 ≥ 40%
+      setSelect("omFilter",   "0.1");   // 營業利益率 ≥ 10%
+      setSelect("dpFilter",   "0.6");   // 配息率 ≤ 60%
       setSelect("deFilter",   "0.5");   // D/E ≤ 0.5
-      setSelect("betaFilter", "1.0");   // Beta ≤ 1
+      setSelect("betaFilter", "1.0");   // β ≤ 1
     }
 
     if (name === "dividend") {
       // 高股息策略
-      setSelect("dyFilter",   "0.04");  // Div Yield ≥ 4%
-      setSelect("dpFilter",   "0.8");   // Payout ≤ 80%
+      setSelect("dyFilter",   "0.04");  // 股息殖利率 ≥ 4%
+      setSelect("dpFilter",   "0.8");   // 配息率 ≤ 80%
       setSelect("deFilter",   "1");     // D/E ≤ 1
-      setSelect("betaFilter", "1.0");   // Beta ≤ 1
-      setSelect("rgFilter",   "0.05");  // Rev YoY ≥ 5%
+      setSelect("betaFilter", "1.0");   // β ≤ 1
+      setSelect("rgFilter",   "0.05");  // 營收年增率 ≥ 5%
     }
 
     if (name === "growth") {
       // 高成長策略
-      setSelect("rgFilter",   "0.15");  // Rev YoY ≥ 15%
-      setSelect("egFilter",   "0.2");   // EPS YoY ≥ 20%
-      setSelect("gmFilter",   "0.5");   // Gross ≥ 50%
-      setSelect("omFilter",   "0.1");   // Opm ≥ 10%
-      setSelect("psFilter",   "10");    // PS ≤ 10
+      setSelect("rgFilter",   "0.15");  // 營收年增率 ≥ 15%
+      setSelect("egFilter",   "0.2");   // EPS 年增率 ≥ 20%
+      setSelect("gmFilter",   "0.5");   // 毛利率 ≥ 50%
+      setSelect("omFilter",   "0.1");   // 營業利益率 ≥ 10%
+      setSelect("psFilter",   "10");    // P/S ≤ 10
     }
 
     if (name === "value") {
       // 價值股策略
-      setSelect("peFilter",   "15");    // PE ≤ 15
-      setSelect("pbFilter",   "2");     // PB ≤ 2
+      setSelect("peFilter",   "15");    // 本益比 ≤ 15
+      setSelect("pbFilter",   "2");     // P/B ≤ 2
       setSelect("pfcfFilter", "15");    // P/FCF ≤ 15
-      setSelect("eyFilter",   "0.08");  // Earnings Yield ≥ 8%
-      setSelect("fcfFilter",  "0.04");  // FCF Yield ≥ 4%
+      setSelect("eyFilter",   "0.08");  // 盈餘殖利率 ≥ 8%
+      setSelect("fcfFilter",  "0.04");  // FCF 殖利率 ≥ 4%
     }
 
     applyFiltersAndRender();
@@ -494,7 +489,7 @@
 
     if (error) {
       console.error(error);
-      document.getElementById("summaryText").textContent = "載入失敗";
+      document.getElementById("summaryText").textContent = "載入失敗，請稍後再試。";
       return;
     }
 
@@ -615,7 +610,7 @@
       if (fgMin > 0 && (r.fcf_growth == null || r.fcf_growth < fgMin)) return false;
       if (dgMin > 0 && (r.dividend_growth == null || r.dividend_growth < dgMin)) return false;
 
-      // Sector
+      // 產業
       if (sectorMode !== "all") {
         if (!r.sector || r.sector !== sectorMode) return false;
       }
@@ -723,7 +718,7 @@
   document.getElementById("sectorFilter").addEventListener("change", applyFiltersAndRender);
   document.getElementById("betaFilter").addEventListener("change", applyFiltersAndRender);
 
-  // 🔹 一鍵策略按鈕事件（記得上面 HTML 要有 .preset-btn）
+  // 一鍵策略按鈕事件
   document.querySelectorAll(".preset-btn").forEach(btn => {
     btn.addEventListener("click", () => {
       const name = btn.dataset.preset;  // buffett / dividend / growth / value
@@ -746,6 +741,6 @@
   });
 
   loadData();
-</script>
+  </script>
 </body>
 </html>
