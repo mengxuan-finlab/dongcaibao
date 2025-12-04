@@ -6,8 +6,8 @@
 
 body {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  background: radial-gradient(circle at top, #020617, #020617 40%, #000 100%);
-  color: #e5e7eb;
+  background:  rgba(3, 15, 22, 0.95);
+  color: #f3f4f5;
   min-height: 100vh;
   padding: 24px 16px 40px;
 }
@@ -41,27 +41,27 @@ h1 {
   display: flex; 
   align-items: center; 
   gap: 6px;
-  background: rgba(15,23,42,0.95);
+  background: rgba(21, 37, 75, 0.95);
   border-radius: 999px;
   padding: 6px 10px;
-  border: 1px solid rgba(148,163,184,0.45);
+  border: 1px solid rgba(127, 140, 158, 0.45);
   font-size: 12px;
 }
 
 .filter-group label { 
-  color: #9ca3af; 
+  color: #ccced4; 
 }
 
 .filter-group select {
   background: transparent; 
   border: none; 
-  color: #e5e7eb;
+  color: #ffffff;
   font-size: 12px; 
   outline: none;
 }
 
 .filter-group option { 
-  color: #0f172a; 
+  color: #495a81; 
 }
 
 .summary { 
@@ -100,7 +100,7 @@ th {
 }
 
 tr:nth-child(odd) { 
-  background: rgba(15,23,42,0.96); 
+  background: rgba(34, 41, 56, 0.96); 
 }
 
 tr:nth-child(even) { 
@@ -117,7 +117,7 @@ tr:hover {
   padding: 2px 7px; 
   border-radius: 999px;
   font-size: 11px;
-  background: rgba(56,189,248,0.14);
+  background: rgba(112, 186, 218, 0.14);
   color: #7dd3fc;
 }
 
@@ -138,9 +138,9 @@ tr:hover {
 }
 
 .preset-btn {
-  border: 1px solid rgba(148,163,184,0.6);
-  background: rgba(15,23,42,0.9);
-  color: #e5e7eb;
+  border: 1px solid rgba(241, 243, 247, 0.6);
+  background: rgba(131, 10, 60, 0.9);
+  color: #ffffff;
   font-size: 12px;
   padding: 6px 10px;
   border-radius: 999px;
@@ -149,7 +149,7 @@ tr:hover {
 }
 
 .preset-btn:hover {
-  background: rgba(37,99,235,0.9);
-  box-shadow: 0 8px 20px rgba(37,99,235,0.35);
+  background: rgba(170, 19, 64, 0.9);
+  box-shadow: 0 8px 20px rgba(138, 14, 121, 0.35);
   transform: translateY(-1px);
 }
