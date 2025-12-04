@@ -129,3 +129,27 @@ tr:hover {
   color: #f97373; 
 }
 
+/* === 一鍵策略按鈕列 === */
+.preset-bar {
+  margin: 8px 0 4px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.preset-btn {
+  border: 1px solid rgba(148,163,184,0.6);
+  background: rgba(15,23,42,0.9);
+  color: #e5e7eb;
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+}
+
+.preset-btn:hover {
+  background: rgba(37,99,235,0.9);
+  box-shadow: 0 8px 20px rgba(37,99,235,0.35);
+  transform: translateY(-1px);
+}
