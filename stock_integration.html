@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>懂才抱</title>
+
+  <meta name="description" content="客製化的股票資訊整合平台">
+  <meta name="keyword" content="股票,財報狗,資訊整合平台">
+  <meta name="author" content="小炫">
+
+  <!-- 背景樣式 -->
+  <link rel="stylesheet" href="css/background_integration.css">
+
+  <!--內文css-->
+  <link rel="stylesheet" href="css/content.css">
+  <!-- 轉換 Markdown → HTML -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+
+<body>
+  <h1>輸入股票代碼</h1>
+
+  <input id="symbolInput" type="text" placeholder="例如：HIMS 或 NVDA" />
+  <button id="fetchBtn">產生公司介紹</button>
+
+  <p id="debug"></p>
+
+  <h2>公司介紹</h2>
+  <div id="result"></div>
+
+  <script>
+  const N8N_WEBHOOK_URL = "https://doncaibao.app.n8n.cloud/webhook/fc4caae3-1805-444c-8710-1f65b59b0399";
+
+  document.getElementById("fetchBtn").addEventListener("click", async () => {
+    const symbol = document.getElementById("symbolInput").value.trim().toUpperCase();
+    const debugEl = document.getElementById("debug");
+    const resultEl = document.getElementById("result");
+
+    if (!symbol) {
+      alert("請輸入股票代碼！");
+      return;
+    }
+
+    debugEl.textContent = "查詢中…（股票代碼：" + symbol + "）";
+    resultEl.innerHTML = "<p>⏳ 正在載入公司介紹…</p>";
+
+    try {
+      const url = `${N8N_WEBHOOK_URL}?symbol=${encodeURIComponent(symbol)}`;
+      console.log("呼叫 n8n URL:", url);
+
+      const res = await fetch(url);
+      console.log("n8n 狀態碼：", res.status);
+
+      if (!res.ok) {
+        throw new Error("n8n 回應錯誤，HTTP 狀態：" + res.status);
+      }
+
+      // 先用 text 拿原始內容，之後再嘗試 JSON.parse
+      const raw = await res.text();
+      console.log("n8n raw 回應：", raw);
+
+      let markdown;
+
+      try {
+        // 如果是 JSON，就解析成物件（例如 { text: "..." }）
+        const data = JSON.parse(raw);
+        markdown = data.text || JSON.stringify(data, null, 2);
+      } catch (e) {
+        // 如果不是 JSON，就當成純 markdown 文字
+        markdown = raw;
+      }
+
+      // 用 marked 把 markdown 轉成 HTML
+      const htmlContent = marked.parse(markdown || "");
+      resultEl.innerHTML = htmlContent;
+      debugEl.textContent = "查詢完成 ✔";
+    } catch (err) {
+      debugEl.textContent = "❌ 發生錯誤：" + err.message;
+      resultEl.innerHTML = "";
+      console.error(err);
+    }
+  });
+</script>
+</body>
+</html>

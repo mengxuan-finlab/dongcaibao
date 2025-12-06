@@ -1,0 +1,83 @@
+/* --- 全域設定 --- */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Microsoft JhengHei', 'PingFang TC', sans-serif;
+  background: linear-gradient(135deg, #9696b1 0%, #8383e0 100%);
+  min-height: 100vh;
+  position: relative;
+  overflow-x: hidden;
+  /* 不特別指定 overflow-y，交給瀏覽器自動算就好 */
+}
+
+/* --- 移動網格線（背景動畫） --- */
+body::before {
+  content: '';
+  position: fixed;     /* 🚩 改成 fixed，貼在視窗上 */
+  inset: 0;            /* 等於 top:0; right:0; bottom:0; left:0; */
+  width: 100%;
+  height: 100%;
+  background-image: 
+      linear-gradient(rgba(9, 237, 245, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 50px 50px;
+  animation: moveGrid 20s linear infinite;
+  pointer-events: none;
+  z-index: -1;         /* 如果需要，讓它永遠在內容後面 */
+}
+
+
+@keyframes moveGrid {
+  0% {
+    transform: translate(0, 0) rotate(-15deg);
+  }
+  100% {
+    transform: translate(50px, 50px) rotate(-15deg);
+  }
+}
+
+/* --- 粒子效果 --- */
+.particle {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: rgba(255, 120, 150, 0.6);
+  border-radius: 50%;
+  animation: float 8s infinite;
+}
+
+/* 粒子位置與延遲 */
+.particle:nth-child(1) { left: 10%; top: 20%; animation-delay: 0s; }
+.particle:nth-child(2) { left: 80%; top: 40%; animation-delay: 2s; }
+.particle:nth-child(3) { left: 30%; top: 60%; animation-delay: 4s; }
+.particle:nth-child(4) { left: 90%; top: 80%; animation-delay: 6s; background: rgba(160, 120, 255, 0.6); }
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0) translateX(0);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-100px) translateX(30px);
+    opacity: 0;
+  }
+}
+html {
+  scroll-behavior: smooth; /* 平滑滾動 */
+  scroll-snap-type: y mandatory; 
+}
+
+section {
+  scroll-snap-align: start; 
+  min-height: 100vh;        /* 確保每頁都是滿版 */
+}

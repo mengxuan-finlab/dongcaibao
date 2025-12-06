@@ -1,0 +1,31 @@
+body {
+  font-family: "Microsoft JhengHei", sans-serif;
+  color: white;
+  padding: 20px;
+}
+
+#result h2, #result h3 {
+  margin-top: 20px;
+  color: #ffdaa2;
+}
+
+#result p, #result li {
+  line-height: 1.7;
+  font-size: 17px;
+}
+
+#result ul {
+  padding-left: 20px;
+}
+
+input {
+  padding: 8px;
+  font-size: 18px;
+}
+
+button {
+  padding: 8px 15px;
+  font-size: 16px;
+  cursor: pointer;
+  margin-left: 5px;
+}
