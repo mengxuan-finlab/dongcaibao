@@ -20,6 +20,8 @@
   <link rel="stylesheet" href="css/differ.css">
   <!--第五頁樣式-->
   <link rel="stylesheet" href="css/fee.css">
+  <!-- Supabase JS v2（一定要放） -->
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 </head>
 <body>
   <!-- 🌌 粒子效果 -->
@@ -30,31 +32,64 @@
 
   <header class="top-logo">
     <div class="logo-text">懂才抱</div>
-  </header>
-  <!-- 首頁內容 -->
-<section id="home">
-  <div class="container">
-    <div class="subtitle">從選股到賣出的股票資訊整合平台</div>
-      <div class="content">
-      <p class="lead">
-      懂才抱從選股、公司資訊整合，到財報追蹤與新聞監控一次包辦，打造屬於你的全方位股票研究流程
-      </p>
 
-      <!-- 兩個主要行動按鈕 -->
-      <div class="hero-actions">
-        <a href="#select" class="btn primary">選出屬於你的優質公司</a>
-        <a href="#integration" class="btn secondary">查看公司及產業報告</a>
-        <a href="#service" class="btn primary">三大財報自動追蹤</a>
-        <a href="#news" class="btn secondary">客製化新聞追蹤</a>
-      </div>
+    <!-- 🔐 右上角登入 / 註冊區塊 -->
+    <div class="auth-area" id="auth-area">
+      <!-- 未登入狀態下顯示 -->
+      <button class="auth-btn" id="open-auth-panel">登入 / 註冊</button>
+
+      <!-- 登入後狀態下顯示（JS 動態塞內容） -->
+      <div class="auth-user" id="auth-user" style="display:none;"></div>
+      <button class="auth-btn" id="logout-btn" style="display:none;">登出</button>
     </div>
+  </header>
 
-    <!-- 向下箭頭 -->
-    <button class="cta-button" onclick="scrollDown()">
-      <svg viewBox="0 0 24 24">
-        <path d="M7 10l5 5 5-5z" />
-      </svg>
-    </button>
+  <!-- ✨ 登入 / 註冊小面板 -->
+  <div class="auth-panel" id="auth-panel">
+    <h3>登入 / 註冊</h3>
+    <div class="field">
+      <label for="auth-email">Email</label>
+      <input type="email" id="auth-email" placeholder="你的 Email" />
+    </div>
+    <div class="field">
+      <label for="auth-password">密碼</label>
+      <input type="password" id="auth-password" placeholder="至少 6 碼" />
+    </div>
+    <div class="panel-actions">
+      <button class="btn-login" id="do-login">登入</button>
+      <button class="btn-signup" id="do-signup">註冊</button>
+    </div>
+    <div class="hint">註冊成功後會自動建立你的帳號資料（預設方案：free）。</div>
+    <div class="error" id="auth-error" style="display:none;"></div>
   </div>
-</section>
-</body>  
+
+  <!-- 首頁內容 -->
+  <section id="home">
+    <div class="container">
+      <div class="subtitle">從選股到賣出的股票資訊整合平台</div>
+      <div class="content">
+        <p class="lead">
+          懂才抱從選股、公司資訊整合，到財報追蹤與新聞監控一次包辦，打造屬於你的全方位股票研究流程
+        </p>
+
+        <!-- 兩個主要行動按鈕 -->
+        <div class="hero-actions">
+          <a href="#select" class="btn primary">選出屬於你的優質公司</a>
+          <a href="#integration" class="btn secondary">查看公司及產業報告</a>
+          <a href="#service" class="btn primary">三大財報自動追蹤</a>
+          <a href="#news" class="btn secondary">客製化新聞追蹤</a>
+        </div>
+      </div>
+
+      <!-- 向下箭頭 -->
+      <button class="cta-button" onclick="scrollDown()">
+        <svg viewBox="0 0 24 24">
+          <path d="M7 10l5 5 5-5z" />
+        </svg>
+      </button>
+    </div>
+  </section>
+
+  <script src="js/auth.js"></script>
+</body>
+</html>

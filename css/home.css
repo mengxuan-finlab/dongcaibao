@@ -120,3 +120,202 @@
   -webkit-background-clip: text;    /* WebKit 語法 */
   -webkit-text-fill-color: transparent;
 }
+
+
+/*登入按鈕*/
+
+  /* 讓上方 logo + 登入區塊變成一條水平列，固定在畫面最上方 */
+  header.top-logo {
+    position: fixed;      /* 固定在視窗頂部 */
+    top: 0;
+    left: 0;
+    width: 100%;
+    padding: 16px 40px;   /* 左右邊界可依喜好調整 */
+    display: flex;
+    justify-content: space-between; /* 左右兩邊拉開：左 logo、右登入 */
+    align-items: center;            /* 垂直置中 */
+    z-index: 100;                   /* 蓋在最上層，避免被其他區塊遮住 */
+    background: linear-gradient(
+      to bottom,
+      rgba(10, 16, 40, 0.9),
+      transparent
+    ); /* 上方做一點漸層，不會突兀 */
+  }
+
+  .logo-text {
+    font-size: 20px;
+    font-weight: 700;
+    color: #ffffff;
+  }
+
+  /* 右上登入區塊：水平排版 */
+  .auth-area {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+  }
+
+  .auth-btn {
+    padding: 6px 14px;
+    border-radius: 9999px;
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    background: transparent;
+    color: #ffffff;
+    cursor: pointer;
+    font-size: 13px;
+    backdrop-filter: blur(4px);
+  }
+
+  .auth-btn.primary {
+    background: #4f46e5;
+    border-color: #4f46e5;
+  }
+
+  .auth-user {
+    color: #e5e7eb;
+    font-size: 13px;
+  }
+
+  /* 登入小面板的位置：對齊右上角 header */
+  /* 右上登入卡片整體樣式 */
+.auth-panel {
+  position: fixed;
+  top: 80px;
+  right: 40px;
+  width: 320px;
+  background: rgba(15, 23, 42, 0.96); /* 深藍半透明，搭配背景 */
+  border-radius: 18px;
+  padding: 18px 18px 14px;
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.65);
+  z-index: 120;
+  display: none;
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+}
+
+.auth-panel.show {
+  display: block;
+}
+
+.auth-panel h3 {
+  margin: 0 0 10px;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: #e5e7eb;
+}
+
+/* 表單欄位區 */
+.auth-panel .field {
+  margin-bottom: 10px;
+}
+
+.auth-panel label {
+  display: block;
+  font-size: 12px;
+  margin-bottom: 4px;
+  color: #9ca3af;
+}
+
+.auth-panel input {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 9999px;
+  border: 1px solid #4b5563;
+  background: #020617;
+  color: #f9fafb;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.auth-panel input::placeholder {
+  color: #6b7280;
+}
+
+.auth-panel input:focus {
+  border-color: #a855f7;
+  box-shadow: 0 0 0 1px rgba(168, 85, 247, 0.5);
+}
+
+/* 登入 / 註冊按鈕列 */
+.auth-panel .panel-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.auth-panel button {
+  flex: 1;
+  padding: 8px 0;
+  border-radius: 9999px;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* 左邊：登入（深色主按鈕） */
+.auth-panel .btn-login {
+  background: linear-gradient(135deg, #6366f1, #a855f7);
+  color: #f9fafb;
+  box-shadow: 0 10px 25px rgba(99, 102, 241, 0.35);
+}
+
+/* 右邊：註冊（外框次要按鈕） */
+.auth-panel .btn-signup {
+  background: transparent;
+  color: #e5e7eb;
+  border: 1px solid rgba(148, 163, 184, 0.8);
+}
+
+/* 提示 / 錯誤訊息 */
+.auth-panel .hint {
+  margin-top: 8px;
+  font-size: 11px;
+  color: #9ca3af;
+  line-height: 1.4;
+}
+
+.auth-panel .error {
+  margin-top: 4px;
+  font-size: 11px;
+  color: #fecaca;
+}
+
+/* 右上角的「登入 / 註冊」按鈕也順便調整一下質感 */
+.auth-area {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.auth-btn {
+  padding: 7px 16px;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(15, 23, 42, 0.7);
+  color: #f9fafb;
+  cursor: pointer;
+  font-size: 13px;
+  backdrop-filter: blur(6px);
+  font-weight: 500;
+}
+
+.auth-btn:hover {
+  border-color: #a855f7;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.55);
+}
+
+.auth-user {
+  color: #e5e7eb;
+  font-size: 13px;
+}
+
+
+  /* 讓首頁內容往下推，不會被固定 header 蓋住 */
+  #home {
+    padding-top: 120px;  /* 視覺上看起來舒服即可，可微調 */
+  }
