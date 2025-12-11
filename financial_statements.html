@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <title>懂才抱｜財報追蹤管理</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <style>
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, "Segoe UI", "Microsoft JhengHei", sans-serif;
+      background: #f3f4f6;
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      min-height: 100vh;
+    }
+    .sidebar {
+      background: #111827;
+      color: #e5e7eb;
+      padding: 24px;
+    }
+    .sidebar h1 {
+      font-size: 20px;
+      margin-bottom: 16px;
+    }
+    .sidebar .plan {
+      font-size: 14px;
+      margin-bottom: 16px;
+    }
+    .sidebar label {
+      font-size: 14px;
+      display: block;
+      margin: 12px 0 4px;
+    }
+    .sidebar input {
+      width: 100%;
+      padding: 8px;
+      border-radius: 6px;
+      border: 1px solid #374151;
+      background: #111827;
+      color: #f9fafb;
+    }
+    .sidebar button {
+      margin-top: 8px;
+      padding: 8px 12px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      background: #4f46e5;
+      color: #f9fafb;
+      font-size: 14px;
+    }
+    .sidebar button:disabled {
+      background: #6b7280;
+      cursor: not-allowed;
+    }
+    .stock-list {
+      margin-top: 16px;
+      font-size: 14px;
+    }
+    .stock-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 0;
+      border-bottom: 1px solid #1f2937;
+    }
+    .stock-item button {
+      padding: 2px 8px;
+      font-size: 12px;
+      background: #b91c1c;
+    }
+
+    .content {
+      padding: 16px;
+      overflow-y: auto;
+    }
+    .dashboards {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+    }
+    .dash-card {
+      background: #ffffff;
+      border-radius: 12px;
+      border: 1px solid #e5e7eb;
+      padding: 8px;
+      height: 600px; /* 根據你那頁高度微調 */
+      box-shadow: 0 4px 12px rgba(15,23,42,0.06);
+    }
+    .dash-card h2 {
+      font-size: 16px;
+      margin: 4px 8px 4px;
+    }
+    .dash-card iframe {
+      width: 100%;
+      height: calc(100% - 30px);
+      border: none;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+<div class="layout">
+  <!-- 左邊：輸入追蹤股票 -->
+  <aside class="sidebar">
+    <h1>財報追蹤管理</h1>
+    <div class="plan">
+      目前方案：<span id="planName">載入中...</span><br>
+      可追蹤檔數上限：<span id="planLimit">-</span> 檔
+    </div>
+
+    <label for="symbolInput">新增追蹤股票（美股代號，例如 HIMS、AAPL）</label>
+    <input id="symbolInput" placeholder="輸入股票代號（英文）" />
+    <button id="addBtn">新增追蹤</button>
+    <div style="font-size:12px; margin-top:4px; color:#9ca3af;">Free: 1 檔、Plus: 3 檔、Pro: 5 檔</div>
+
+    <div class="stock-list" id="stockList"></div>
+  </aside>
+
+  <!-- 右邊：顯示追蹤的財報 HTML（用 iframe 引入你那頁） -->
+  <main class="content">
+    <div class="dashboards" id="dashboards"></div>
+  </main>
+</div>
+
+<script>
+  // ------- 1. 初始化 Supabase -------
+  const supabaseUrl = "https://zlkexplsleznuebighte.supabase.co";
+  const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpsa2V4cGxzbGV6bnVlYmlnaHRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0MzAwNjUsImV4cCI6MjA4MTAwNjA2NX0.HPVn3jcN88M4U3-RCVW-YO-b65rDOKv6pxEaVWwbm68";
+  const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+  const planLimitMap = {
+    free: 1,
+    plus: 3,
+    pro: 5
+  };
+
+  let currentUser = null;
+  let currentPlan = "free";
+  let currentLimit = 1;
+  let tracked = []; // { id, symbol }
+
+  // ------- 2. 取得登入狀態 + 會員方案 -------
+  async function init() {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      alert("請先登入後再使用財報追蹤功能");
+      window.location.href = "login.html"; // 你的登入頁
+      return;
+    }
+    currentUser = session.user;
+
+    // 抓 profile 的 plan
+    const { data: profile, error } = await supabase
+      .from("profiles")
+      .select("plan")
+      .eq("id", currentUser.id)
+      .single();
+
+    if (error) {
+      console.error("讀取 profile 失敗：", error);
+      alert("無法載入會員方案設定");
+      return;
+    }
+
+    currentPlan = profile.plan || "free";
+    currentLimit = planLimitMap[currentPlan] || 1;
+
+    document.getElementById("planName").textContent = currentPlan.toUpperCase();
+    document.getElementById("planLimit").textContent = currentLimit;
+
+    await loadTrackedStocks();
+  }
+
+  // ------- 3. 載入目前追蹤清單 -------
+  async function loadTrackedStocks() {
+    const { data, error } = await supabase
+      .from("tracked_stocks")
+      .select("id, symbol")
+      .eq("user_id", currentUser.id)
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      console.error("讀取追蹤股票失敗：", error);
+      return;
+    }
+
+    tracked = data || [];
+    renderStockList();
+    renderDashboards();
+    updateAddButtonState();
+  }
+
+  function renderStockList() {
+    const listEl = document.getElementById("stockList");
+    if (tracked.length === 0) {
+      listEl.innerHTML = "<div>尚未追蹤任何股票</div>";
+      return;
+    }
+    listEl.innerHTML = tracked
+      .map(s => `
+        <div class="stock-item">
+          <span>${s.symbol}</span>
+          <button onclick="removeStock(${s.id})">移除</button>
+        </div>
+      `)
+      .join("");
+  }
+
+  // 右邊：產生 iframe，載入 financial_dashboard.html?symbol=XXX
+  function renderDashboards() {
+    const container = document.getElementById("dashboards");
+    container.innerHTML = tracked
+      .map(s => `
+        <div class="dash-card">
+          <h2>${s.symbol} 財報分析</h2>
+          <iframe src="financial_dashboard.html?symbol=${encodeURIComponent(s.symbol)}"></iframe>
+        </div>
+      `)
+      .join("");
+  }
+
+  function updateAddButtonState() {
+    const addBtn = document.getElementById("addBtn");
+    if (tracked.length >= currentLimit) {
+      addBtn.disabled = true;
+      addBtn.textContent = "已達方案上限";
+    } else {
+      addBtn.disabled = false;
+      addBtn.textContent = "新增追蹤";
+    }
+  }
+
+  // ------- 4. 新增追蹤股票 -------
+  async function addStock() {
+    const input = document.getElementById("symbolInput");
+    const symbolRaw = input.value.trim().toUpperCase();
+    if (!symbolRaw) return;
+
+    if (tracked.length >= currentLimit) {
+      alert(`目前方案 (${currentPlan}) 最多只能追蹤 ${currentLimit} 檔，請先移除或升級方案。`);
+      return;
+    }
+
+    // 防呆：避免重複
+    if (tracked.some(s => s.symbol === symbolRaw)) {
+      alert("這檔股票已經在追蹤清單中");
+      return;
+    }
+
+    const { error } = await supabase
+      .from("tracked_stocks")
+      .insert({
+        user_id: currentUser.id,
+        symbol: symbolRaw
+      });
+
+    if (error) {
+      console.error("新增追蹤失敗：", error);
+      alert("新增追蹤失敗");
+      return;
+    }
+
+    input.value = "";
+    await loadTrackedStocks();
+  }
+
+  // ------- 5. 移除追蹤 -------
+  async function removeStock(id) {
+    const { error } = await supabase
+      .from("tracked_stocks")
+      .delete()
+      .eq("id", id)
+      .eq("user_id", currentUser.id);
+
+    if (error) {
+      console.error("移除追蹤失敗：", error);
+      alert("移除失敗");
+      return;
+    }
+
+    await loadTrackedStocks();
+  }
+
+  // 綁定事件
+  document.getElementById("addBtn").addEventListener("click", addStock);
+
+  // 初始化
+  init();
+</script>
+</body>
+</html>
