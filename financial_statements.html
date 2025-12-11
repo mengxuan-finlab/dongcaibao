@@ -260,9 +260,10 @@
 
     if (error) {
       console.error("新增追蹤失敗：", error);
-      alert("新增追蹤失敗");
+      alert("新增追蹤失敗：" + error.message);  // 直接顯示錯誤內容
       return;
     }
+
 
     input.value = "";
     await loadTrackedStocks();
