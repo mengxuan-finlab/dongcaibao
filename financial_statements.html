@@ -67,6 +67,14 @@
       padding: 6px 0;
       border-bottom: 1px solid #1f2937;
     }
+    .stock-item .status-tag {
+      font-size: 11px;
+      padding: 2px 6px;
+      border-radius: 999px;
+      margin-left: 6px;
+      background: #374151;
+      color: #d1d5db;
+    }
     .stock-item button {
       padding: 2px 8px;
       font-size: 12px;
@@ -103,6 +111,10 @@
       color: #3730a3;
       margin-bottom: 8px;
     }
+    .dash-card .status.ready {
+      background: #dcfce7;
+      color: #166534;
+    }
     .dash-card p {
       font-size: 14px;
       line-height: 1.7;
@@ -113,6 +125,13 @@
       font-size: 12px;
       color: #9ca3af;
       margin-top: 6px;
+    }
+    .dash-card iframe {
+      width: 100%;
+      height: 480px;
+      border: none;
+      border-radius: 8px;
+      margin-top: 12px;
     }
   </style>
 </head>
@@ -134,7 +153,7 @@
     <div class="stock-list" id="stockList"></div>
   </aside>
 
-  <!-- 右邊：顯示追蹤清單（目前先顯示「兩天內整理」的提示） -->
+  <!-- 右邊：顯示追蹤清單（依 status 決定顯示內容） -->
   <main class="content">
     <div class="dashboards" id="dashboards"></div>
   </main>
@@ -155,7 +174,8 @@
   let currentUser = null;
   let currentPlan = "free";
   let currentLimit = 1;
-  let tracked = []; // { id, symbol }
+  // tracked: { id, symbol, status, report_url }
+  let tracked = [];
 
   // ------- 2. 取得登入狀態 + 會員方案 -------
   async function init() {
@@ -193,7 +213,7 @@
   async function loadTrackedStocks() {
     const { data, error } = await supabase
       .from("tracked_stocks")
-      .select("id, symbol")
+      .select("id, symbol, status, report_url")
       .eq("user_id", currentUser.id)
       .order("created_at", { ascending: true });
 
@@ -215,18 +235,26 @@
       return;
     }
     listEl.innerHTML = tracked
-      .map(s => `
-        <div class="stock-item">
-          <span>${s.symbol}</span>
-          <button onclick="removeStock(${s.id})">移除</button>
-        </div>
-      `)
+      .map(s => {
+        const statusText =
+          s.status === "ready" ? "已完成" :
+          s.status === "pending" || !s.status ? "準備中" :
+          s.status;
+
+        return `
+          <div class="stock-item">
+            <span>
+              ${s.symbol}
+              <span class="status-tag">${statusText}</span>
+            </span>
+            <button onclick="removeStock(${s.id})">移除</button>
+          </div>
+        `;
+      })
       .join("");
   }
 
-  // ------- 3-1. 右邊內容：暫時只顯示「兩天內整理完成」 -------
-  // 未來如果你有真正的 financial_dashboard.html?symbol=...，
-  // 可以在這裡改成依 status 顯示 iframe。
+  // ------- 3-1. 右邊內容：依 status 顯示 -------
   function renderDashboards() {
     const container = document.getElementById("dashboards");
 
@@ -236,16 +264,55 @@
     }
 
     container.innerHTML = tracked
-      .map(s => `
-        <div class="dash-card">
-          <h2>${s.symbol} 財報分析</h2>
-          <div class="status">處理中 · 預計 2 天內完成</div>
-          <p>
-            我們已收到你對 <strong>${s.symbol}</strong> 的財報追蹤申請。
-            系統將在背景自動整理最新財報數據與圖表，完成後會在此處更新完整分析頁面。
-          </p>
-        </div>
-      `)
+      .map(s => {
+        let statusClass = "status";
+        let statusLabel = "";
+        let bodyHtml = "";
+
+        if (s.status === "ready" && s.report_url) {
+          // 報告已完成：顯示 iframe
+          statusClass += " ready";
+          statusLabel = "已完成 · 報告已上線";
+
+          bodyHtml = `
+            <p>
+              <strong>${s.symbol}</strong> 的財報整理已完成，下方為為你準備的最新圖表與說明。
+            </p>
+            <div class="hint">
+              若畫面沒有顯示，請確認瀏覽器是否允許載入此報表網址。
+            </div>
+            <iframe src="${s.report_url}"></iframe>
+          `;
+        } else if (s.status === "pending" || !s.status) {
+          // 剛新增 / 你還沒處理：顯示等待訊息
+          statusLabel = "處理中 · 預計 2 天內完成";
+          bodyHtml = `
+            <p>
+              我們已收到你對 <strong>${s.symbol}</strong> 的財報追蹤申請。
+              系統會在背景整理最新財報數據與圖表，預計於 <strong>2 天內</strong> 完成並更新在此區域。
+            </p>
+            <p class="hint">
+              完成後，這裡會自動顯示完整的財報分析頁面，包含損益表、資產負債表、現金流量與估值指標。
+            </p>
+          `;
+        } else {
+          // 其他狀態（防呆）
+          statusLabel = `狀態：${s.status}`;
+          bodyHtml = `
+            <p>
+              這檔股票的財報內容尚在準備中，完成後會自動顯示在這裡。
+            </p>
+          `;
+        }
+
+        return `
+          <div class="dash-card">
+            <h2>${s.symbol} 財報分析</h2>
+            <div class="${statusClass}">${statusLabel}</div>
+            ${bodyHtml}
+          </div>
+        `;
+      })
       .join("");
   }
 
@@ -281,8 +348,9 @@
       .from("tracked_stocks")
       .insert({
         user_id: currentUser.id,
-        symbol: symbolRaw
-        // 之後如果要做「狀態」，可以加：status: 'pending'
+        symbol: symbolRaw,
+        status: "pending"      // 一律先設為「準備中」
+        // report_url 先留空，等你準備好再從後台填
       });
 
     if (error) {
