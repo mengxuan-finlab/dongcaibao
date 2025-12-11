@@ -86,19 +86,33 @@
       background: #ffffff;
       border-radius: 12px;
       border: 1px solid #e5e7eb;
-      padding: 8px;
-      height: 600px; /* 根據你那頁高度微調 */
+      padding: 16px;
       box-shadow: 0 4px 12px rgba(15,23,42,0.06);
     }
     .dash-card h2 {
       font-size: 16px;
-      margin: 4px 8px 4px;
+      margin: 0 0 8px;
     }
-    .dash-card iframe {
-      width: 100%;
-      height: calc(100% - 30px);
-      border: none;
-      border-radius: 8px;
+    .dash-card .status {
+      display: inline-flex;
+      align-items: center;
+      font-size: 12px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: #eef2ff;
+      color: #3730a3;
+      margin-bottom: 8px;
+    }
+    .dash-card p {
+      font-size: 14px;
+      line-height: 1.7;
+      margin: 4px 0;
+      color: #4b5563;
+    }
+    .dash-card .hint {
+      font-size: 12px;
+      color: #9ca3af;
+      margin-top: 6px;
     }
   </style>
 </head>
@@ -120,7 +134,7 @@
     <div class="stock-list" id="stockList"></div>
   </aside>
 
-  <!-- 右邊：顯示追蹤的財報 HTML（用 iframe 引入你那頁） -->
+  <!-- 右邊：顯示追蹤清單（目前先顯示「兩天內整理」的提示） -->
   <main class="content">
     <div class="dashboards" id="dashboards"></div>
   </main>
@@ -210,14 +224,26 @@
       .join("");
   }
 
-  // 右邊：產生 iframe，載入 financial_dashboard.html?symbol=XXX
+  // ------- 3-1. 右邊內容：暫時只顯示「兩天內整理完成」 -------
+  // 未來如果你有真正的 financial_dashboard.html?symbol=...，
+  // 可以在這裡改成依 status 顯示 iframe。
   function renderDashboards() {
     const container = document.getElementById("dashboards");
+
+    if (tracked.length === 0) {
+      container.innerHTML = "";
+      return;
+    }
+
     container.innerHTML = tracked
       .map(s => `
         <div class="dash-card">
           <h2>${s.symbol} 財報分析</h2>
-          <iframe src="financial_dashboard.html?symbol=${encodeURIComponent(s.symbol)}"></iframe>
+          <div class="status">處理中 · 預計 2 天內完成</div>
+          <p>
+            我們已收到你對 <strong>${s.symbol}</strong> 的財報追蹤申請。
+            系統將在背景自動整理最新財報數據與圖表，完成後會在此處更新完整分析頁面。
+          </p>
         </div>
       `)
       .join("");
@@ -256,14 +282,14 @@
       .insert({
         user_id: currentUser.id,
         symbol: symbolRaw
+        // 之後如果要做「狀態」，可以加：status: 'pending'
       });
 
     if (error) {
       console.error("新增追蹤失敗：", error);
-      alert("新增追蹤失敗：" + error.message);  // 直接顯示錯誤內容
+      alert("新增追蹤失敗：" + error.message);
       return;
     }
-
 
     input.value = "";
     await loadTrackedStocks();
