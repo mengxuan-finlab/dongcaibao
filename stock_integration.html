@@ -16,6 +16,76 @@
   <link rel="stylesheet" href="css/content.css">
   <!-- 轉換 Markdown → HTML -->
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+  <!-- ★ 新增：Supabase JS SDK v2 -->
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+
+  <!-- ★ 新增：簡單 modal 樣式 -->
+  <style>
+    /* ★ 新增：使用次數資訊區塊 */
+    #usageInfo {
+      margin-top: 8px;
+      font-size: 14px;
+      color: #4b5563;
+    }
+
+    /* ★ 新增：Modal 外層容器 */
+    .dc-modal {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+    }
+    .dc-modal.show {
+      display: flex;
+    }
+    .dc-modal-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.5);
+    }
+    .dc-modal-content {
+      position: relative;
+      background: #ffffff;
+      border-radius: 16px;
+      padding: 24px 20px;
+      max-width: 360px;
+      width: 90%;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.18);
+      z-index: 1;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft JhengHei", sans-serif;
+    }
+    .dc-modal-content h3 {
+      margin: 0 0 8px;
+      font-size: 18px;
+      font-weight: 700;
+      color: #111827;
+    }
+    .dc-modal-content p {
+      margin: 0 0 16px;
+      font-size: 14px;
+      color: #4b5563;
+      line-height: 1.6;
+      white-space: pre-line;
+    }
+    .dc-modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+    .dc-btn-primary {
+      border: none;
+      border-radius: 999px;
+      padding: 8px 16px;
+      font-size: 14px;
+      cursor: pointer;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      color: #ffffff;
+      font-weight: 600;
+    }
+  </style>
 </head>
 
 <body>
@@ -24,18 +94,194 @@
   <input id="symbolInput" type="text" placeholder="例如：HIMS 或 NVDA" />
   <button id="fetchBtn">產生公司介紹</button>
 
+  <!-- ★ 新增：顯示本週使用次數 / 方案 -->
+  <p id="usageInfo"></p>
+
   <p id="debug"></p>
 
   <h2>公司介紹</h2>
   <div id="result"></div>
 
+  <!-- ★ 新增：Modal 結構 -->
+  <div id="planModal" class="dc-modal">
+    <div class="dc-modal-backdrop" id="planModalBackdrop"></div>
+    <div class="dc-modal-content">
+      <h3>已達本週使用上限</h3>
+      <p id="planModalMessage"></p>
+      <div class="dc-modal-actions">
+        <button id="planModalClose" class="dc-btn-primary">知道了</button>
+      </div>
+    </div>
+  </div>
+
   <script>
   const N8N_WEBHOOK_URL = "https://doncaibao.app.n8n.cloud/webhook/fc4caae3-1805-444c-8710-1f65b59b0399";
 
+  // ============================
+  // ★ 新增：Supabase 初始化與方案限制
+  // ============================
+
+  const supabaseUrl = "https://zlkexplsleznuebighte.supabase.co";
+  const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpsa2V4cGxzbGV6bnVlYmlnaHRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0MzAwNjUsImV4cCI6MjA4MTAwNjA2NX0.HPVn3jcN88M4U3-RCVW-YO-b65rDOKv6pxEaVWwbm68";
+
+  const supabaseClient = supabase.createClient(supabaseUrl, supabaseAnonKey);
+
+  // free：每週 2 次；plus：每週 10 次；pro：無限
+  const PLAN_LIMIT = {
+    free: 2,
+    plus: 10,
+    pro: Infinity
+  };
+
+  // ============================
+  // ★ 新增：Modal 操作函式
+  // ============================
+
+  const planModal = document.getElementById("planModal");
+  const planModalBackdrop = document.getElementById("planModalBackdrop");
+  const planModalClose = document.getElementById("planModalClose");
+  const planModalMessage = document.getElementById("planModalMessage");
+
+  function showPlanModal(message) {
+    planModalMessage.textContent = message;
+    planModal.classList.add("show");
+  }
+
+  function hidePlanModal() {
+    planModal.classList.remove("show");
+  }
+
+  planModalClose.addEventListener("click", hidePlanModal);
+  planModalBackdrop.addEventListener("click", hidePlanModal);
+
+  // ============================
+  // ★ 新增：共用函式（user + plan + 使用次數）
+  // ============================
+
+  async function getCurrentUserPlan() {
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+    if (userError) {
+      console.error("取得使用者失敗：", userError);
+      return { user: null, plan: null };
+    }
+    if (!user) {
+      return { user: null, plan: null };
+    }
+
+    const { data: profile, error: profileError } = await supabaseClient
+      .from("profiles")
+      .select("plan")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (profileError) {
+      console.error("讀取 profile 失敗：", profileError);
+      return { user, plan: "free" };
+    }
+
+    return { user, plan: profile?.plan || "free" };
+  }
+
+  async function getWeeklyUsage(userId) {
+    const startOfWeek = new Date();
+    startOfWeek.setHours(0, 0, 0, 0);
+    startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay()); // 週日為一週開始
+
+    const { data, error } = await supabaseClient
+      .from("usage_logs")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("action", "company_intro")
+      .gte("created_at", startOfWeek.toISOString());
+
+    if (error) {
+      console.error("讀取使用次數失敗：", error);
+      return 999;
+    }
+
+    return data.length;
+  }
+
+  async function addUsage(userId) {
+    const { error } = await supabaseClient
+      .from("usage_logs")
+      .insert({
+        user_id: userId,
+        action: "company_intro"
+      });
+
+    if (error) {
+      console.error("新增使用紀錄失敗：", error);
+    }
+  }
+
+  // ★ 新增：更新畫面上的「本週使用次數 / 上限」
+  async function updateUsageInfo(user, plan) {
+    const usageInfoEl = document.getElementById("usageInfo");
+    if (!usageInfoEl) return;
+
+    if (!user) {
+      usageInfoEl.textContent = "請先登入以查看本週使用次數與方案限制。";
+      return;
+    }
+
+    const limit = PLAN_LIMIT[plan] ?? PLAN_LIMIT["free"];
+
+    if (limit === Infinity) {
+      usageInfoEl.textContent = `目前方案：${plan}（本功能使用次數不限）。`;
+      return;
+    }
+
+    const used = await getWeeklyUsage(user.id);
+    usageInfoEl.textContent = `目前方案：${plan}｜本週已使用 ${used} / ${limit} 次。`;
+  }
+
+  // ★ 新增：頁面載入時，先更新一次使用資訊
+  window.addEventListener("DOMContentLoaded", async () => {
+    const { user, plan } = await getCurrentUserPlan();
+    await updateUsageInfo(user, plan);
+  });
+
+  // ============================
+  // ★ 修改：按鈕事件加入方案 / 次數檢查 + modal
+  // ============================
+
   document.getElementById("fetchBtn").addEventListener("click", async () => {
-    const symbol = document.getElementById("symbolInput").value.trim().toUpperCase();
     const debugEl = document.getElementById("debug");
     const resultEl = document.getElementById("result");
+
+    // 1) 先確認登入與方案
+    const { user, plan } = await getCurrentUserPlan();
+
+    if (!user) {
+      alert("請先登入才能使用產生公司介紹功能。");
+      debugEl.textContent = "尚未登入，無法使用此功能。";
+      return;
+    }
+
+    const limit = PLAN_LIMIT[plan] ?? PLAN_LIMIT["free"];
+
+    // 2) 限制方案（free / plus），pro 不限制
+    if (limit !== Infinity) {
+      const used = await getWeeklyUsage(user.id);
+      console.log(`方案：${plan}，本週已使用：`, used, "／限制：", limit);
+
+      if (used >= limit) {
+        const msg = `你的方案（${plan}）本功能每週最多可使用 ${limit} 次。\n如需更多使用次數，請考慮升級方案。`;
+        showPlanModal(msg);   // ★ 改成用 modal
+        debugEl.textContent = `已達本週使用上限（${used}/${limit}）。`;
+        return;
+      }
+    }
+
+    // 3) 檢查通過 → 先紀錄一次使用
+    await addUsage(user.id);
+
+    // 4) 使用資訊也跟著更新
+    await updateUsageInfo(user, plan);
+
+    // 5) 以下為原本的 n8n 呼叫邏輯
+    const symbol = document.getElementById("symbolInput").value.trim().toUpperCase();
 
     if (!symbol) {
       alert("請輸入股票代碼！");
@@ -56,22 +302,18 @@
         throw new Error("n8n 回應錯誤，HTTP 狀態：" + res.status);
       }
 
-      // 先用 text 拿原始內容，之後再嘗試 JSON.parse
       const raw = await res.text();
       console.log("n8n raw 回應：", raw);
 
       let markdown;
 
       try {
-        // 如果是 JSON，就解析成物件（例如 { text: "..." }）
         const data = JSON.parse(raw);
         markdown = data.text || JSON.stringify(data, null, 2);
       } catch (e) {
-        // 如果不是 JSON，就當成純 markdown 文字
         markdown = raw;
       }
 
-      // 用 marked 把 markdown 轉成 HTML
       const htmlContent = marked.parse(markdown || "");
       resultEl.innerHTML = htmlContent;
       debugEl.textContent = "查詢完成 ✔";
@@ -81,6 +323,6 @@
       console.error(err);
     }
   });
-</script>
+  </script>
 </body>
 </html>
