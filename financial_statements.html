@@ -64,8 +64,18 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 6px 0;
-      border-bottom: 1px solid #1f2937;
+      padding: 6px 10px;
+      border-radius: 8px;
+      margin-bottom: 4px;
+      cursor: pointer;
+      border: 1px solid transparent;
+    }
+    .stock-item:hover {
+      background: #1f2937;
+    }
+    .stock-item.active {
+      background: #1f2937;
+      border-color: #4f46e5;
     }
     .stock-item .status-tag {
       font-size: 11px;
@@ -82,7 +92,7 @@
     }
 
     .content {
-      padding: 16px;
+      padding: 0px;
       overflow-y: auto;
     }
     .dashboards {
@@ -98,7 +108,7 @@
       box-shadow: 0 4px 12px rgba(15,23,42,0.06);
     }
     .dash-card h2 {
-      font-size: 16px;
+      font-size: 18px;
       margin: 0 0 8px;
     }
     .dash-card .status {
@@ -109,7 +119,7 @@
       border-radius: 999px;
       background: #eef2ff;
       color: #3730a3;
-      margin-bottom: 8px;
+      margin-bottom: 0px;
     }
     .dash-card .status.ready {
       background: #dcfce7;
@@ -121,14 +131,9 @@
       margin: 4px 0;
       color: #4b5563;
     }
-    .dash-card .hint {
-      font-size: 12px;
-      color: #9ca3af;
-      margin-top: 6px;
-    }
     .dash-card iframe {
       width: 100%;
-      height: 480px;
+      height: 100vh;
       border: none;
       border-radius: 8px;
       margin-top: 12px;
@@ -153,7 +158,7 @@
     <div class="stock-list" id="stockList"></div>
   </aside>
 
-  <!-- 右邊：顯示追蹤清單（依 status 決定顯示內容） -->
+  <!-- 右邊：只顯示「目前選取」那一檔 -->
   <main class="content">
     <div class="dashboards" id="dashboards"></div>
   </main>
@@ -176,6 +181,8 @@
   let currentLimit = 1;
   // tracked: { id, symbol, status, report_url }
   let tracked = [];
+  // ★ 新增：目前選到哪一筆
+  let selectedStockId = null;
 
   // ------- 2. 取得登入狀態 + 會員方案 -------
   async function init() {
@@ -223,6 +230,16 @@
     }
 
     tracked = data || [];
+
+    // ★ 如果還沒選，預設選第一筆
+    if (tracked.length > 0) {
+      if (!selectedStockId || !tracked.some(s => s.id === selectedStockId)) {
+        selectedStockId = tracked[0].id;
+      }
+    } else {
+      selectedStockId = null;
+    }
+
     renderStockList();
     renderDashboards();
     updateAddButtonState();
@@ -241,79 +258,88 @@
           s.status === "pending" || !s.status ? "準備中" :
           s.status;
 
+        const activeClass = s.id === selectedStockId ? "active" : "";
+
         return `
-          <div class="stock-item">
+          <div class="stock-item ${activeClass}"
+               onclick="selectStock(${s.id})">
             <span>
               ${s.symbol}
               <span class="status-tag">${statusText}</span>
             </span>
-            <button onclick="removeStock(${s.id})">移除</button>
+            <button onclick="event.stopPropagation(); removeStock(${s.id})">移除</button>
           </div>
         `;
       })
       .join("");
   }
 
-  // ------- 3-1. 右邊內容：依 status 顯示 -------
+  // ------- ★ 新增：切換選取的股票 -------
+  function selectStock(id) {
+    selectedStockId = id;
+    renderStockList();
+    renderDashboards();
+  }
+
+  // ------- 3-1. 右邊內容：只顯示選取的那一檔 -------
   function renderDashboards() {
     const container = document.getElementById("dashboards");
 
-    if (tracked.length === 0) {
+    if (tracked.length === 0 || !selectedStockId) {
       container.innerHTML = "";
       return;
     }
 
-    container.innerHTML = tracked
-      .map(s => {
-        let statusClass = "status";
-        let statusLabel = "";
-        let bodyHtml = "";
+    const s = tracked.find(item => item.id === selectedStockId);
+    if (!s) {
+      container.innerHTML = "";
+      return;
+    }
 
-        if (s.status === "ready" && s.report_url) {
-          // 報告已完成：顯示 iframe
-          statusClass += " ready";
-          statusLabel = "已完成 · 報告已上線";
+    let statusClass = "status";
+    let statusLabel = "";
+    let bodyHtml = "";
 
-          bodyHtml = `
-            <p>
-              <strong>${s.symbol}</strong> 的財報整理已完成，下方為為你準備的最新圖表與說明。
-            </p>
-            <div class="hint">
-              若畫面沒有顯示，請確認瀏覽器是否允許載入此報表網址。
-            </div>
-            <iframe src="${s.report_url}"></iframe>
-          `;
-        } else if (s.status === "pending" || !s.status) {
-          // 剛新增 / 你還沒處理：顯示等待訊息
-          statusLabel = "處理中 · 預計 2 天內完成";
-          bodyHtml = `
-            <p>
-              我們已收到你對 <strong>${s.symbol}</strong> 的財報追蹤申請。
-              系統會在背景整理最新財報數據與圖表，預計於 <strong>2 天內</strong> 完成並更新在此區域。
-            </p>
-            <p class="hint">
-              完成後，這裡會自動顯示完整的財報分析頁面，包含損益表、資產負債表、現金流量與估值指標。
-            </p>
-          `;
-        } else {
-          // 其他狀態（防呆）
-          statusLabel = `狀態：${s.status}`;
-          bodyHtml = `
-            <p>
-              這檔股票的財報內容尚在準備中，完成後會自動顯示在這裡。
-            </p>
-          `;
-        }
+    if (s.status === "ready" && s.report_url) {
+      // 報告已完成：顯示 iframe
+      statusClass += " ready";
+      statusLabel = "已完成 · 報告已上線";
 
-        return `
-          <div class="dash-card">
-            <h2>${s.symbol} 財報分析</h2>
-            <div class="${statusClass}">${statusLabel}</div>
-            ${bodyHtml}
-          </div>
-        `;
-      })
-      .join("");
+      bodyHtml = `
+        <p>
+          <strong>${s.symbol}</strong> 的財報整理已完成，下方為為你準備的最新圖表與說明。
+        </p>
+        <iframe src="${s.report_url}"></iframe>
+      `;
+    } else if (s.status === "pending" || !s.status) {
+      // 剛新增 / 你還沒處理：顯示等待訊息
+      statusLabel = "處理中 · 預計 2 天內完成";
+      bodyHtml = `
+        <p>
+          我們已收到你對 <strong>${s.symbol}</strong> 的財報追蹤申請。
+          系統會在背景整理最新財報數據與圖表，預計於 <strong>2 天內</strong> 完成並更新在此區域。
+        </p>
+        <p class="hint">
+          完成後，這裡會自動顯示完整的財報分析頁面，包含損益表、資產負債表、現金流量與估值指標。
+        </p>
+      `;
+    } else {
+      // 其他狀態（防呆）
+      statusLabel = `狀態：${s.status}`;
+      bodyHtml = `
+        <p>
+          這檔股票的財報內容尚在準備中，完成後會自動顯示在這裡。
+        </p>
+      `;
+    }
+
+    container.innerHTML = `
+      <div class="dash-card">
+        <h2>${s.symbol} 財報分析</h2>
+        <div class="${statusClass}">${statusLabel}</div>
+        ${bodyHtml}
+      </div>
+    `;
   }
 
   function updateAddButtonState() {
@@ -349,8 +375,7 @@
       .insert({
         user_id: currentUser.id,
         symbol: symbolRaw,
-        status: "pending"      // 一律先設為「準備中」
-        // report_url 先留空，等你準備好再從後台填
+        status: "pending"
       });
 
     if (error) {
