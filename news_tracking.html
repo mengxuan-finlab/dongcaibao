@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>懂才抱｜新聞追蹤設定</title>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <style>
+    body{font-family:system-ui,-apple-system,"Microsoft JhengHei",sans-serif;background:#f3f4f6;margin:0}
+    .wrap{max-width:980px;margin:0 auto;padding:24px}
+    .card{background:#fff;border-radius:14px;padding:18px;box-shadow:0 6px 20px rgba(0,0,0,.06);margin-bottom:14px}
+    .row{display:flex;gap:10px;flex-wrap:wrap}
+    input,textarea,select,button{font:inherit}
+    input,textarea{width:100%;padding:10px 12px;border:1px solid #e5e7eb;border-radius:10px;background:#fff}
+    textarea{min-height:90px;resize:vertical}
+    button{padding:10px 14px;border:0;border-radius:10px;background:#111827;color:#fff;cursor:pointer}
+    button.secondary{background:#6b7280}
+    button.danger{background:#b91c1c}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .meta{color:#6b7280;font-size:13px}
+    .pill{display:inline-block;background:#eef2ff;color:#3730a3;padding:4px 10px;border-radius:999px;font-size:12px;margin-left:8px}
+    .item{border-top:1px solid #eef2f7;padding-top:12px;margin-top:12px}
+    .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+    .muted{color:#9ca3af}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+
+    <div class="card">
+      <h2 style="margin:0 0 6px;">新聞追蹤設定 <span id="planPill" class="pill">Plan: -</span></h2>
+      <div class="meta">你可以新增 / 編輯 / 停用「股票、追蹤理由、關鍵字」。寄信與產報告後續交給 n8n。</div>
+      <div class="meta" style="margin-top:8px;">目前：<b id="countNow">0</b> / <b id="countLimit">0</b> 檔</div>
+      <div class="meta muted" id="loginHint" style="margin-top:8px;"></div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin:0 0 10px;">新增追蹤</h3>
+      <div class="grid">
+        <div>
+          <div class="meta">股票代號</div>
+          <input id="symbol" placeholder="例如 HIMS" />
+        </div>
+        <div>
+          <div class="meta">關鍵字（逗號分隔）</div>
+          <input id="keywords" placeholder="例如 GLP-1, 遠距醫療, Novo Nordisk" />
+        </div>
+      </div>
+      <div style="margin-top:10px;">
+        <div class="meta">追蹤理由</div>
+        <textarea id="reason" placeholder="為什麼追蹤這檔？你想關注哪些風險或催化？"></textarea>
+      </div>
+      <div class="actions">
+        <button id="btnAdd">儲存新增</button>
+        <button class="secondary" id="btnReload">重新整理列表</button>
+      </div>
+      <div class="meta" id="msg"></div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin:0 0 10px;">我的追蹤清單</h3>
+      <div id="list" class="meta">載入中...</div>
+    </div>
+
+  </div>
+
+<script>
+  // 1) 改成你的專案
+  const SUPABASE_URL = "https://zlkexplsleznuebighte.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpsa2V4cGxzbGV6bnVlYmlnaHRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0MzAwNjUsImV4cCI6MjA4MTAwNjA2NX0.HPVn3jcN88M4U3-RCVW-YO-b65rDOKv6pxEaVWwbm68";
+  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  // 2) 方案限制（你可依實際調整）
+  const PLAN_LIMIT = { free: 1, plus: 3, pro: 5 };
+
+  let CURRENT_USER_ID = null;
+  let CURRENT_PLAN = "free";
+  let ACTIVE_RULES = [];
+
+  const $ = (id) => document.getElementById(id);
+  const setMsg = (t) => $("msg").textContent = t || "";
+
+  function normalizeSymbol(s) {
+    return (s || "").trim().toUpperCase();
+  }
+
+  async function requireLogin() {
+    const { data, error } = await supabase.auth.getUser();
+    if (error) throw error;
+    if (!data?.user) {
+      $("loginHint").textContent = "尚未登入：請先完成登入，才能讀取/儲存你的追蹤設定。";
+      throw new Error("NOT_LOGGED_IN");
+    }
+    CURRENT_USER_ID = data.user.id;
+  }
+
+  async function loadProfile() {
+    // profiles.id 建議是 auth.user.id（你若不是這樣，回我，我幫你對齊）
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("id, plan")
+      .eq("id", CURRENT_USER_ID)
+      .single();
+
+    if (error) throw error;
+
+    CURRENT_PLAN = (data?.plan || "free").toLowerCase();
+    $("planPill").textContent = `Plan: ${CURRENT_PLAN}`;
+    $("countLimit").textContent = PLAN_LIMIT[CURRENT_PLAN] ?? 1;
+  }
+
+  async function loadRules() {
+    const { data, error } = await supabase
+      .from("news_tracking_rules")
+      .select("id, symbol, reason, keywords, is_active, created_at, updated_at")
+      .eq("user_id", CURRENT_USER_ID)
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+
+    ACTIVE_RULES = (data || []).filter(r => r.is_active !== false);
+    $("countNow").textContent = ACTIVE_RULES.length;
+
+    renderList(data || []);
+  }
+
+  function renderList(rows) {
+    const el = $("list");
+    if (!rows.length) {
+      el.innerHTML = `<div class="muted">尚未新增追蹤。</div>`;
+      return;
+    }
+
+    el.innerHTML = rows.map(r => `
+      <div class="item">
+        <div><b>${r.symbol}</b> ${r.is_active === false ? '<span class="pill" style="background:#fee2e2;color:#991b1b;">停用</span>' : ''}</div>
+        <div class="meta" style="margin-top:6px;"><b>關鍵字：</b>${escapeHtml(r.keywords || "")}</div>
+        <div class="meta" style="margin-top:6px;"><b>理由：</b><br>${escapeHtml(r.reason || "").replace(/\n/g, "<br>")}</div>
+        <div class="actions">
+          ${r.is_active === false ? "" : `<button class="secondary" onclick="editRule('${r.id}')">編輯</button>`}
+          ${r.is_active === false ? "" : `<button class="danger" onclick="disableRule('${r.id}')">停用</button>`}
+        </div>
+      </div>
+    `).join("");
+  }
+
+  function escapeHtml(str) {
+    return String(str)
+      .replaceAll("&","&amp;")
+      .replaceAll("<","&lt;")
+      .replaceAll(">","&gt;")
+      .replaceAll('"',"&quot;")
+      .replaceAll("'","&#039;");
+  }
+
+  async function addRule() {
+    setMsg("");
+    const symbol = normalizeSymbol($("symbol").value);
+    const keywords = ($("keywords").value || "").trim();
+    const reason = ($("reason").value || "").trim();
+
+    if (!symbol) return setMsg("請輸入股票代號。");
+    if (!keywords) return setMsg("請輸入關鍵字（逗號分隔）。");
+    if (!reason) return setMsg("請輸入追蹤理由。");
+
+    const limit = PLAN_LIMIT[CURRENT_PLAN] ?? 1;
+    if (ACTIVE_RULES.length >= limit) {
+      return setMsg(`你的方案最多 ${limit} 檔，請先停用一檔再新增。`);
+    }
+
+    const { error } = await supabase
+      .from("news_tracking_rules")
+      .insert({
+        user_id: CURRENT_USER_ID,
+        symbol,
+        keywords,
+        reason,
+        is_active: true
+      });
+
+    if (error) {
+      console.error(error);
+      return setMsg("新增失敗（請看 console）。");
+    }
+
+    $("symbol").value = "";
+    $("keywords").value = "";
+    $("reason").value = "";
+    setMsg("已新增追蹤設定。");
+    await loadRules();
+  }
+
+  window.editRule = async function(id) {
+    // 極簡：用 prompt 編輯；你之後可以改成 modal
+    const row = (ACTIVE_RULES || []).find(r => r.id === id);
+    if (!row) return;
+
+    const newKeywords = prompt("更新關鍵字（逗號分隔）：", row.keywords || "");
+    if (newKeywords === null) return;
+
+    const newReason = prompt("更新追蹤理由：", row.reason || "");
+    if (newReason === null) return;
+
+    const { error } = await supabase
+      .from("news_tracking_rules")
+      .update({
+        keywords: newKeywords.trim(),
+        reason: newReason.trim(),
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", id)
+      .eq("user_id", CURRENT_USER_ID);
+
+    if (error) {
+      console.error(error);
+      return alert("更新失敗，請看 console");
+    }
+    await loadRules();
+  }
+
+  window.disableRule = async function(id) {
+    if (!confirm("確定要停用這個追蹤？")) return;
+
+    const { error } = await supabase
+      .from("news_tracking_rules")
+      .update({
+        is_active: false,
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", id)
+      .eq("user_id", CURRENT_USER_ID);
+
+    if (error) {
+      console.error(error);
+      return alert("停用失敗，請看 console");
+    }
+    await loadRules();
+  }
+
+  $("btnAdd").addEventListener("click", addRule);
+  $("btnReload").addEventListener("click", loadRules);
+
+  (async function init() {
+    try {
+      await requireLogin();
+      await loadProfile();
+      await loadRules();
+      setMsg("");
+    } catch (e) {
+      console.warn(e);
+      if (String(e.message) !== "NOT_LOGGED_IN") {
+        $("list").textContent = "載入失敗，請看 console。";
+      } else {
+        $("list").textContent = "請先登入後再使用此頁。";
+      }
+    }
+  })();
+</script>
+</body>
+</html>
