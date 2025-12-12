@@ -7,15 +7,15 @@
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
   <style>
     body{font-family:system-ui,-apple-system,"Microsoft JhengHei",sans-serif;background:#f3f4f6;margin:0}
-    .wrap{max-width:980px;margin:0 auto;padding:24px}
-    .card{background:#fff;border-radius:14px;padding:18px;box-shadow:0 6px 20px rgba(0,0,0,.06);margin-bottom:14px}
+    .wrap{max-width:10000px;margin:0 auto;padding:24px}
+    .card{background:#fff;border-radius:14px;padding:50px;box-shadow:0 6px 20px rgba(0,0,0,.06);margin-bottom:14px}
     .row{display:flex;gap:10px;flex-wrap:wrap}
     input,textarea,select,button{font:inherit}
     input,textarea{width:100%;padding:10px 12px;border:1px solid #e5e7eb;border-radius:10px;background:#fff}
     textarea{min-height:90px;resize:vertical}
     button{padding:10px 14px;border:0;border-radius:10px;background:#111827;color:#fff;cursor:pointer}
     button.secondary{background:#6b7280}
-    button.danger{background:#b91c1c}
+    button.danger{background:#c43a3a}
     .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
     .meta{color:#6b7280;font-size:13px}
     .pill{display:inline-block;background:#eef2ff;color:#3730a3;padding:4px 10px;border-radius:999px;font-size:12px;margin-left:8px}
@@ -63,6 +63,29 @@
     </div>
 
   </div>
+    <!-- Edit Modal -->
+  <div id="editModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:9999;">
+    <div class="card" style="max-width:720px; margin:8vh auto; padding:18px;">
+      <h3 style="margin:0 0 10px;">編輯追蹤設定</h3>
+
+      <div class="meta">股票代號（不可改）</div>
+      <input id="editSymbol" disabled />
+
+      <div class="meta" style="margin-top:10px;">關鍵字（逗號分隔）</div>
+      <input id="editKeywords" />
+
+      <div class="meta" style="margin-top:10px;">追蹤理由</div>
+      <textarea id="editReason"></textarea>
+
+      <div class="actions" style="margin-top:12px;">
+        <button id="btnSaveEdit">儲存</button>
+        <button class="secondary" id="btnCancelEdit">取消</button>
+      </div>
+
+      <div class="meta" id="editMsg" style="margin-top:8px;"></div>
+    </div>
+  </div>
+
 
 <script>
   // 1) 改成你的專案
@@ -190,33 +213,66 @@
     await loadRules();
   }
 
-  window.editRule = async function(id) {
-    // 極簡：用 prompt 編輯；你之後可以改成 modal
-    const row = (ACTIVE_RULES || []).find(r => r.id === id);
-    if (!row) return;
+    // ===== Edit Modal (replace prompt edit) =====
+  let EDITING_ID = null;
 
-    const newKeywords = prompt("更新關鍵字（逗號分隔）：", row.keywords || "");
-    if (newKeywords === null) return;
+  function openEditModal(row) {
+    EDITING_ID = row.id;
+    $("editSymbol").value = row.symbol || "";
+    $("editKeywords").value = row.keywords || "";
+    $("editReason").value = row.reason || "";
+    $("editMsg").textContent = "";
+    $("editModal").style.display = "block";
+  }
 
-    const newReason = prompt("更新追蹤理由：", row.reason || "");
-    if (newReason === null) return;
+  function closeEditModal() {
+    EDITING_ID = null;
+    $("editModal").style.display = "none";
+  }
+
+  // 點黑色背景也可關閉（可選）
+  $("editModal").addEventListener("click", (e) => {
+    if (e.target.id === "editModal") closeEditModal();
+  });
+
+  $("btnCancelEdit").addEventListener("click", closeEditModal);
+
+  $("btnSaveEdit").addEventListener("click", async () => {
+    $("editMsg").textContent = "";
+
+    const newKeywords = ($("editKeywords").value || "").trim();
+    const newReason = ($("editReason").value || "").trim();
+
+    if (!newKeywords) return $("editMsg").textContent = "關鍵字不能為空。";
+    if (!newReason) return $("editMsg").textContent = "追蹤理由不能為空。";
+    if (!EDITING_ID) return;
 
     const { error } = await supabase
       .from("news_tracking_rules")
       .update({
-        keywords: newKeywords.trim(),
-        reason: newReason.trim(),
+        keywords: newKeywords,
+        reason: newReason,
         updated_at: new Date().toISOString()
       })
-      .eq("id", id)
+      .eq("id", EDITING_ID)
       .eq("user_id", CURRENT_USER_ID);
 
     if (error) {
       console.error(error);
-      return alert("更新失敗，請看 console");
+      return $("editMsg").textContent = "更新失敗，請看 console。";
     }
+
+    closeEditModal();
     await loadRules();
+  });
+
+    window.editRule = async function(id) {
+    // 直接從目前列表抓資料，打開 modal
+    const row = (ACTIVE_RULES || []).find(r => r.id === id);
+    if (!row) return;
+    openEditModal(row);
   }
+
 
   window.disableRule = async function(id) {
     if (!confirm("確定要停用這個追蹤？")) return;
