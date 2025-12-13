@@ -169,3 +169,35 @@
   .money{ font-size: 26px; }
   .btn{ width: 100%; }                     /* 手機讓按鈕滿寬 */
 }
+
+
+
+.feature-list li { text-align: left; }
+
+.feat-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+}
+
+.feat-head h4{
+  margin:0;
+  font-size:18px;
+  font-weight:700;
+}
+
+.badge{
+  display:inline-block;
+  padding:4px 10px;
+  border-radius:999px;
+  font-size:12px;
+  white-space:nowrap;
+  background: rgba(255,255,255,.10);
+  border:1px solid rgba(255,255,255,.14);
+}
+
+.badge-strong{
+  background: rgba(130,110,255,.20);
+  border-color: rgba(130,110,255,.35);
+}
