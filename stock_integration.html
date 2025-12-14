@@ -289,7 +289,7 @@
     }
 
     debugEl.textContent = "查詢中…（股票代碼：" + symbol + "）";
-    resultEl.innerHTML = "<p>⏳ 正在載入公司介紹…</p>";
+    resultEl.innerHTML = "<p>正在載入公司介紹…(約一分鐘)</p>";
 
     try {
       const url = `${N8N_WEBHOOK_URL}?symbol=${encodeURIComponent(symbol)}`;
