@@ -487,7 +487,12 @@
     applyFiltersAndRender();
   }
 
-  async function loadData() {
+ async function loadData() {
+  const pageSize = 1000;
+  let from = 0;
+  let all = [];
+
+  while (true) {
     const { data, error } = await supabase
       .from("core_metrics")
       .select(`
@@ -508,19 +513,20 @@
         p_fcf,
         debt_to_equity,
         debt_to_asset,
-        dividendpayoutratio,   
-        dividendyield,          
-        dividendpershare,       
-        grossmargin,            
-        operatingmargin,        
-        evtoebitda,            
-        revenue_growth,       
-        eps_growth,             
-        fcf_growth,             
+        dividendpayoutratio,
+        dividendyield,
+        dividendpershare,
+        grossmargin,
+        operatingmargin,
+        evtoebitda,
+        revenue_growth,
+        eps_growth,
+        fcf_growth,
         dividend_growth,
         beta,
-        sector         
-      `);
+        sector
+      `)
+      .range(from, from + pageSize - 1);
 
     if (error) {
       console.error(error);
@@ -528,9 +534,20 @@
       return;
     }
 
-    allRows = data;
-    applyFiltersAndRender();
+    if (!data || data.length === 0) break;
+
+    all = all.concat(data);
+
+    // 下一頁
+    if (data.length < pageSize) break;
+    from += pageSize;
   }
+
+  allRows = all;
+  document.getElementById("summaryText").textContent = `已載入：${allRows.length} 檔`;
+  applyFiltersAndRender();
+}
+
 
   function applyFiltersAndRender() {
     const capMode = document.getElementById("capFilter").value;
@@ -573,10 +590,11 @@
       }
 
       // 獲利 & 現金流
-      if (r.roe == null || r.roe < roeMin) return false;
-      if (r.fcf_yield == null || r.fcf_yield < fcfMin) return false;
-      if (r.roic == null || r.roic < roicMin) return false;
-      if (r.earnings_yield == null || r.earnings_yield < eyMin) return false;
+      if (roeMin > 0 && (r.roe == null || r.roe < roeMin)) return false;
+      if (fcfMin > 0 && (r.fcf_yield == null || r.fcf_yield < fcfMin)) return false;
+      if (roicMin > 0 && (r.roic == null || r.roic < roicMin)) return false;
+      if (eyMin > 0 && (r.earnings_yield == null || r.earnings_yield < eyMin)) return false;
+
 
       // 流動比率
       if (crMin > 0 && (r.current_ratio == null || r.current_ratio < crMin)) return false;
