@@ -709,7 +709,14 @@
       const cccClass = r.ccc != null && r.ccc < 0 ? "pill-pos" : "";
       const tr = document.createElement("tr");
       tr.innerHTML = `
-        <td><span class="badge">${r.symbol}</span></td>
+        <td>
+          <a 
+            href="analysis.html?symbol=${r.symbol}" 
+            class="symbol-link"
+          >
+            <span class="badge">${r.symbol}</span>
+          </a>
+        </td>
         <td>${formatCap(r.market_cap)}</td>
         <td>${r.sector || "-"}</td>
         <td>${r.beta != null ? r.beta.toFixed(2) : "-"}</td>

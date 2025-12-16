@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>懂才抱｜財報快照</title>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+
+  <style>
+    :root{
+      --bg1:#0b1220;
+      --bg2:#0f1b33;
+      --card: rgba(255,255,255,.07);
+      --card2: rgba(255,255,255,.10);
+      --stroke: rgba(255,255,255,.12);
+      --text:#e5e7eb;
+      --muted:#9ca3af;
+      --good:#22c55e;
+      --mid:#60a5fa;
+      --bad:#f59e0b;
+      --shadow: 0 20px 60px rgba(0,0,0,.35);
+      --radius: 18px;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: system-ui,-apple-system,BlinkMacSystemFont,"Microsoft JhengHei",sans-serif;
+      color:var(--text);
+      background:
+        radial-gradient(900px 500px at 20% 10%, rgba(99,102,241,.25), transparent 60%),
+        radial-gradient(700px 400px at 80% 30%, rgba(34,197,94,.18), transparent 55%),
+        linear-gradient(180deg, var(--bg1), var(--bg2));
+      min-height:100vh;
+    }
+    .wrap{
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 28px 18px 64px;
+    }
+    .topbar{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    .title{
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing:.2px;
+      margin:0;
+    }
+    .subtitle{
+      margin-top:6px;
+      color:var(--muted);
+      font-size: 14px;
+    }
+    .actions{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      justify-content:flex-end;
+    }
+    .btn{
+      border:1px solid var(--stroke);
+      background: rgba(255,255,255,.06);
+      color: var(--text);
+      padding: 10px 12px;
+      border-radius: 999px;
+      text-decoration:none;
+      font-size: 13px;
+      display:inline-flex;
+      gap:8px;
+      align-items:center;
+      backdrop-filter: blur(10px);
+      transition: transform .15s ease, background .15s ease;
+      user-select:none;
+    }
+    .btn:hover{ transform: translateY(-1px); background: rgba(255,255,255,.10); }
+    .grid{
+      display:grid;
+      grid-template-columns: 1.2fr .8fr;
+      gap:16px;
+      margin-top: 14px;
+    }
+    @media (max-width: 900px){
+      .grid{ grid-template-columns: 1fr; }
+    }
+
+    .card{
+      background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.05));
+      border: 1px solid var(--stroke);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 16px;
+      backdrop-filter: blur(12px);
+    }
+    .cardHeader{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      margin-bottom: 10px;
+      gap: 10px;
+    }
+    .cardTitle{
+      font-weight: 800;
+      font-size: 14px;
+      letter-spacing:.2px;
+      color: #ffffff;
+      opacity:.95;
+      margin:0;
+    }
+    .pill{
+      font-size: 12px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--stroke);
+      background: rgba(255,255,255,.06);
+      color: var(--muted);
+      white-space:nowrap;
+    }
+
+    .scoreWrap{
+      display:flex;
+      gap:14px;
+      align-items:center;
+      flex-wrap:wrap;
+    }
+    .ring{
+      width: 120px;
+      height: 120px;
+      position: relative;
+      border-radius: 999px;
+      display:grid;
+      place-items:center;
+      background:
+        conic-gradient(var(--ringColor) calc(var(--p)*1%), rgba(255,255,255,.12) 0);
+      box-shadow: inset 0 0 0 10px rgba(0,0,0,.15);
+    }
+    .ring::after{
+      content:"";
+      position:absolute;
+      inset: 10px;
+      border-radius: 999px;
+      background: rgba(15,27,51,.9);
+      border: 1px solid rgba(255,255,255,.10);
+    }
+    .ringInner{
+      position:relative;
+      z-index:1;
+      text-align:center;
+      line-height:1.1;
+    }
+    .scoreNum{
+      font-size: 28px;
+      font-weight: 900;
+    }
+    .scoreDen{
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+    .grade{
+      font-weight: 800;
+      font-size: 14px;
+      margin-top: 6px;
+      color: var(--ringColor);
+    }
+
+    .bars{
+      flex: 1;
+      min-width: 260px;
+    }
+    .barRow{
+      margin: 10px 0;
+    }
+    .barTop{
+      display:flex;
+      justify-content:space-between;
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .bar{
+      height: 10px;
+      background: rgba(255,255,255,.10);
+      border-radius: 999px;
+      overflow:hidden;
+      border:1px solid rgba(255,255,255,.08);
+    }
+    .bar > div{
+      height:100%;
+      width: var(--w);
+      background: linear-gradient(90deg, rgba(255,255,255,.25), var(--ringColor));
+    }
+
+    .kpiGrid{
+      display:grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-top: 12px;
+    }
+    @media (max-width: 640px){
+      .kpiGrid{ grid-template-columns: repeat(2, 1fr); }
+    }
+    .kpi{
+      padding: 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.10);
+      background: rgba(255,255,255,.06);
+    }
+    .kLabel{
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .kVal{
+      font-size: 18px;
+      font-weight: 900;
+      letter-spacing:.2px;
+    }
+    .kHint{
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+
+    .note{
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height:1.6;
+    }
+
+    .state{
+      padding: 14px 16px;
+      border: 1px dashed rgba(255,255,255,.20);
+      border-radius: 14px;
+      color: var(--muted);
+      background: rgba(255,255,255,.04);
+    }
+    .insight{
+    margin-top: 14px;
+    padding: 12px 12px;
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,.10);
+    background: rgba(255,255,255,.06);
+    }
+    .insightTitle{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    margin-bottom: 8px;
+    }
+    .insightTitle h4{
+    margin:0;
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing:.2px;
+    color:#fff;
+    opacity:.92;
+    }
+    .insightTitle .tag{
+    font-size: 12px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,.12);
+    background: rgba(255,255,255,.05);
+    color: var(--muted);
+    white-space:nowrap;
+    }
+    .insight ul{
+    margin: 0;
+    padding-left: 18px;
+    color: var(--text);
+    opacity: .92;
+    font-size: 13px;
+    line-height: 1.7;
+    }
+    .insight li{ margin: 6px 0; }
+
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div>
+        <h1 class="title" id="title">載入中...</h1>
+        <div class="subtitle" id="subTitle">懂才抱 · 財報快照（Snapshot）</div>
+      </div>
+
+      <div class="actions">
+        <a class="btn" href="core_screener.html">← 回選股器</a>
+        <a class="btn" id="tvLink" href="#" target="_blank" rel="noopener">TradingView</a>
+        <a class="btn" id="yfLink" href="#" target="_blank" rel="noopener">Yahoo</a>
+      </div>
+    </div>
+
+    <div id="snapshot" class="state">正在載入資料…</div>
+  </div>
+
+<script>
+const SUPABASE_URL = "https://ojeirmqxborwxhuwuems.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_wur9F2qRW0NFyZpijPub2A__IsGlpgZ";
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const params = new URLSearchParams(window.location.search);
+const symbol = (params.get("symbol") || "").toUpperCase();
+
+// --------- formatting ----------
+function fmtPct(x, digits=1){
+  if (x == null || Number.isNaN(x)) return "—";
+  return (x*100).toFixed(digits) + "%";
+}
+function fmtNum(x, digits=1){
+  if (x == null || Number.isNaN(x)) return "—";
+  return Number(x).toFixed(digits);
+}
+function fmtCap(x){
+  if (x == null || Number.isNaN(x)) return "—";
+  const n = Number(x);
+  if (n >= 1e12) return (n/1e12).toFixed(2) + " 兆";
+  if (n >= 1e9)  return (n/1e9).toFixed(1) + " 億";
+  if (n >= 1e6)  return (n/1e6).toFixed(1) + " 百萬";
+  return n.toLocaleString();
+}
+function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
+
+// --------- scoring ----------
+function calculateScore(d) {
+  let quality = 0, growth = 0, valuation = 0;
+
+  // 品質（40）
+  if (d.roe >= 0.2) quality += 15;
+  else if (d.roe >= 0.1) quality += 10;
+  else quality += 5;
+
+  if (d.roic >= 0.15) quality += 15;
+  else if (d.roic >= 0.08) quality += 10;
+  else quality += 5;
+
+  if (d.fcf_yield >= 0.04) quality += 10;
+  else if (d.fcf_yield >= 0.02) quality += 5;
+
+  // 成長（30）
+  if (d.revenue_growth >= 0.15) growth += 15;
+  else if (d.revenue_growth >= 0.05) growth += 10;
+  else growth += 5;
+
+  if (d.eps_growth >= 0.15) growth += 15;
+  else if (d.eps_growth >= 0.05) growth += 10;
+  else growth += 5;
+
+  // 估值（30）
+  if (d.pe != null && d.pe <= 20) valuation += 15;
+  else if (d.pe != null && d.pe <= 30) valuation += 10;
+  else valuation += 5;
+
+  if (d.fcf_yield >= 0.04) valuation += 15;
+  else if (d.fcf_yield >= 0.02) valuation += 10;
+  else valuation += 5;
+
+  const total = quality + growth + valuation;
+
+  let grade = "普通";
+  if (total >= 80) grade = "優質";
+  else if (total >= 65) grade = "良好";
+
+  // ring color by grade
+  let ringColor = getComputedStyle(document.documentElement).getPropertyValue('--mid').trim();
+  if (total >= 80) ringColor = getComputedStyle(document.documentElement).getPropertyValue('--good').trim();
+  else if (total < 65) ringColor = getComputedStyle(document.documentElement).getPropertyValue('--bad').trim();
+
+  return { total, quality, growth, valuation, grade, ringColor };
+}
+
+function buildInsight(d, s) {
+  // 目標：固定輸出 3 行，分別解釋 成長/品質/估值
+  const lines = [];
+
+  // 1) 成長解讀
+  const rev = d.revenue_growth;
+  const eps = d.eps_growth;
+  if (rev == null || eps == null) {
+    lines.push("成長：部分成長指標缺值，建議再確認營收與 EPS 的最新趨勢。");
+  } else if (rev >= 0.15 && eps >= 0.15) {
+    lines.push("成長：營收與 EPS 皆維持高速成長，支撐成長評分。");
+  } else if (rev < 0.05 && eps < 0.05) {
+    lines.push("成長：營收與 EPS 成長偏弱（或趨緩），使成長評分受壓。");
+  } else {
+    lines.push("成長：成長動能分歧（營收與 EPS 一強一弱），建議留意可持續性。");
+  }
+
+  // 2) 品質解讀
+  const roe = d.roe;
+  const roic = d.roic;
+  if (roe == null || roic == null) {
+    lines.push("品質：ROE/ROIC 指標缺值，無法完整判斷資本效率。");
+  } else if (roe >= 0.2 && roic >= 0.15) {
+    lines.push("品質：ROE 與 ROIC 皆偏高，代表資本效率與獲利品質良好。");
+  } else if (roe < 0.1 || roic < 0.08) {
+    lines.push("品質：ROE 或 ROIC 偏低，顯示資本效率較保守，品質評分偏弱。");
+  } else {
+    lines.push("品質：資本效率落在中段水準，屬於穩定但不極強的品質結構。");
+  }
+
+  // 3) 估值解讀（PE + FCF Yield）
+  const pe = d.pe;
+  const fcfy = d.fcf_yield;
+  if (pe == null || fcfy == null) {
+    lines.push("估值：估值指標缺值，建議補齊 PE 與 FCF 殖利率再評估。");
+  } else if (pe <= 20 && fcfy >= 0.04) {
+    lines.push("估值：PE 偏合理且 FCF 殖利率較佳，估值面相對友善。");
+  } else if (pe > 30 && fcfy < 0.02) {
+    lines.push("估值：PE 偏高且 FCF 殖利率偏低，估值評分容易被拉低。");
+  } else {
+    lines.push("估值：估值落在中性區間，建議搭配成長性一起衡量是否合理。");
+  }
+
+  // 保證只回 3 行
+  return lines.slice(0, 3);
+}
+
+async function loadSnapshot() {
+  if (!symbol) {
+    document.getElementById("title").innerText = "懂才抱｜財報快照";
+    document.getElementById("snapshot").className = "state";
+    document.getElementById("snapshot").innerText = "網址缺少 symbol，例如：analysis.html?symbol=AAPL";
+    return;
+  }
+
+  // external links
+  document.getElementById("tvLink").href = `https://www.tradingview.com/symbols/NASDAQ-${symbol}/`;
+  document.getElementById("yfLink").href = `https://finance.yahoo.com/quote/${symbol}`;
+
+  const { data, error } = await supabase
+    .from("core_metrics")
+    .select("*")
+    .eq("symbol", symbol)
+    .single();
+
+  if (error || !data) {
+    document.getElementById("title").innerText = `${symbol}｜財報快照`;
+    document.getElementById("snapshot").className = "state";
+    document.getElementById("snapshot").innerText = "找不到資料（可能尚未寫入 core_metrics）。";
+    return;
+  }
+
+  const s = calculateScore(data);
+  const insight = buildInsight(data, s);
+
+  document.getElementById("title").innerText = `${data.symbol}｜財報快照`;
+
+  const scoreP = clamp(s.total, 0, 100);
+  const qP = clamp(Math.round((s.quality/40)*100), 0, 100);
+  const gP = clamp(Math.round((s.growth/30)*100), 0, 100);
+  const vP = clamp(Math.round((s.valuation/30)*100), 0, 100);
+
+
+  document.getElementById("snapshot").className = "";
+  document.getElementById("snapshot").innerHTML = `
+    <div class="grid">
+      <div class="card">
+        <div class="cardHeader">
+          <h3 class="cardTitle">快照評分</h3>
+          <span class="pill">Snapshot Score</span>
+        </div>
+
+        <div class="scoreWrap" style="--ringColor:${s.ringColor};">
+          <div class="ring" style="--p:${scoreP}; --ringColor:${s.ringColor};">
+            <div class="ringInner">
+              <div class="scoreNum">${s.total}</div>
+              <div class="scoreDen">/ 100</div>
+              <div class="grade">${s.grade}</div>
+            </div>
+          </div>
+
+          <div class="bars">
+            <div class="barRow">
+              <div class="barTop"><span>品質</span><span>${s.quality}/40</span></div>
+              <div class="bar"><div style="--w:${qP}%; --ringColor:${s.ringColor};"></div></div>
+            </div>
+            <div class="barRow">
+              <div class="barTop"><span>成長</span><span>${s.growth}/30</span></div>
+              <div class="bar"><div style="--w:${gP}%; --ringColor:${s.ringColor};"></div></div>
+            </div>
+            <div class="barRow">
+              <div class="barTop"><span>估值</span><span>${s.valuation}/30</span></div>
+              <div class="bar"><div style="--w:${vP}%; --ringColor:${s.ringColor};"></div></div>
+            </div>
+
+            <div class="note">
+              評分用於快速比較公司獲利品質、成長性與估值水準；僅供參考，不構成投資建議。
+            </div>
+            <div class="insight">
+                <div class="insightTitle">
+                    <h4>AI 快速解讀</h4>
+                    <span class="tag">Snapshot Insight</span>
+                </div>
+                <ul>
+                    <li>${insight[0]}</li>
+                    <li>${insight[1]}</li>
+                    <li>${insight[2]}</li>
+                </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="cardHeader">
+          <h3 class="cardTitle">公司快照</h3>
+          <span class="pill">core_metrics</span>
+        </div>
+
+        <div class="kpiGrid">
+          <div class="kpi">
+            <div class="kLabel">市值</div>
+            <div class="kVal">${fmtCap(data.market_cap)}</div>
+            <div class="kHint">Market Cap</div>
+          </div>
+
+          <div class="kpi">
+            <div class="kLabel">PE</div>
+            <div class="kVal">${data.pe == null ? "—" : fmtNum(data.pe, 1)}</div>
+            <div class="kHint">Price / Earnings</div>
+          </div>
+
+          <div class="kpi">
+            <div class="kLabel">PEG</div>
+            <div class="kVal">${data.peg == null ? "—" : fmtNum(data.peg, 2)}</div>
+            <div class="kHint">PEG Ratio</div>
+          </div>
+
+          <div class="kpi">
+            <div class="kLabel">ROE</div>
+            <div class="kVal">${fmtPct(data.roe, 1)}</div>
+            <div class="kHint">Equity Return</div>
+          </div>
+
+          <div class="kpi">
+            <div class="kLabel">ROIC</div>
+            <div class="kVal">${fmtPct(data.roic, 1)}</div>
+            <div class="kHint">Invested Capital</div>
+          </div>
+
+          <div class="kpi">
+            <div class="kLabel">FCF 殖利率</div>
+            <div class="kVal">${fmtPct(data.fcf_yield, 1)}</div>
+            <div class="kHint">Free Cash Flow</div>
+          </div>
+
+          <div class="kpi">
+            <div class="kLabel">營收 YoY</div>
+            <div class="kVal">${fmtPct(data.revenue_growth, 1)}</div>
+            <div class="kHint">Revenue Growth</div>
+          </div>
+
+          <div class="kpi">
+            <div class="kLabel">EPS YoY</div>
+            <div class="kVal">${fmtPct(data.eps_growth, 1)}</div>
+            <div class="kHint">EPS Growth</div>
+          </div>
+
+          <div class="kpi">
+            <div class="kLabel">β</div>
+            <div class="kVal">${data.beta == null ? "—" : fmtNum(data.beta, 2)}</div>
+            <div class="kHint">Volatility</div>
+          </div>
+        </div>
+
+        <div class="note">
+          若對於公司資訊及財報相關內容有更詳細需求，可使用懂才抱後續服務
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+loadSnapshot();
+</script>
+</body>
+</html>
