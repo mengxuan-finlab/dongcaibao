@@ -358,7 +358,8 @@
   const SUPABASE_URL = "https://ojeirmqxborwxhuwuems.supabase.co";
   const SUPABASE_ANON_KEY = "sb_publishable_wur9F2qRW0NFyZpijPub2A__IsGlpgZ";
 
-  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  // 【修正點 1】變數改名為 supabaseClient
+  const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   let allRows = [];
   let sortState = { key: "market_cap", dir: "desc" };
@@ -493,7 +494,8 @@
   let all = [];
 
   while (true) {
-    const { data, error } = await supabase
+    // 這裡也要跟著改成 supabaseClient
+      const { data, error } = await supabaseClient
       .from("core_metrics")
       .select(`
         symbol,

@@ -406,8 +406,8 @@
 <script>
 const SUPABASE_URL = "https://ojeirmqxborwxhuwuems.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_wur9F2qRW0NFyZpijPub2A__IsGlpgZ";
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
+// 改個名字，例如 supabaseClient
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const params = new URLSearchParams(window.location.search);
 const symbol = (params.get("symbol") || "").toUpperCase();
 
@@ -775,7 +775,8 @@ async function loadSnapshot() {
   document.getElementById("tvLink").href = `https://www.tradingview.com/symbols/NASDAQ-${symbol}/`;
   document.getElementById("yfLink").href = `https://finance.yahoo.com/quote/${symbol}`;
 
-  const { data, error } = await supabase
+  // 這裡也要跟著改名
+    const { data, error } = await supabaseClient
     .from("core_metrics")
     .select("*")
     .eq("symbol", symbol)
