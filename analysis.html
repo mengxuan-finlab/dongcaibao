@@ -724,9 +724,9 @@ function buildHealthChecks(d){
   }
 
   return [
-    pack("成長股健診", growthChecks),
-    pack("定存股健診", incomeChecks),
-    pack("便宜股健診", valueChecks),
+    pack("成長型投資適配度", growthChecks),
+    pack("定存型投資適配度", incomeChecks),
+    pack("價值型投資適配度", valueChecks),
     pack("排除地雷股", riskChecks),
   ];
 }
@@ -740,8 +740,7 @@ function renderHealthSection(d){
   host.innerHTML = `
     <div class="healthCard">
       <div class="healthHeader">
-        <h3>股票健診（Beta）</h3>
-        <span class="pill">rules · v0</span>
+        <h3>投資風格適配度分析</h3>
       </div>
 
       <div class="healthGrid">
@@ -759,7 +758,7 @@ function renderHealthSection(d){
       </div>
 
       <div class="healthNote">
-        註：此為規則式快篩（利用你資料庫欄位計算），用於快速比較，不構成投資建議。
+        註：此為規則式快篩，用於快速比較，不構成投資建議。
       </div>
     </div>
   `;
