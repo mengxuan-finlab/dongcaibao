@@ -5,13 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>懂才抱｜財報快照</title>
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <style>
     :root{
       --bg1:#0b1220;
       --bg2:#0f1b33;
-      --card: rgba(255,255,255,.07);
-      --card2: rgba(255,255,255,.10);
       --stroke: rgba(255,255,255,.12);
       --text:#e5e7eb;
       --muted:#9ca3af;
@@ -239,47 +238,70 @@
       color: var(--muted);
       background: rgba(255,255,255,.04);
     }
+
     .insight{
-    margin-top: 14px;
-    padding: 12px 12px;
-    border-radius: 14px;
-    border: 1px solid rgba(255,255,255,.10);
-    background: rgba(255,255,255,.06);
+      margin-top: 14px;
+      padding: 12px 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.10);
+      background: rgba(255,255,255,.06);
     }
     .insightTitle{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:10px;
-    margin-bottom: 8px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      margin-bottom: 8px;
     }
     .insightTitle h4{
-    margin:0;
-    font-size: 13px;
-    font-weight: 800;
-    letter-spacing:.2px;
-    color:#fff;
-    opacity:.92;
+      margin:0;
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing:.2px;
+      color:#fff;
+      opacity:.92;
     }
     .insightTitle .tag{
-    font-size: 12px;
-    padding: 4px 10px;
-    border-radius: 999px;
-    border: 1px solid rgba(255,255,255,.12);
-    background: rgba(255,255,255,.05);
-    color: var(--muted);
-    white-space:nowrap;
+      font-size: 12px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.05);
+      color: var(--muted);
+      white-space:nowrap;
     }
     .insight ul{
-    margin: 0;
-    padding-left: 18px;
-    color: var(--text);
-    opacity: .92;
-    font-size: 13px;
-    line-height: 1.7;
+      margin: 0;
+      padding-left: 18px;
+      color: var(--text);
+      opacity: .92;
+      font-size: 13px;
+      line-height: 1.7;
     }
     .insight li{ margin: 6px 0; }
 
+    /* Charts */
+    .chartGrid{
+      display:grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 12px;
+      margin-top: 12px;
+    }
+    .chartBox{
+      padding: 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.10);
+      background: rgba(255,255,255,.06);
+    }
+    .chartTitle{
+      font-size: 13px;
+      font-weight: 800;
+      margin: 0 0 8px;
+      color: rgba(255,255,255,.92);
+    }
+    .chartCanvasWrap{
+      height: 220px;
+    }
   </style>
 </head>
 
@@ -299,6 +321,7 @@
     </div>
 
     <div id="snapshot" class="state">正在載入資料…</div>
+    <div id="trends" style="margin-top:16px;"></div>
   </div>
 
 <script>
@@ -308,6 +331,167 @@ const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const params = new URLSearchParams(window.location.search);
 const symbol = (params.get("symbol") || "").toUpperCase();
+
+// ===== FMP (Income / Cash Flow) =====
+const FMP_API_KEY = "PHTJpjhhPVzIdzjMEP84WKq5JiNRYxA6";
+let _revChart = null;
+let _epsChart = null;
+let _fcfChart = null;
+
+async function fetchIncomeStatementFY(sym) {
+  const url = `https://financialmodelingprep.com/stable/income-statement?symbol=${encodeURIComponent(sym)}&apikey=${encodeURIComponent(FMP_API_KEY)}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`FMP income HTTP ${res.status}`);
+  const json = await res.json();
+  if (!Array.isArray(json)) return [];
+
+  return json
+    .filter(r => (String(r.period || "").toUpperCase() === "FY") || (r.calendarYear && !r.period))
+    .map(r => ({
+      year: Number(r.fiscalYear || r.calendarYear || (r.date ? String(r.date).slice(0,4) : NaN)),
+      revenue: Number(r.revenue),
+      eps: Number((r.eps ?? r.epsDiluted)),
+    }))
+    .filter(r => Number.isFinite(r.year))
+    .sort((a,b) => a.year - b.year);
+}
+
+async function fetchCashFlowFY(sym) {
+  const url = `https://financialmodelingprep.com/stable/cash-flow-statement?symbol=${encodeURIComponent(sym)}&apikey=${encodeURIComponent(FMP_API_KEY)}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`FMP cashflow HTTP ${res.status}`);
+  const json = await res.json();
+  if (!Array.isArray(json)) return [];
+
+  return json
+    .filter(r => String(r.period || "").toUpperCase() === "FY")
+    .map(r => ({
+      year: Number(r.fiscalYear || (r.date ? String(r.date).slice(0,4) : NaN)),
+      fcf: Number(r.freeCashFlow),
+    }))
+    .filter(r => Number.isFinite(r.year))
+    .sort((a,b) => a.year - b.year);
+}
+
+function destroyCharts(){
+  if (_revChart) { _revChart.destroy(); _revChart = null; }
+  if (_epsChart) { _epsChart.destroy(); _epsChart = null; }
+  if (_fcfChart) { _fcfChart.destroy(); _fcfChart = null; }
+}
+
+function renderLineChart(canvas, labels, series, title, ySuffix="", decimals=1){
+  const ctx = canvas.getContext("2d");
+  return new Chart(ctx, {
+    type: "line",
+    data: {
+      labels,
+      datasets: [{
+        label: title,
+        data: series,
+        tension: 0.25,
+        pointRadius: 2,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (c) => `${Number(c.parsed.y).toFixed(decimals)}${ySuffix}`
+          }
+        }
+      },
+      scales: {
+        x: { ticks: { maxRotation: 0 } },
+        y: {
+          ticks: {
+            callback: (v) => Number(v).toFixed(decimals) // ✅ 左邊刻度小數位
+          }
+        }
+      }
+    }
+  });
+}
+
+async function loadQuickTrends(sym){
+  const el = document.getElementById("trends");
+  if (!el) return;
+
+  el.innerHTML = `
+    <div class="card">
+      <div class="cardHeader">
+        <h3 class="cardTitle">財務趨勢（Quick Trends）</h3>
+        <span class="pill">FMP · Income & Cash Flow</span>
+      </div>
+
+      <div id="trendState" class="note">載入中…</div>
+
+      <div class="chartGrid">
+        <div class="chartBox">
+          <div class="chartTitle">營收（億 USD）</div>
+          <div class="chartCanvasWrap"><canvas id="revChart"></canvas></div>
+        </div>
+
+        <div class="chartBox">
+          <div class="chartTitle">EPS（USD）</div>
+          <div class="chartCanvasWrap"><canvas id="epsChart"></canvas></div>
+        </div>
+
+        <div class="chartBox">
+          <div class="chartTitle">自由現金流 FCF（億 USD）</div>
+          <div class="chartCanvasWrap"><canvas id="fcfChart"></canvas></div>
+        </div>
+      </div>
+
+      <div class="note">資料來源：Financial Modeling Prep（年度 FY）。</div>
+    </div>
+  `;
+
+  try{
+    destroyCharts();
+
+    const [fy, fcfFY] = await Promise.all([
+      fetchIncomeStatementFY(sym),
+      fetchCashFlowFY(sym),
+    ]);
+
+    const state = document.getElementById("trendState");
+
+    if (!fy.length){
+      state.textContent = "暫時抓不到趨勢資料（可能 API 無資料或被限制）。";
+      return;
+    }
+
+    // 最近 8 年（以 Income statement 年份為基準）
+    const last = fy.slice(-8);
+    const labels = last.map(x => String(x.year));
+    const revenueB = last.map(x => Number.isFinite(x.revenue) ? +(x.revenue / 1e9).toFixed(1) : null); // 億
+    const eps = last.map(x => Number.isFinite(x.eps) ? +x.eps.toFixed(2) : null);
+
+    // FCF 對齊同一組年份
+    const fcfMap = new Map((fcfFY || []).map(r => [r.year, r.fcf]));
+    const fcfB = last.map(x => {
+      const v = fcfMap.get(x.year);
+      return Number.isFinite(v) ? +(v / 1e9).toFixed(1) : null; // 億
+    });
+
+    state.textContent = "";
+
+    const revCanvas = document.getElementById("revChart");
+    const epsCanvas = document.getElementById("epsChart");
+    const fcfCanvas = document.getElementById("fcfChart");
+
+    _revChart = renderLineChart(revCanvas, labels, revenueB, "Revenue", " 億", 1);
+    _epsChart = renderLineChart(epsCanvas, labels, eps, "EPS", "", 2);
+    _fcfChart = renderLineChart(fcfCanvas, labels, fcfB, "Free Cash Flow", " 億", 1);
+
+  } catch(e){
+    const state = document.getElementById("trendState");
+    if (state) state.textContent = `趨勢載入失敗：${e.message}`;
+  }
+}
 
 // --------- formatting ----------
 function fmtPct(x, digits=1){
@@ -368,7 +552,6 @@ function calculateScore(d) {
   if (total >= 80) grade = "優質";
   else if (total >= 65) grade = "良好";
 
-  // ring color by grade
   let ringColor = getComputedStyle(document.documentElement).getPropertyValue('--mid').trim();
   if (total >= 80) ringColor = getComputedStyle(document.documentElement).getPropertyValue('--good').trim();
   else if (total < 65) ringColor = getComputedStyle(document.documentElement).getPropertyValue('--bad').trim();
@@ -377,10 +560,8 @@ function calculateScore(d) {
 }
 
 function buildInsight(d, s) {
-  // 目標：固定輸出 3 行，分別解釋 成長/品質/估值
   const lines = [];
 
-  // 1) 成長解讀
   const rev = d.revenue_growth;
   const eps = d.eps_growth;
   if (rev == null || eps == null) {
@@ -393,7 +574,6 @@ function buildInsight(d, s) {
     lines.push("成長：成長動能分歧（營收與 EPS 一強一弱），建議留意可持續性。");
   }
 
-  // 2) 品質解讀
   const roe = d.roe;
   const roic = d.roic;
   if (roe == null || roic == null) {
@@ -406,7 +586,6 @@ function buildInsight(d, s) {
     lines.push("品質：資本效率落在中段水準，屬於穩定但不極強的品質結構。");
   }
 
-  // 3) 估值解讀（PE + FCF Yield）
   const pe = d.pe;
   const fcfy = d.fcf_yield;
   if (pe == null || fcfy == null) {
@@ -419,7 +598,6 @@ function buildInsight(d, s) {
     lines.push("估值：估值落在中性區間，建議搭配成長性一起衡量是否合理。");
   }
 
-  // 保證只回 3 行
   return lines.slice(0, 3);
 }
 
@@ -431,7 +609,6 @@ async function loadSnapshot() {
     return;
   }
 
-  // external links
   document.getElementById("tvLink").href = `https://www.tradingview.com/symbols/NASDAQ-${symbol}/`;
   document.getElementById("yfLink").href = `https://finance.yahoo.com/quote/${symbol}`;
 
@@ -445,6 +622,7 @@ async function loadSnapshot() {
     document.getElementById("title").innerText = `${symbol}｜財報快照`;
     document.getElementById("snapshot").className = "state";
     document.getElementById("snapshot").innerText = "找不到資料（可能尚未寫入 core_metrics）。";
+    document.getElementById("trends").innerHTML = "";
     return;
   }
 
@@ -457,7 +635,6 @@ async function loadSnapshot() {
   const qP = clamp(Math.round((s.quality/40)*100), 0, 100);
   const gP = clamp(Math.round((s.growth/30)*100), 0, 100);
   const vP = clamp(Math.round((s.valuation/30)*100), 0, 100);
-
 
   document.getElementById("snapshot").className = "";
   document.getElementById("snapshot").innerHTML = `
@@ -494,16 +671,17 @@ async function loadSnapshot() {
             <div class="note">
               評分用於快速比較公司獲利品質、成長性與估值水準；僅供參考，不構成投資建議。
             </div>
+
             <div class="insight">
-                <div class="insightTitle">
-                    <h4>AI 快速解讀</h4>
-                    <span class="tag">Snapshot Insight</span>
-                </div>
-                <ul>
-                    <li>${insight[0]}</li>
-                    <li>${insight[1]}</li>
-                    <li>${insight[2]}</li>
-                </ul>
+              <div class="insightTitle">
+                <h4>AI 快速解讀</h4>
+                <span class="tag">Snapshot Insight</span>
+              </div>
+              <ul>
+                <li>${insight[0]}</li>
+                <li>${insight[1]}</li>
+                <li>${insight[2]}</li>
+              </ul>
             </div>
           </div>
         </div>
@@ -577,6 +755,9 @@ async function loadSnapshot() {
       </div>
     </div>
   `;
+
+  // 等 DOM 把 canvas 放上去後再畫圖
+  requestAnimationFrame(() => loadQuickTrends(symbol));
 }
 
 loadSnapshot();
