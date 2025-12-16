@@ -302,6 +302,84 @@
     .chartCanvasWrap{
       height: 220px;
     }
+
+    /* Health Check（自成一格，放在趨勢下面） */
+    .healthCard{
+      padding: 16px;
+      border-radius: 18px;
+      border: 1px solid rgba(255,255,255,.10);
+      background: rgba(255,255,255,.06);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(12px);
+    }
+    .healthHeader{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .healthHeader h3{
+      margin:0;
+      font-size: 14px;
+      font-weight: 900;
+      letter-spacing: .2px;
+    }
+    .healthGrid{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    @media (max-width: 900px){
+      .healthGrid{ grid-template-columns: 1fr; }
+    }
+    .healthBox{
+      padding: 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.10);
+      background: rgba(0,0,0,.18);
+    }
+    .healthBoxTitle{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    .healthBoxTitle b{
+      font-size: 13px;
+      opacity: .95;
+    }
+
+    /* Health 專用 pill（避免污染全域 .pill） */
+    .hpill{
+      font-size: 12px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.05);
+      color: var(--muted);
+      white-space:nowrap;
+    }
+    .hpill.good{ border-color: rgba(39,200,122,.35); color: rgba(195,255,223,.92); }
+    .hpill.mid { border-color: rgba(255,203, 74,.35); color: rgba(255,239,200,.92); }
+    .hpill.bad { border-color: rgba(255, 96, 96,.35); color: rgba(255,205,205,.92); }
+
+    .healthList{
+      margin: 0;
+      padding-left: 18px;
+      color: var(--text);
+      opacity: .92;
+      font-size: 13px;
+      line-height: 1.7;
+    }
+    .healthList li{ margin: 6px 0; }
+    .healthNote{
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 12px;
+      opacity: .92;
+    }
   </style>
 </head>
 
@@ -322,6 +400,7 @@
 
     <div id="snapshot" class="state">正在載入資料…</div>
     <div id="trends" style="margin-top:16px;"></div>
+    <div id="health" style="margin-top:16px;"></div>
   </div>
 
 <script>
@@ -407,7 +486,7 @@ function renderLineChart(canvas, labels, series, title, ySuffix="", decimals=1){
         x: { ticks: { maxRotation: 0 } },
         y: {
           ticks: {
-            callback: (v) => Number(v).toFixed(decimals) // ✅ 左邊刻度小數位
+            callback: (v) => Number(v).toFixed(decimals) // 左邊刻度小數位
           }
         }
       }
@@ -464,28 +543,22 @@ async function loadQuickTrends(sym){
       return;
     }
 
-    // 最近 8 年（以 Income statement 年份為基準）
     const last = fy.slice(-8);
     const labels = last.map(x => String(x.year));
-    const revenueB = last.map(x => Number.isFinite(x.revenue) ? +(x.revenue / 1e9).toFixed(1) : null); // 億
+    const revenueB = last.map(x => Number.isFinite(x.revenue) ? +(x.revenue / 1e9).toFixed(1) : null);
     const eps = last.map(x => Number.isFinite(x.eps) ? +x.eps.toFixed(2) : null);
 
-    // FCF 對齊同一組年份
     const fcfMap = new Map((fcfFY || []).map(r => [r.year, r.fcf]));
     const fcfB = last.map(x => {
       const v = fcfMap.get(x.year);
-      return Number.isFinite(v) ? +(v / 1e9).toFixed(1) : null; // 億
+      return Number.isFinite(v) ? +(v / 1e9).toFixed(1) : null;
     });
 
     state.textContent = "";
 
-    const revCanvas = document.getElementById("revChart");
-    const epsCanvas = document.getElementById("epsChart");
-    const fcfCanvas = document.getElementById("fcfChart");
-
-    _revChart = renderLineChart(revCanvas, labels, revenueB, "Revenue", " 億", 1);
-    _epsChart = renderLineChart(epsCanvas, labels, eps, "EPS", "", 2);
-    _fcfChart = renderLineChart(fcfCanvas, labels, fcfB, "Free Cash Flow", " 億", 1);
+    _revChart = renderLineChart(document.getElementById("revChart"), labels, revenueB, "Revenue", " 億", 1);
+    _epsChart = renderLineChart(document.getElementById("epsChart"), labels, eps, "EPS", "", 2);
+    _fcfChart = renderLineChart(document.getElementById("fcfChart"), labels, fcfB, "Free Cash Flow", " 億", 1);
 
   } catch(e){
     const state = document.getElementById("trendState");
@@ -601,6 +674,97 @@ function buildInsight(d, s) {
   return lines.slice(0, 3);
 }
 
+function yn(ok){ return ok ? "✅" : "•"; }
+
+function buildHealthChecks(d){
+  const rev = Number(d.revenue_growth);
+  const eps = Number(d.eps_growth);
+  const roic = Number(d.roic);
+  const roe = Number(d.roe);
+  const beta = Number(d.beta);
+  const pe = Number(d.pe);
+  const peg = Number(d.peg);
+  const fcfy = Number(d.fcf_yield);
+
+  const growthChecks = [
+    { label: "營收 YoY ≥ 10%", ok: Number.isFinite(rev) && rev >= 0.10 },
+    { label: "EPS YoY ≥ 10%", ok: Number.isFinite(eps) && eps >= 0.10 },
+    { label: "ROIC ≥ 12%", ok: Number.isFinite(roic) && roic >= 0.12 },
+    { label: "PEG ≤ 2.5（有資料時）", ok: !Number.isFinite(peg) ? true : (peg > 0 && peg <= 2.5) },
+  ];
+
+  const incomeChecks = [
+    { label: "FCF 殖利率 ≥ 3%", ok: Number.isFinite(fcfy) && fcfy >= 0.03 },
+    { label: "ROE ≥ 12%（穩定獲利能力）", ok: Number.isFinite(roe) && roe >= 0.12 },
+    { label: "營收 YoY ≥ 3%（不萎縮）", ok: Number.isFinite(rev) && rev >= 0.03 },
+    { label: "β ≤ 1.2（波動較低）", ok: Number.isFinite(beta) && beta <= 1.2 },
+  ];
+
+  const valueChecks = [
+    { label: "PE ≤ 20（有資料時）", ok: !Number.isFinite(pe) ? true : pe > 0 && pe <= 20 },
+    { label: "PEG ≤ 1.5（有資料時）", ok: !Number.isFinite(peg) ? true : (peg > 0 && peg <= 1.5) },
+    { label: "FCF 殖利率 ≥ 4%", ok: Number.isFinite(fcfy) && fcfy >= 0.04 },
+    { label: "ROIC ≥ 10%（便宜但也要好）", ok: Number.isFinite(roic) && roic >= 0.10 },
+  ];
+
+  const riskChecks = [
+    { label: "ROE > 0", ok: Number.isFinite(roe) && roe > 0 },
+    { label: "ROIC > 0", ok: Number.isFinite(roic) && roic > 0 },
+    { label: "FCF 殖利率 > 0", ok: Number.isFinite(fcfy) && fcfy > 0 },
+    { label: "PEG 不為負（有資料時）", ok: !Number.isFinite(peg) ? true : peg > 0 },
+  ];
+
+  function pack(title, checks){
+    const pass = checks.filter(c => c.ok).length;
+    const total = checks.length;
+    const ratio = pass / total;
+    const level = ratio >= 0.75 ? "good" : ratio >= 0.5 ? "mid" : "bad";
+    const label = ratio >= 0.75 ? "偏符合" : ratio >= 0.5 ? "中性" : "偏不符合";
+    return { title, checks, pass, total, level, label };
+  }
+
+  return [
+    pack("成長股健診", growthChecks),
+    pack("定存股健診", incomeChecks),
+    pack("便宜股健診", valueChecks),
+    pack("排除地雷股", riskChecks),
+  ];
+}
+
+function renderHealthSection(d){
+  const host = document.getElementById("health");
+  if (!host) return;
+
+  const blocks = buildHealthChecks(d);
+
+  host.innerHTML = `
+    <div class="healthCard">
+      <div class="healthHeader">
+        <h3>股票健診（Beta）</h3>
+        <span class="pill">rules · v0</span>
+      </div>
+
+      <div class="healthGrid">
+        ${blocks.map(b => `
+          <div class="healthBox">
+            <div class="healthBoxTitle">
+              <b>${b.title}</b>
+              <span class="hpill ${b.level}">${b.pass}/${b.total} · ${b.label}</span>
+            </div>
+            <ul class="healthList">
+              ${b.checks.map(c => `<li>${yn(c.ok)} ${c.label}</li>`).join("")}
+            </ul>
+          </div>
+        `).join("")}
+      </div>
+
+      <div class="healthNote">
+        註：此為規則式快篩（利用你資料庫欄位計算），用於快速比較，不構成投資建議。
+      </div>
+    </div>
+  `;
+}
+
 async function loadSnapshot() {
   if (!symbol) {
     document.getElementById("title").innerText = "懂才抱｜財報快照";
@@ -623,6 +787,7 @@ async function loadSnapshot() {
     document.getElementById("snapshot").className = "state";
     document.getElementById("snapshot").innerText = "找不到資料（可能尚未寫入 core_metrics）。";
     document.getElementById("trends").innerHTML = "";
+    document.getElementById("health").innerHTML = "";
     return;
   }
 
@@ -756,7 +921,10 @@ async function loadSnapshot() {
     </div>
   `;
 
-  // 等 DOM 把 canvas 放上去後再畫圖
+  // 先畫健診（在趨勢下面，自成一格）
+  renderHealthSection(data);
+
+  // 再載入趨勢圖（只呼叫一次）
   requestAnimationFrame(() => loadQuickTrends(symbol));
 }
 
