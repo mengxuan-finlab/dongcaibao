@@ -168,7 +168,7 @@
   // ------- 1. 初始化 Supabase -------
   const supabaseUrl = "https://zlkexplsleznuebighte.supabase.co";
   const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpsa2V4cGxzbGV6bnVlYmlnaHRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0MzAwNjUsImV4cCI6MjA4MTAwNjA2NX0.HPVn3jcN88M4U3-RCVW-YO-b65rDOKv6pxEaVWwbm68";
-  const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+  const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
 
   const planLimitMap = {
     free: 1,
@@ -186,7 +186,7 @@
 
   // ------- 2. 取得登入狀態 + 會員方案 -------
   async function init() {
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { session } } = await supabaseClient.auth.getSession();
     if (!session) {
       alert("請先登入後再使用財報追蹤功能");
       window.location.href = "login.html"; // 你的登入頁
@@ -195,7 +195,7 @@
     currentUser = session.user;
 
     // 抓 profile 的 plan
-    const { data: profile, error } = await supabase
+    const { data: profile, error } = await supabaseClient
       .from("profiles")
       .select("plan")
       .eq("id", currentUser.id)
@@ -218,7 +218,7 @@
 
   // ------- 3. 載入目前追蹤清單 -------
   async function loadTrackedStocks() {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseClient
       .from("tracked_stocks")
       .select("id, symbol, status, report_url")
       .eq("user_id", currentUser.id)
@@ -370,7 +370,7 @@
       return;
     }
 
-    const { error } = await supabase
+    const { error } = await supabaseClient
       .from("tracked_stocks")
       .insert({
         user_id: currentUser.id,
@@ -390,7 +390,7 @@
 
   // ------- 5. 移除追蹤 -------
   async function removeStock(id) {
-    const { error } = await supabase
+    const { error } = await supabaseClient
       .from("tracked_stocks")
       .delete()
       .eq("id", id)

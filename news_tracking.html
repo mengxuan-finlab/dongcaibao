@@ -91,7 +91,7 @@
   // 1) 改成你的專案
   const SUPABASE_URL = "https://zlkexplsleznuebighte.supabase.co";
   const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpsa2V4cGxzbGV6bnVlYmlnaHRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0MzAwNjUsImV4cCI6MjA4MTAwNjA2NX0.HPVn3jcN88M4U3-RCVW-YO-b65rDOKv6pxEaVWwbm68";
-  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   // 2) 方案限制（你可依實際調整）
   const PLAN_LIMIT = { free: 1, plus: 3, pro: 5 };
@@ -108,7 +108,7 @@
   }
 
   async function requireLogin() {
-    const { data, error } = await supabase.auth.getUser();
+    const { data, error } = await supabaseClient.auth.getUser();
     if (error) throw error;
     if (!data?.user) {
       $("loginHint").textContent = "尚未登入：請先完成登入，才能讀取/儲存你的追蹤設定。";
@@ -119,7 +119,7 @@
 
   async function loadProfile() {
     // profiles.id 建議是 auth.user.id（你若不是這樣，回我，我幫你對齊）
-    const { data, error } = await supabase
+    const { data, error } = await supabaseClient
       .from("profiles")
       .select("id, plan")
       .eq("id", CURRENT_USER_ID)
@@ -133,7 +133,7 @@
   }
 
   async function loadRules() {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseClient
       .from("news_tracking_rules")
       .select("id, symbol, reason, keywords, is_active, created_at, updated_at")
       .eq("user_id", CURRENT_USER_ID)
@@ -191,7 +191,7 @@
       return setMsg(`你的方案最多 ${limit} 檔，請先停用一檔再新增。`);
     }
 
-    const { error } = await supabase
+    const { error } = await supabaseClient
       .from("news_tracking_rules")
       .insert({
         user_id: CURRENT_USER_ID,
@@ -247,7 +247,7 @@
     if (!newReason) return $("editMsg").textContent = "追蹤理由不能為空。";
     if (!EDITING_ID) return;
 
-    const { error } = await supabase
+    const { error } = await supabaseClient
       .from("news_tracking_rules")
       .update({
         keywords: newKeywords,
@@ -277,7 +277,7 @@
   window.disableRule = async function(id) {
     if (!confirm("確定要停用這個追蹤？")) return;
 
-    const { error } = await supabase
+    const { error } = await supabaseClient
       .from("news_tracking_rules")
       .update({
         is_active: false,
