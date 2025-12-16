@@ -690,28 +690,28 @@ function buildHealthChecks(d){
     { label: "營收 YoY ≥ 10%", ok: Number.isFinite(rev) && rev >= 0.10 },
     { label: "EPS YoY ≥ 10%", ok: Number.isFinite(eps) && eps >= 0.10 },
     { label: "ROIC ≥ 12%", ok: Number.isFinite(roic) && roic >= 0.12 },
-    { label: "PEG ≤ 2.5（有資料時）", ok: !Number.isFinite(peg) ? true : (peg > 0 && peg <= 2.5) },
+    { label: "PEG ≤ 2.5", ok: !Number.isFinite(peg) ? true : (peg > 0 && peg <= 2.5) },
   ];
 
   const incomeChecks = [
     { label: "FCF 殖利率 ≥ 3%", ok: Number.isFinite(fcfy) && fcfy >= 0.03 },
-    { label: "ROE ≥ 12%（穩定獲利能力）", ok: Number.isFinite(roe) && roe >= 0.12 },
-    { label: "營收 YoY ≥ 3%（不萎縮）", ok: Number.isFinite(rev) && rev >= 0.03 },
-    { label: "β ≤ 1.2（波動較低）", ok: Number.isFinite(beta) && beta <= 1.2 },
+    { label: "ROE ≥ 12%", ok: Number.isFinite(roe) && roe >= 0.12 },
+    { label: "營收 YoY ≥ 3%", ok: Number.isFinite(rev) && rev >= 0.03 },
+    { label: "β ≤ 1.2）", ok: Number.isFinite(beta) && beta <= 1.2 },
   ];
 
   const valueChecks = [
-    { label: "PE ≤ 20（有資料時）", ok: !Number.isFinite(pe) ? true : pe > 0 && pe <= 20 },
-    { label: "PEG ≤ 1.5（有資料時）", ok: !Number.isFinite(peg) ? true : (peg > 0 && peg <= 1.5) },
+    { label: "PE ≤ 20", ok: !Number.isFinite(pe) ? true : pe > 0 && pe <= 20 },
+    { label: "PEG ≤ 1.5", ok: !Number.isFinite(peg) ? true : (peg > 0 && peg <= 1.5) },
     { label: "FCF 殖利率 ≥ 4%", ok: Number.isFinite(fcfy) && fcfy >= 0.04 },
-    { label: "ROIC ≥ 10%（便宜但也要好）", ok: Number.isFinite(roic) && roic >= 0.10 },
+    { label: "ROIC ≥ 10%", ok: Number.isFinite(roic) && roic >= 0.10 },
   ];
 
   const riskChecks = [
     { label: "ROE > 0", ok: Number.isFinite(roe) && roe > 0 },
     { label: "ROIC > 0", ok: Number.isFinite(roic) && roic > 0 },
     { label: "FCF 殖利率 > 0", ok: Number.isFinite(fcfy) && fcfy > 0 },
-    { label: "PEG 不為負（有資料時）", ok: !Number.isFinite(peg) ? true : peg > 0 },
+    { label: "PEG 不為負", ok: !Number.isFinite(peg) ? true : peg > 0 },
   ];
 
   function pack(title, checks){
