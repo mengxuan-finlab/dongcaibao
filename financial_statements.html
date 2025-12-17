@@ -5,6 +5,8 @@
   <title>懂才抱｜財報追蹤管理</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
   <style>
     body {
       margin: 0;
@@ -41,6 +43,7 @@
       border: 1px solid #374151;
       background: #111827;
       color: #f9fafb;
+      box-sizing: border-box; /* 確保 padding 不會撐爆寬度 */
     }
     .sidebar button {
       margin-top: 8px;
@@ -51,6 +54,7 @@
       background: #4f46e5;
       color: #f9fafb;
       font-size: 14px;
+      width: 100%;
     }
     .sidebar button:disabled {
       background: #6b7280;
@@ -64,7 +68,7 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 6px 10px;
+      padding: 8px 10px;
       border-radius: 8px;
       margin-bottom: 4px;
       cursor: pointer;
@@ -89,29 +93,113 @@
       padding: 2px 8px;
       font-size: 12px;
       background: #b91c1c;
+      width: auto; /* 移除按鈕這部分的全寬設定 */
     }
 
     .content {
-      padding: 0px;
+      padding: 24px;
       overflow-y: auto;
     }
     .dashboards {
       display: grid;
       grid-template-columns: 1fr;
       gap: 16px;
+      max-width: 1000px;
+      margin: 0 auto;
     }
     .dash-card {
       background: #ffffff;
       border-radius: 12px;
       border: 1px solid #e5e7eb;
-      padding: 16px;
+      padding: 24px;
       box-shadow: 0 4px 12px rgba(15,23,42,0.06);
+      min-height: 500px;
     }
     .dash-card h2 {
-      font-size: 18px;
-      margin: 0 0 8px;
+      font-size: 20px;
+      margin: 0 0 16px;
+      border-bottom: 1px solid #e5e7eb;
+      padding-bottom: 12px;
     }
-    .dash-card .status {
+    
+    /* ★ 2. 新增 Tab 按鈕樣式 */
+    .tab-container {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+      border-bottom: 1px solid #f3f4f6;
+      padding-bottom: 10px;
+    }
+    .tab-btn {
+      padding: 8px 16px;
+      border-radius: 6px;
+      border: 1px solid #e5e7eb;
+      background: white;
+      color: #374151;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .tab-btn:hover {
+      background: #f9fafb;
+    }
+    .tab-btn.active {
+      background: #4f46e5;
+      color: white;
+      border-color: #4f46e5;
+    }
+
+    /* 內容顯示區塊 */
+    .view-section {
+      display: none; /* 預設隱藏 */
+      animation: fadeIn 0.3s ease-in-out;
+    }
+    .view-section.active {
+      display: block; /* 加上 active 類別才顯示 */
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(5px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Iframe 樣式 */
+    iframe {
+      width: 100%;
+      height: 800px;
+      border: none;
+      border-radius: 8px;
+      background: #f9fafb;
+    }
+
+    /* AI Summary 樣式 (Markdown 渲染後) */
+    .summary-content {
+      line-height: 1.8;
+      color: #374151;
+      font-size: 16px;
+    }
+    .summary-content h3 {
+      color: #111827;
+      margin-top: 24px;
+      margin-bottom: 12px;
+      border-left: 4px solid #4f46e5;
+      padding-left: 10px;
+      font-size: 18px;
+    }
+    .summary-content strong {
+      color: #000;
+      background-color: #f3f4f6;
+      padding: 0 4px;
+    }
+    .summary-content ul {
+      padding-left: 20px;
+    }
+    .summary-content li {
+      margin-bottom: 8px;
+    }
+
+    /* 狀態標籤 */
+    .status-badge {
       display: inline-flex;
       align-items: center;
       font-size: 12px;
@@ -119,30 +207,16 @@
       border-radius: 999px;
       background: #eef2ff;
       color: #3730a3;
-      margin-bottom: 0px;
+      margin-bottom: 10px;
     }
-    .dash-card .status.ready {
-      background: #dcfce7;
-      color: #166534;
-    }
-    .dash-card p {
-      font-size: 14px;
-      line-height: 1.7;
-      margin: 4px 0;
-      color: #4b5563;
-    }
-    .dash-card iframe {
-      width: 100%;
-      height: 100vh;
-      border: none;
-      border-radius: 8px;
-      margin-top: 12px;
+    .status-badge.pending {
+      background: #fff7ed;
+      color: #c2410c;
     }
   </style>
 </head>
 <body>
 <div class="layout">
-  <!-- 左邊：輸入追蹤股票 -->
   <aside class="sidebar">
     <h1>財報追蹤管理</h1>
     <div class="plan">
@@ -150,7 +224,7 @@
       可追蹤檔數上限：<span id="planLimit">-</span> 檔
     </div>
 
-    <label for="symbolInput">新增追蹤股票（美股代號，例如 HIMS、AAPL）</label>
+    <label for="symbolInput">新增追蹤股票（美股代號，例如 HIMS）</label>
     <input id="symbolInput" placeholder="輸入股票代號（英文）" />
     <button id="addBtn">新增追蹤</button>
     <div style="font-size:12px; margin-top:4px; color:#9ca3af;">Free: 1 檔、Plus: 3 檔、Pro: 5 檔</div>
@@ -158,7 +232,6 @@
     <div class="stock-list" id="stockList"></div>
   </aside>
 
-  <!-- 右邊：只顯示「目前選取」那一檔 -->
   <main class="content">
     <div class="dashboards" id="dashboards"></div>
   </main>
@@ -170,18 +243,13 @@
   const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpsa2V4cGxzbGV6bnVlYmlnaHRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0MzAwNjUsImV4cCI6MjA4MTAwNjA2NX0.HPVn3jcN88M4U3-RCVW-YO-b65rDOKv6pxEaVWwbm68";
   const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
 
-  const planLimitMap = {
-    free: 1,
-    plus: 3,
-    pro: 5
-  };
+  const planLimitMap = { free: 1, plus: 3, pro: 5 };
 
   let currentUser = null;
   let currentPlan = "free";
   let currentLimit = 1;
-  // tracked: { id, symbol, status, report_url }
+  // tracked: { id, symbol, status, report_url, summary }
   let tracked = [];
-  // ★ 新增：目前選到哪一筆
   let selectedStockId = null;
 
   // ------- 2. 取得登入狀態 + 會員方案 -------
@@ -189,12 +257,11 @@
     const { data: { session } } = await supabaseClient.auth.getSession();
     if (!session) {
       alert("請先登入後再使用財報追蹤功能");
-      window.location.href = "login.html"; // 你的登入頁
+      // window.location.href = "login.html"; 
       return;
     }
     currentUser = session.user;
 
-    // 抓 profile 的 plan
     const { data: profile, error } = await supabaseClient
       .from("profiles")
       .select("plan")
@@ -202,12 +269,11 @@
       .single();
 
     if (error) {
-      console.error("讀取 profile 失敗：", error);
-      alert("無法載入會員方案設定");
-      return;
+      console.error("讀取 profile 失敗，使用預設值");
+      currentPlan = "free";
+    } else {
+      currentPlan = profile.plan || "free";
     }
-
-    currentPlan = profile.plan || "free";
     currentLimit = planLimitMap[currentPlan] || 1;
 
     document.getElementById("planName").textContent = currentPlan.toUpperCase();
@@ -218,9 +284,10 @@
 
   // ------- 3. 載入目前追蹤清單 -------
   async function loadTrackedStocks() {
+    // ★ 關鍵：記得多抓取 summary 欄位
     const { data, error } = await supabaseClient
       .from("tracked_stocks")
-      .select("id, symbol, status, report_url")
+      .select("id, symbol, status, report_url, summary")
       .eq("user_id", currentUser.id)
       .order("created_at", { ascending: true });
 
@@ -231,7 +298,7 @@
 
     tracked = data || [];
 
-    // ★ 如果還沒選，預設選第一筆
+    // 預設選第一筆
     if (tracked.length > 0) {
       if (!selectedStockId || !tracked.some(s => s.id === selectedStockId)) {
         selectedStockId = tracked[0].id;
@@ -248,21 +315,16 @@
   function renderStockList() {
     const listEl = document.getElementById("stockList");
     if (tracked.length === 0) {
-      listEl.innerHTML = "<div>尚未追蹤任何股票</div>";
+      listEl.innerHTML = "<div style='padding:10px; color:#9ca3af;'>尚未追蹤任何股票</div>";
       return;
     }
     listEl.innerHTML = tracked
       .map(s => {
-        const statusText =
-          s.status === "ready" ? "已完成" :
-          s.status === "pending" || !s.status ? "準備中" :
-          s.status;
-
+        let statusText = s.status === "ready" ? "已完成" : s.status === "review" ? "審核中" : "準備中";
         const activeClass = s.id === selectedStockId ? "active" : "";
 
         return `
-          <div class="stock-item ${activeClass}"
-               onclick="selectStock(${s.id})">
+          <div class="stock-item ${activeClass}" onclick="selectStock(${s.id})">
             <span>
               ${s.symbol}
               <span class="status-tag">${statusText}</span>
@@ -274,70 +336,93 @@
       .join("");
   }
 
-  // ------- ★ 新增：切換選取的股票 -------
   function selectStock(id) {
     selectedStockId = id;
     renderStockList();
     renderDashboards();
   }
 
-  // ------- 3-1. 右邊內容：只顯示選取的那一檔 -------
+  // ------- ★ 4. 切換 Tab 的功能 -------
+  // 為了讓 HTML onclick 呼叫得到，掛在 window 上
+  window.switchView = function(viewName) {
+    // 1. 處理按鈕樣式
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    document.getElementById(`btn-${viewName}`).classList.add('active');
+
+    // 2. 處理內容顯示
+    document.querySelectorAll('.view-section').forEach(sec => sec.classList.remove('active'));
+    document.getElementById(`view-${viewName}`).classList.add('active');
+  }
+
+  // ------- 5. 右邊內容渲染邏輯 (主要修改處) -------
   function renderDashboards() {
     const container = document.getElementById("dashboards");
 
     if (tracked.length === 0 || !selectedStockId) {
-      container.innerHTML = "";
+      container.innerHTML = "<div style='text-align:center; color:#6b7280; padding-top:50px;'>請從左側選擇股票</div>";
       return;
     }
 
     const s = tracked.find(item => item.id === selectedStockId);
-    if (!s) {
-      container.innerHTML = "";
+    if (!s) { container.innerHTML = ""; return; }
+
+    // --- 狀態判斷 ---
+    if (s.status === "pending") {
+      container.innerHTML = `
+        <div class="dash-card" style="text-align:center; padding: 60px;">
+          <div style="font-size:40px; margin-bottom:10px;">⏳</div>
+          <h2>AI 正在分析 ${s.symbol} ...</h2>
+          <p>系統正在讀取 10-Q 財報並生成摘要，請稍候約 1-2 分鐘。</p>
+        </div>`;
       return;
     }
 
-    let statusClass = "status";
-    let statusLabel = "";
-    let bodyHtml = "";
-
-    if (s.status === "ready" && s.report_url) {
-      // 報告已完成：顯示 iframe
-      statusClass += " ready";
-      statusLabel = "已完成 · 報告已上線";
-
-      bodyHtml = `
-        <p>
-          <strong>${s.symbol}</strong> 的財報整理已完成，下方為為你準備的最新圖表與說明。
-        </p>
-        <iframe src="${s.report_url}"></iframe>
-      `;
-    } else if (s.status === "pending" || !s.status) {
-      // 剛新增 / 你還沒處理：顯示等待訊息
-      statusLabel = "處理中 · 預計 2 天內完成";
-      bodyHtml = `
-        <p>
-          我們已收到你對 <strong>${s.symbol}</strong> 的財報追蹤申請。
-          系統會在背景整理最新財報數據與圖表，預計於 <strong>2 天內</strong> 完成並更新在此區域。
-        </p>
-        <p class="hint">
-          完成後，這裡會自動顯示完整的財報分析頁面，包含損益表、資產負債表、現金流量與估值指標。
-        </p>
-      `;
-    } else {
-      // 其他狀態（防呆）
-      statusLabel = `狀態：${s.status}`;
-      bodyHtml = `
-        <p>
-          這檔股票的財報內容尚在準備中，完成後會自動顯示在這裡。
-        </p>
-      `;
+    if (s.status === "review") {
+      container.innerHTML = `
+        <div class="dash-card" style="text-align:center; padding: 60px;">
+          <div style="font-size:40px; margin-bottom:10px;">🧐</div>
+          <h2>${s.symbol} 分析報告審核中</h2>
+          <p>AI 已完成摘要，目前正由分析師進行最終確認與圖表校正。</p>
+        </div>`;
+      return;
     }
 
+    // --- 狀態為 ready (已完成) ---
+    // 1. 處理 Summary (Markdown -> HTML)
+    const summaryHtml = s.summary ? marked.parse(s.summary) : "<p>暫無文字摘要。</p>";
+    
+    // 2. 處理 Iframe (財報連結)
+    const iframeHtml = s.report_url 
+      ? `<iframe src="${s.report_url}"></iframe>` 
+      : `<div style="text-align:center; padding:40px; background:#f9fafb; border-radius:8px;">尚未連結圖表數據</div>`;
+
+    // 3. 組合 HTML：上方 Tab + 下方兩個內容區塊
     container.innerHTML = `
       <div class="dash-card">
-        <h2>${s.symbol} 財報分析</h2>
-        <div class="${statusClass}">${statusLabel}</div>
-        ${bodyHtml}
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <h2>${s.symbol} 財務分析報告</h2>
+          <span class="status-badge">已完成</span>
+        </div>
+
+        <div class="tab-container">
+          <button id="btn-financial" class="tab-btn active" onclick="switchView('financial')">
+          三大財報及估值分析
+          </button>
+          <button id="btn-doc" class="tab-btn" onclick="switchView('doc')">
+          最新季度官方文件
+          </button>
+        </div>
+
+        <div id="view-financial" class="view-section active">
+          ${iframeHtml}
+        </div>
+
+        <div id="view-doc" class="view-section">
+          <div class="summary-content">
+            ${summaryHtml}
+          </div>
+        </div>
+
       </div>
     `;
   }
@@ -353,7 +438,7 @@
     }
   }
 
-  // ------- 4. 新增追蹤股票 -------
+  // ------- 6. 新增與移除功能 -------
   async function addStock() {
     const input = document.getElementById("symbolInput");
     const symbolRaw = input.value.trim().toUpperCase();
@@ -364,7 +449,6 @@
       return;
     }
 
-    // 防呆：避免重複
     if (tracked.some(s => s.symbol === symbolRaw)) {
       alert("這檔股票已經在追蹤清單中");
       return;
@@ -375,11 +459,11 @@
       .insert({
         user_id: currentUser.id,
         symbol: symbolRaw,
-        status: "pending"
+        status: "pending",
+        summary: null // 確保 summary 為空
       });
 
     if (error) {
-      console.error("新增追蹤失敗：", error);
       alert("新增追蹤失敗：" + error.message);
       return;
     }
@@ -388,8 +472,8 @@
     await loadTrackedStocks();
   }
 
-  // ------- 5. 移除追蹤 -------
   async function removeStock(id) {
+    if(!confirm("確定要移除嗎？")) return;
     const { error } = await supabaseClient
       .from("tracked_stocks")
       .delete()
@@ -397,18 +481,13 @@
       .eq("user_id", currentUser.id);
 
     if (error) {
-      console.error("移除追蹤失敗：", error);
       alert("移除失敗");
       return;
     }
-
     await loadTrackedStocks();
   }
 
-  // 綁定事件
   document.getElementById("addBtn").addEventListener("click", addStock);
-
-  // 初始化
   init();
 </script>
 </body>
