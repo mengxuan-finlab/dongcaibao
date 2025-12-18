@@ -10,9 +10,16 @@
 </head>
 <body>
   <div class="container">
-    <h1>懂才抱核心指標選股器</h1>
-    <p class="subtitle">以下資料每日定期更新，祝各位巴菲特投資順心</p>
-
+    <div class="header-row">
+        <div>
+            <h1>懂才抱核心指標選股器</h1>
+            <p class="subtitle">以下資料每日定期更新，祝各位巴菲特投資順心</p>
+        </div>
+        <div class="search-section">
+            <input type="text" id="stockInput" placeholder="輸入代號 (如: NVDA)" />
+            <button id="btnGoSnapshot">查看快照</button>
+        </div>
+    </div>
     <div class="filters">
       <div class="filter-group">
         <label for="capFilter">市值篩選</label>
@@ -800,6 +807,30 @@
       }
       applyFiltersAndRender();
     });
+  });
+
+  // ★★★ 新增：搜尋跳轉功能 ★★★
+  function goToSnapshot() {
+    const input = document.getElementById("stockInput");
+    const symbol = input.value.trim().toUpperCase(); // 去除空白並轉大寫
+
+    if (!symbol) {
+      alert("請輸入股票代號！");
+      return;
+    }
+
+    // 跳轉到 analysis.html 並帶上 symbol 參數
+    window.location.href = `analysis.html?symbol=${symbol}`;
+  }
+
+  // 綁定按鈕點擊事件
+  document.getElementById("btnGoSnapshot").addEventListener("click", goToSnapshot);
+
+  // 綁定 Enter 鍵事件 (讓使用者按 Enter 也能搜尋)
+  document.getElementById("stockInput").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      goToSnapshot();
+    }
   });
 
   loadData();

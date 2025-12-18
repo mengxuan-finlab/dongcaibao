@@ -26,7 +26,7 @@ h1 {
 .subtitle { 
   font-size: 14px; 
   color: #9ca3af; 
-  margin-bottom: 16px; 
+  margin-bottom: -10px; 
 }
 
 .filters {
@@ -152,4 +152,70 @@ tr:hover {
   background: rgba(170, 19, 64, 0.9);
   box-shadow: 0 8px 20px rgba(138, 14, 121, 0.35);
   transform: translateY(-1px);
+}
+
+/* 搜尋區塊樣式 */
+.header-row {
+  display: flex;
+  
+  /* ★ 關鍵修改 1：原本是 space-between，改成 flex-start (靠左對齊) */
+  justify-content: flex-start; 
+  
+  /* ★ 關鍵修改 2：讓搜尋框跟標題底部對齊，或是改成 center 垂直置中 */
+  align-items: flex-end; 
+  
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  
+  /* ★ 關鍵修改 3：設定標題跟搜尋框之間的距離 (原本 16px，可以稍微加大一點) */
+  gap: 30px; 
+  
+  /* 如果之前有加 margin-top 負值，可以保留或調整 */
+  margin-top: -10px; 
+}
+
+/* 調整搜尋區塊樣式，讓它小巧精緻一點 */
+.search-section {
+  display: flex;
+  gap: 8px;
+}
+
+.search-section input {
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background-color: #1f2937;
+  color: #fff;
+  font-size: 14px;
+  width: 180px;
+  outline: none;
+}
+
+.search-section button {
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: none;
+  background-color: #2563eb;
+  color: white;
+  font-size: 14px;
+  cursor: pointer;
+  white-space: nowrap; /* 防止文字換行 */
+}
+
+.search-section button:hover {
+  background-color: #1d4ed8;
+}
+
+/* 手機版適配：標題太長時搜尋框換行 */
+@media (max-width: 768px) {
+    .header-row {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .search-section {
+        width: 100%;
+    }
+    .search-section input {
+        width: 100%;
+    }
 }
