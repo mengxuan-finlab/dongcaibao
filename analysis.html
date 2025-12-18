@@ -676,44 +676,85 @@ function buildInsight(d, s) {
 
 function yn(ok){ return ok ? "✅" : "❌"; }
 
-function buildHealthChecks(d){
-  const rev = Number(d.revenue_growth);
-  const eps = Number(d.eps_growth);
-  const roic = Number(d.roic);
-  const roe = Number(d.roe);
-  const beta = Number(d.beta);
-  const pe = Number(d.pe);
-  const peg = Number(d.peg);
-  const fcfy = Number(d.fcf_yield);
+function buildHealthChecks(d) {
+  // 1. 安全轉換函式：處理 null/undefined/空字串
+  const safeNum = (v) => {
+    if (v === null || v === undefined || v === "") return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
 
+  // --- 讀取欄位 (變數名稱對應你的資料庫欄位) ---
+  const rev_g    = safeNum(d.revenue_growth);     // 營收成長率
+  const eps_g    = safeNum(d.eps_growth);         // EPS 成長率
+  const fcf_g    = safeNum(d.fcf_growth);         // FCF 成長率
+  const div_g    = safeNum(d.dividend_growth);    // 股息成長率
+  
+  const roic     = safeNum(d.roic);               // 資本回報率
+  const roe      = safeNum(d.roe);                // 股東權益報酬率
+  const beta     = safeNum(d.beta);               // 波動率
+  const peg      = safeNum(d.peg);                // PEG
+  
+  const dy       = safeNum(d.dividendyield);      // 現金殖利率
+  const payout   = safeNum(d.dividendpayoutratio);// 配息率
+  
+  const pe       = safeNum(d.pe);                 // 本益比
+  const pb       = safeNum(d.pb);                 // 股價淨值比
+  const ev_ebitda= safeNum(d.evtoebitda);         // 企業價值倍數 (EV/EBITDA)
+  const p_fcf    = safeNum(d.p_fcf);              // 股價自由現金流比 (P/FCF)
+  
+  const curr_r   = safeNum(d.current_ratio);      // 流動比 (短期償債)
+  const net_d_e  = safeNum(d.net_debt_to_ebitda); // 淨負債/EBITDA (長期償債)
+  const de_ratio = safeNum(d.debt_to_equity);     // 負債權益比
+
+  // --- 2. 定義四大類型的檢查邏輯 ---
+
+  // A. 成長型 (Growth) - 看重成長動能與效率
   const growthChecks = [
-    { label: "營收 YoY ≥ 10%", ok: Number.isFinite(rev) && rev >= 0.10 },
-    { label: "EPS YoY ≥ 10%", ok: Number.isFinite(eps) && eps >= 0.10 },
-    { label: "ROIC ≥ 12%", ok: Number.isFinite(roic) && roic >= 0.12 },
-    { label: "PEG ≤ 2.5", ok: !Number.isFinite(peg) ? true : (peg > 0 && peg <= 2.5) },
+    { label: "營收成長 ≥ 10%",   ok: rev_g !== null && rev_g >= 0.10 },
+    { label: "EPS 成長 ≥ 10%",   ok: eps_g !== null && eps_g >= 0.10 },
+    { label: "FCF 成長 > 0%",    ok: fcf_g !== null && fcf_g > 0 }, // 真金白銀也要成長
+    { label: "PEG ≤ 2.0",        ok: peg !== null && peg > 0 && peg <= 2.0 }, // 成長股可以接受稍高估值，但不能離譜
   ];
 
+  // B. 定存/存股型 (Dividend/Income) - 看重殖利率與配息安全性
   const incomeChecks = [
-    { label: "FCF 殖利率 ≥ 3%", ok: Number.isFinite(fcfy) && fcfy >= 0.03 },
-    { label: "ROE ≥ 12%", ok: Number.isFinite(roe) && roe >= 0.12 },
-    { label: "營收 YoY ≥ 3%", ok: Number.isFinite(rev) && rev >= 0.03 },
-    { label: "β ≤ 1.2）", ok: Number.isFinite(beta) && beta <= 1.2 },
+    // 1. 殖利率門檻 (例如 4%)
+    { label: "現金殖利率 ≥ 4%",  ok: dy !== null && dy >= 0.04 },
+    // 2. 配息率 < 90% (賺 100 發 90 內算安全，超過 100 代表老本或借錢發)
+    // 註：REITs 類股通常會高於 90%，一般公司則不宜過高
+    { label: "配息率 ≤ 90%",     ok: payout !== null && payout > 0 && payout <= 0.90 },
+    // 3. 股息有成長 (抗通膨)
+    { label: "股息成長 > 0",     ok: div_g !== null && div_g > 0 },
+    // 4. 波動低 (晚上睡得著)
+    { label: "低波動 (β < 1)",   ok: beta !== null && beta < 1.0 },
   ];
 
+  // C. 價值型 (Value) - 看重便宜估值
   const valueChecks = [
-    { label: "PE ≤ 20", ok: !Number.isFinite(pe) ? true : pe > 0 && pe <= 20 },
-    { label: "PEG ≤ 1.5", ok: !Number.isFinite(peg) ? true : (peg > 0 && peg <= 1.5) },
-    { label: "FCF 殖利率 ≥ 4%", ok: Number.isFinite(fcfy) && fcfy >= 0.04 },
-    { label: "ROIC ≥ 10%", ok: Number.isFinite(roic) && roic >= 0.10 },
+    // 1. 本益比便宜
+    { label: "PE ≤ 15",          ok: pe !== null && pe > 0 && pe <= 15 },
+    // 2. EV/EBITDA (比 PE 更專業的估值，通常 < 12 算便宜)
+    { label: "EV/EBITDA ≤ 12",   ok: ev_ebitda !== null && ev_ebitda > 0 && ev_ebitda <= 12 },
+    // 3. P/FCF (股價/自由現金流，越低越好，< 20 代表 5% FCF Yield)
+    { label: "P/FCF ≤ 20",       ok: p_fcf !== null && p_fcf > 0 && p_fcf <= 20 },
+    // 4. 股價淨值比 (傳統價值指標)
+    { label: "PB ≤ 1.5",         ok: pb !== null && pb > 0 && pb <= 1.5 },
   ];
 
+  // D. 排除地雷股 (Safety) - 看重償債能力與基本獲利
   const riskChecks = [
-    { label: "ROE > 0", ok: Number.isFinite(roe) && roe > 0 },
-    { label: "ROIC > 0", ok: Number.isFinite(roic) && roic > 0 },
-    { label: "FCF 殖利率 > 0", ok: Number.isFinite(fcfy) && fcfy > 0 },
-    { label: "PEG 不為負", ok: !Number.isFinite(peg) ? true : peg > 0 },
+    // 1. 流動比 > 1 (短期能還錢)
+    { label: "流動比 ≥ 1",       ok: curr_r !== null && curr_r >= 1.0 },
+    // 2. 淨負債比 < 4 (還債壓力測試，越低越好)
+    { label: "淨負債/EBITDA ≤ 4",ok: net_d_e !== null && net_d_e <= 4.0 }, 
+    // 3. 負債比 (不宜過度槓桿)
+    { label: "負債權益比 ≤ 2",   ok: de_ratio !== null && de_ratio <= 2.0 },
+    // 4. 基本獲利能力 (沒虧錢)
+    { label: "ROE > 0",          ok: roe !== null && roe > 0 },
   ];
 
+  // --- 3. 打包回傳 ---
   function pack(title, checks){
     const pass = checks.filter(c => c.ok).length;
     const total = checks.length;
@@ -727,7 +768,7 @@ function buildHealthChecks(d){
     pack("成長型投資適配度", growthChecks),
     pack("定存型投資適配度", incomeChecks),
     pack("價值型投資適配度", valueChecks),
-    pack("排除地雷股", riskChecks),
+    pack("財務健康與避雷", riskChecks),
   ];
 }
 
