@@ -107,32 +107,47 @@
   });
 
   // ✅ 5. 按「註冊」：只做註冊 + 提示，不寫 profiles
-  document.getElementById("do-signup").addEventListener("click", async () => {
+document.getElementById("do-signup").addEventListener("click", async () => {
     const email = document.getElementById("auth-email").value.trim();
     const password = document.getElementById("auth-password").value;
+    const authErrorEl = document.getElementById("auth-error");
 
     authErrorEl.style.display = "none";
     authErrorEl.textContent = "";
 
+    // 1. 基本檢查
     if (!email || !password) {
       authErrorEl.textContent = "請輸入 Email 和密碼";
       authErrorEl.style.display = "block";
       return;
     }
+    if (password.length < 6) {
+      authErrorEl.textContent = "密碼長度需至少 6 碼";
+      authErrorEl.style.display = "block";
+      return;
+    }
 
+    // 2. 執行註冊
     const { data, error } = await supabaseClient.auth.signUp({
       email,
       password,
     });
 
+    // 3. 錯誤處理
     if (error) {
+      console.error("註冊錯誤:", error); // 方便 Debug
       authErrorEl.textContent = "註冊失敗：" + error.message;
       authErrorEl.style.display = "block";
       return;
     }
 
-    authErrorEl.textContent = "註冊成功，請到信箱收信完成驗證，再重新登入。";
-    authErrorEl.style.display = "block";
+    // 4. 成功處理 (優化體驗)
+    alert("註冊成功！請前往信箱收取驗證信，驗證後即可登入。");
+    
+    // 關閉面板並清空欄位
+    document.getElementById("auth-panel").classList.remove("show");
+    document.getElementById("auth-email").value = "";
+    document.getElementById("auth-password").value = "";
   });
 
   // ✅ 6. 登出
