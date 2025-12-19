@@ -106,7 +106,7 @@
     await refreshAuthUI();
   });
 
-  // ✅ 5. 按「註冊」：只做註冊 + 提示，不寫 profiles
+  // ✅ 5. 按「註冊」
 document.getElementById("do-signup").addEventListener("click", async () => {
     const email = document.getElementById("auth-email").value.trim();
     const password = document.getElementById("auth-password").value;
@@ -127,28 +127,33 @@ document.getElementById("do-signup").addEventListener("click", async () => {
       return;
     }
 
-    // 2. 執行註冊
+    // 2. 執行註冊 (🔥這裡加了一點優化)
+    // window.location.origin 會自動抓目前的網址 (例如 localhost:3000 或你的正式網址)
     const { data, error } = await supabaseClient.auth.signUp({
       email,
       password,
+      options: {
+        emailRedirectTo: window.location.origin, 
+      }
     });
 
     // 3. 錯誤處理
     if (error) {
-      console.error("註冊錯誤:", error); // 方便 Debug
+      console.error("註冊錯誤:", error);
       authErrorEl.textContent = "註冊失敗：" + error.message;
       authErrorEl.style.display = "block";
       return;
     }
 
-    // 4. 成功處理 (優化體驗)
-    alert("註冊成功！請前往信箱收取驗證信，驗證後即可登入。");
+    // 4. 成功處理
+    // 提示多加了一句，讓使用者知道信是從哪裡寄來的
+    alert(`註冊成功！\n請前往信箱 (${email}) 收取驗證信。\n寄件者會顯示 Doncaibao Team。`);
     
     // 關閉面板並清空欄位
     document.getElementById("auth-panel").classList.remove("show");
     document.getElementById("auth-email").value = "";
     document.getElementById("auth-password").value = "";
-  });
+});
 
   // ✅ 6. 登出
   document.getElementById("logout-btn").addEventListener("click", async () => {
