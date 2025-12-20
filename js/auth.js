@@ -127,8 +127,7 @@ document.getElementById("do-signup").addEventListener("click", async () => {
       return;
     }
 
-    // 2. 執行註冊 (🔥這裡加了一點優化)
-    // window.location.origin 會自動抓目前的網址 (例如 localhost:3000 或你的正式網址)
+    // 2. 執行註冊
     const { data, error } = await supabaseClient.auth.signUp({
       email,
       password,
@@ -137,7 +136,7 @@ document.getElementById("do-signup").addEventListener("click", async () => {
       }
     });
 
-    // 3. 錯誤處理
+    // 3. 錯誤處理 (這裡捕捉格式錯誤、密碼太弱等)
     if (error) {
       console.error("註冊錯誤:", error);
       authErrorEl.textContent = "註冊失敗：" + error.message;
@@ -145,9 +144,11 @@ document.getElementById("do-signup").addEventListener("click", async () => {
       return;
     }
 
-    // 4. 成功處理
-    // 提示多加了一句，讓使用者知道信是從哪裡寄來的
-    alert(`註冊成功！\n請前往信箱 (${email}) 收取驗證信。\n寄件者會顯示 Doncaibao Team。`);
+    // 4. 成功處理 (通用訊息)
+    // 這裡的邏輯是：無論是新帳號(真的註冊成功) 還是舊帳號(Supabase 假裝成功)，
+    // 前端都顯示這段話，讓使用者自己去確認。
+    
+    alert(`請求已送出！\n\n已將通知發送至 ${email}。\n若您尚未註冊，請前往信箱點擊連結啟用帳號。\n若此 Email 曾經註冊過，請直接登入即可。`);
     
     // 關閉面板並清空欄位
     document.getElementById("auth-panel").classList.remove("show");
