@@ -422,25 +422,28 @@
     setSelect("betaFilter",  "all");
 
     if (name === "buffett") {
-      // 巴菲特風格（高品質＋穩健）
-      setSelect("roeFilter",  "15");    // ROE ≥ 15%
+      // 巴菲特風格：放寬估值，堅持品質
+      setSelect("roeFilter",  "15");    // ROE ≥ 15% (堅持)
       setSelect("roicFilter", "0.10");  // ROIC ≥ 10%
-      setSelect("fcfFilter",  "0.04");  // FCF 殖利率 ≥ 4%
-      setSelect("eyFilter",   "0.06");  // 盈餘殖利率 ≥ 6%
+      // 修正：放寬現金流要求，避免篩不到好公司
+      setSelect("fcfFilter",  "0.02");  // FCF 殖利率 ≥ 2% (原本 4% 太嚴)
+      setSelect("eyFilter",   "0.04");  // 盈餘殖利率 ≥ 4% (PE < 25) (原本 6% 太嚴)
+      
       setSelect("gmFilter",   "0.4");   // 毛利率 ≥ 40%
       setSelect("omFilter",   "0.1");   // 營業利益率 ≥ 10%
       setSelect("dpFilter",   "0.6");   // 配息率 ≤ 60%
       setSelect("deFilter",   "0.5");   // D/E ≤ 0.5
-      setSelect("betaFilter", "1.0");   // β ≤ 1
+      // Beta 不一定要鎖死，巴菲特有時也買波動大的蘋果，但設 1.0 偏保守也行
+      setSelect("betaFilter", "1.2");   // 建議稍微放寬到 1.2
     }
 
     if (name === "dividend") {
-      // 高股息策略
-      setSelect("dyFilter",   "0.04");  // 股息殖利率 ≥ 4%
-      setSelect("dpFilter",   "0.8");   // 配息率 ≤ 80%
-      setSelect("deFilter",   "1");     // D/E ≤ 1
-      setSelect("betaFilter", "1.0");   // β ≤ 1
-      setSelect("rgFilter",   "0.05");  // 營收年增率 ≥ 5%
+      // 如果想抓更多穩健的大型股，建議殖利率改 0.03 (3%)
+      setSelect("dyFilter",   "0.03");  
+      setSelect("dpFilter",   "0.8");   
+      setSelect("deFilter",   "1");     
+      setSelect("betaFilter", "1.0");   
+      setSelect("rgFilter",   "0.05");  
     }
 
     if (name === "growth") {
@@ -453,13 +456,14 @@
     }
 
     if (name === "value") {
-      // 價值股策略
-      setSelect("peFilter",   "15");    // 本益比 ≤ 15
-      setSelect("pbFilter",   "2");     // P/B ≤ 2
-      setSelect("pfcfFilter", "15");    // P/FCF ≤ 15
-      setSelect("eyFilter",   "0.08");  // 盈餘殖利率 ≥ 8%
-      setSelect("fcfFilter",  "0.04");  // FCF 殖利率 ≥ 4%
-    }
+    // 價值股策略：避免過度嚴格
+    setSelect("peFilter",   "15");    // PE ≤ 15
+    setSelect("pbFilter",   "2");     // PB ≤ 2
+    setSelect("pfcfFilter", "15");    // P/FCF ≤ 15
+    // 修正：既然限制了 PE <= 15，這裡就不用再鎖 EY >= 8%，避免衝突
+    setSelect("eyFilter",   "0");     
+    setSelect("fcfFilter",  "0.04");  // FCF 殖利率 ≥ 4%
+  }
     
     if (name === "lynch") {
       // 彼得林區：PEG 便宜成長股
