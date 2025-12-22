@@ -466,34 +466,37 @@
   }
     
     if (name === "lynch") {
-      // 彼得林區：PEG 便宜成長股
-      setSelect("pegFilter", "1.5");     // PEG ≤ 1.5
-      setSelect("rgFilter", "0.10");     // 營收 YoY ≥ 10%
-      setSelect("egFilter", "0.10");     // EPS YoY ≥ 10%
-      setSelect("roeFilter", "15");      // ROE ≥ 15%
+      // 彼得林區：PEG + 適度成長 + 低負債
+      setSelect("pegFilter", "1.5");
+      setSelect("rgFilter",  "0.10");
+      setSelect("egFilter",  "0.10");
+      setSelect("roeFilter", "15");
+      setSelect("deFilter",  "0.8");  // 加強：低負債
     }
 
     if (name === "magic") {
-      // 魔法公式：ROIC 高 + 公司便宜
-      setSelect("roicFilter", "0.10");     // ROIC ≥ 10%
-      setSelect("evFilter", "15");         // EV/EBITDA ≤ 15
-      setSelect("peFilter", "20");         // PE ≤ 20（可選）
+      // 魔法公式：高 ROIC + 便宜 (EV/EBITDA)
+      setSelect("roicFilter", "0.15"); // 加強：ROIC 拉高
+      setSelect("evFilter",   "15");
+      setSelect("roeFilter",  "15");
+      // 建議：不鎖 PE，專注於 EV/EBITDA
     }
 
     if (name === "compounder") {
-      // 複利成長股（自由現金流強＋護城河）
-      setSelect("roicFilter", "0.10");
-      setSelect("fcfFilter", "0.04");       // FCF Yield ≥ 4%
-      setSelect("fgFilter", "0.10");        // FCF YoY ≥ 10%
-      setSelect("rgFilter", "0.10");        // Rev YoY ≥ 10%
-      setSelect("gmFilter", "0.50");        // 毛利 ≥ 50%
+      // 複利成長：高品質 + 現金流成長 (不一定便宜)
+      setSelect("roicFilter", "0.15"); // 加強：效率要高
+      setSelect("fcfFilter",  "0.02"); // 放寬：好公司殖利率通常不高
+      setSelect("fgFilter",   "0.10");
+      setSelect("rgFilter",   "0.10");
+      setSelect("gmFilter",   "0.3");  // 放寬：涵蓋更多產業
     }
 
     if (name === "lowvol") {
-      // 低波動策略：低 Beta + 高品質
-      setSelect("betaFilter", "1.0");       // Beta ≤ 1
-      setSelect("deFilter", "1");           // D/E ≤ 1
-      setSelect("roeFilter", "10");         // ROE ≥ 10%
+      // 低波動：Beta 低 + 配息穩
+      setSelect("betaFilter", "0.8");  // 加強：Beta 要夠低
+      setSelect("deFilter",   "1");
+      setSelect("roeFilter",  "10");
+      setSelect("dyFilter",   "0.02"); // 新增：防禦型通常有股息
     }
 
     applyFiltersAndRender();
