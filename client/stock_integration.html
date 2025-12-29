@@ -115,18 +115,17 @@
   </div>
 
   <script>
-  const N8N_WEBHOOK_URL = "https://doncaibao.app.n8n.cloud/webhook/fc4caae3-1805-444c-8710-1f65b59b0399";
-
   // ============================
-  // ★ 新增：Supabase 初始化與方案限制
+  // ★ 設定區
   // ============================
+  // 測試時用 localhost，上線後要改成你的 Render/Railway 網址
+  const BACKEND_URL = "http://localhost:3000/api/analyze-stock";
 
   const supabaseUrl = "https://zlkexplsleznuebighte.supabase.co";
   const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpsa2V4cGxzbGV6bnVlYmlnaHRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0MzAwNjUsImV4cCI6MjA4MTAwNjA2NX0.HPVn3jcN88M4U3-RCVW-YO-b65rDOKv6pxEaVWwbm68";
-
   const supabaseClient = supabase.createClient(supabaseUrl, supabaseAnonKey);
 
-  // free：每週 2 次；plus：每週 10 次；pro：無限
+  // 顯示用的方案限制 (僅供顯示，實際限制在後端執行)
   const PLAN_LIMIT = {
     free: 2,
     plus: 10,
@@ -134,9 +133,8 @@
   };
 
   // ============================
-  // ★ 新增：Modal 操作函式
+  // ★ Modal UI 操作
   // ============================
-
   const planModal = document.getElementById("planModal");
   const planModalBackdrop = document.getElementById("planModalBackdrop");
   const planModalClose = document.getElementById("planModalClose");
@@ -155,29 +153,17 @@
   planModalBackdrop.addEventListener("click", hidePlanModal);
 
   // ============================
-  // ★ 新增：共用函式（user + plan + 使用次數）
+  // ★ 讀取使用者資訊與方案 (僅供顯示用)
   // ============================
-
   async function getCurrentUserPlan() {
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
-    if (userError) {
-      console.error("取得使用者失敗：", userError);
-      return { user: null, plan: null };
-    }
-    if (!user) {
-      return { user: null, plan: null };
-    }
+    const { data: { user } } = await supabaseClient.auth.getUser();
+    if (!user) return { user: null, plan: null };
 
-    const { data: profile, error: profileError } = await supabaseClient
+    const { data: profile } = await supabaseClient
       .from("profiles")
       .select("plan")
       .eq("id", user.id)
       .maybeSingle();
-
-    if (profileError) {
-      console.error("讀取 profile 失敗：", profileError);
-      return { user, plan: "free" };
-    }
 
     return { user, plan: profile?.plan || "free" };
   }
@@ -185,144 +171,109 @@
   async function getWeeklyUsage(userId) {
     const startOfWeek = new Date();
     startOfWeek.setHours(0, 0, 0, 0);
-    startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay()); // 週日為一週開始
+    startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
 
-    const { data, error } = await supabaseClient
+    const { count, error } = await supabaseClient
       .from("usage_logs")
-      .select("*")
+      .select("*", { count: 'exact', head: true }) // 只抓數量，比較快
       .eq("user_id", userId)
       .eq("action", "company_intro")
       .gte("created_at", startOfWeek.toISOString());
 
-    if (error) {
-      console.error("讀取使用次數失敗：", error);
-      return 999;
-    }
-
-    return data.length;
+    return error ? 0 : count;
   }
 
-  async function addUsage(userId) {
-    const { error } = await supabaseClient
-      .from("usage_logs")
-      .insert({
-        user_id: userId,
-        action: "company_intro"
-      });
-
-    if (error) {
-      console.error("新增使用紀錄失敗：", error);
-    }
-  }
-
-  // ★ 新增：更新畫面上的「本週使用次數 / 上限」
   async function updateUsageInfo(user, plan) {
     const usageInfoEl = document.getElementById("usageInfo");
     if (!usageInfoEl) return;
 
     if (!user) {
-      usageInfoEl.textContent = "請先登入以查看本週使用次數與方案限制。";
+      usageInfoEl.textContent = "請先登入以使用此功能。";
       return;
     }
 
     const limit = PLAN_LIMIT[plan] ?? PLAN_LIMIT["free"];
-
-    if (limit === Infinity) {
-      usageInfoEl.textContent = `目前方案：${plan}（本功能使用次數不限）。`;
-      return;
-    }
-
+    const limitText = limit === Infinity ? "無限" : limit;
+    
+    // 讀取目前使用量
     const used = await getWeeklyUsage(user.id);
-    usageInfoEl.textContent = `目前方案：${plan}｜本週已使用 ${used} / ${limit} 次。`;
+    usageInfoEl.textContent = `目前方案：${plan}｜本週已使用 ${used} / ${limitText} 次`;
   }
 
-  // ★ 新增：頁面載入時，先更新一次使用資訊
+  // 頁面載入時更新一次資訊
   window.addEventListener("DOMContentLoaded", async () => {
     const { user, plan } = await getCurrentUserPlan();
     await updateUsageInfo(user, plan);
   });
 
   // ============================
-  // ★ 修改：按鈕事件加入方案 / 次數檢查 + modal
+  // ★ 主要功能：呼叫後端 API
   // ============================
-
   document.getElementById("fetchBtn").addEventListener("click", async () => {
     const debugEl = document.getElementById("debug");
     const resultEl = document.getElementById("result");
-
-    // 1) 先確認登入與方案
-    const { user, plan } = await getCurrentUserPlan();
-
-    if (!user) {
-      alert("請先登入才能使用產生公司介紹功能。");
-      debugEl.textContent = "尚未登入，無法使用此功能。";
-      return;
-    }
-
-    const limit = PLAN_LIMIT[plan] ?? PLAN_LIMIT["free"];
-
-    // 2) 限制方案（free / plus），pro 不限制
-    if (limit !== Infinity) {
-      const used = await getWeeklyUsage(user.id);
-      console.log(`方案：${plan}，本週已使用：`, used, "／限制：", limit);
-
-      if (used >= limit) {
-        const msg = `你的方案（${plan}）本功能每週最多可使用 ${limit} 次。\n如需更多使用次數，請考慮升級方案。`;
-        showPlanModal(msg);   // ★ 改成用 modal
-        debugEl.textContent = `已達本週使用上限（${used}/${limit}）。`;
-        return;
-      }
-    }
-
-    // 3) 檢查通過 → 先紀錄一次使用
-    await addUsage(user.id);
-
-    // 4) 使用資訊也跟著更新
-    await updateUsageInfo(user, plan);
-
-    // 5) 以下為原本的 n8n 呼叫邏輯
-    const symbol = document.getElementById("symbolInput").value.trim().toUpperCase();
-
+    const symbolInput = document.getElementById("symbolInput");
+    
+    // 1. 檢查輸入
+    const symbol = symbolInput.value.trim().toUpperCase();
     if (!symbol) {
       alert("請輸入股票代碼！");
       return;
     }
 
-    debugEl.textContent = "查詢中…（股票代碼：" + symbol + "）";
-    resultEl.innerHTML = "<p>正在載入公司介紹…(約一分鐘)</p>";
+    // 2. 檢查登入 (取得 Session Token)
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) {
+      alert("請先登入才能使用產生公司介紹功能。");
+      return;
+    }
+
+    // 3. UI 狀態更新
+    debugEl.textContent = "查詢中…正在分析數據...";
+    resultEl.innerHTML = "<p>正在生成公司報告，請稍候...(約 15-30 秒)</p>";
 
     try {
-      const url = `${N8N_WEBHOOK_URL}?symbol=${encodeURIComponent(symbol)}`;
-      console.log("呼叫 n8n URL:", url);
+      // 4. 發送請求給後端
+      const response = await fetch(BACKEND_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}` // ★ 關鍵：把 Token 傳給後端
+        },
+        body: JSON.stringify({ symbol: symbol })
+      });
 
-      const res = await fetch(url);
-      console.log("n8n 狀態碼：", res.status);
+      const data = await response.json();
 
-      if (!res.ok) {
-        throw new Error("n8n 回應錯誤，HTTP 狀態：" + res.status);
+      // 5. 錯誤處理
+      if (!response.ok) {
+        // 如果後端回傳 403，代表額度滿了
+        if (response.status === 403) {
+          showPlanModal(data.error || "已達本週使用上限，請升級方案。");
+          debugEl.textContent = "已達使用上限 ⛔";
+          resultEl.innerHTML = "";
+          return;
+        }
+        // 其他錯誤 (401, 500 等)
+        throw new Error(data.error || "伺服器發生錯誤");
       }
 
-      const raw = await res.text();
-      console.log("n8n raw 回應：", raw);
-
-      let markdown;
-
-      try {
-        const data = JSON.parse(raw);
-        markdown = data.text || JSON.stringify(data, null, 2);
-      } catch (e) {
-        markdown = raw;
-      }
-
-      const htmlContent = marked.parse(markdown || "");
+      // 6. 成功：顯示結果
+      // 假設後端回傳格式是 { text: "Markdown內容..." }
+      const htmlContent = marked.parse(data.text);
       resultEl.innerHTML = htmlContent;
       debugEl.textContent = "查詢完成 ✔";
+
+      // 7. 更新介面上的使用次數 (重新抓一次資料庫)
+      const { user, plan } = await getCurrentUserPlan();
+      await updateUsageInfo(user, plan);
+
     } catch (err) {
-      debugEl.textContent = "❌ 發生錯誤：" + err.message;
-      resultEl.innerHTML = "";
       console.error(err);
+      debugEl.textContent = "❌ 錯誤：" + err.message;
+      resultEl.innerHTML = `<p style='color:red'>發生錯誤，請確認後端是否已啟動。</p>`;
     }
   });
-  </script>
+</script>
 </body>
 </html>
