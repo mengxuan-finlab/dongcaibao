@@ -205,6 +205,118 @@ tr:hover {
 .search-section button:hover {
   background-color: #1d4ed8;
 }
+/* --- Filters Container (外層容器) --- */
+.filters-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px; /* 區塊間距縮小 */
+  padding: 15px; /* 內距縮小 */
+  background-color: #1a202c; 
+  border-radius: 8px;
+  margin-bottom: 20px;
+  /* 限制最大寬度，避免在超寬螢幕被拉得太長 */
+  max-width: 1400px; 
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* --- Filter Section (每一大類) --- */
+.filter-section {
+  border-bottom: 1px solid #2d3748;
+  padding-bottom: 10px;
+  margin-bottom: 5px;
+}
+
+.filter-section:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+}
+
+/* 小標題樣式 (更緊湊) */
+.section-title {
+  color: #63b3ed;
+  font-size: 0.95rem; /* 字體縮小 */
+  margin-bottom: 8px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* --- Filter Grid (網格佈局 - 關鍵修改) --- */
+.filter-grid {
+  display: grid;
+  /* 修改點：縮小 minmax 到 150px，讓一排能塞更多個 */
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px; /* 格子間距變小 */
+}
+
+/* --- Filter Group (單個輸入框組) --- */
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  /* 移除原本可能有的邊框或背景，讓它乾淨 */
+  border: none;
+  background: transparent;
+  padding: 0; 
+}
+
+.filter-group label {
+  font-size: 0.75rem; /* 標籤字體變小 */
+  color: #a0aec0;
+  margin-bottom: 2px; /* 標籤跟輸入框靠緊一點 */
+  white-space: nowrap; /* 防止標籤換行 */
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.filter-group select {
+  background-color: #2d3748;
+  color: #e2e8f0;
+  border: 1px solid #4a5568;
+  border-radius: 4px; /* 圓角改小一點，比較俐落 */
+  padding: 4px 8px;   /* 內距縮小，讓高度變矮 */
+  font-size: 0.85rem; /* 內容字體縮小 */
+  height: 30px;       /* 固定高度，整齊劃一 */
+  outline: none;
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+.filter-group select:hover {
+  border-color: #718096;
+}
+
+.filter-group select:focus {
+  border-color: #63b3ed;
+  box-shadow: 0 0 0 1px #63b3ed;
+}
+
+/* --- Preset Buttons Area (一鍵策略區) --- */
+.preset-section {
+  padding-top: 5px;
+}
+
+.preset-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.preset-btn {
+  background-color: #c53030;
+  color: white;
+  border: none;
+  padding: 4px 12px; /* 按鈕變扁一點 */
+  border-radius: 15px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: transform 0.1s, background-color 0.2s;
+}
+
+.preset-btn:hover {
+  background-color: #e53e3e;
+}
 
 /* 手機版適配：標題太長時搜尋框換行 */
 @media (max-width: 768px) {
