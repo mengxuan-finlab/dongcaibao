@@ -243,58 +243,133 @@ tr:hover {
   gap: 6px;
 }
 
-/* --- Filter Grid (網格佈局 - 關鍵修改) --- */
-.filter-grid {
-  display: grid;
-  /* 修改點：縮小 minmax 到 150px，讓一排能塞更多個 */
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 8px; /* 格子間距變小 */
+/* --- Filters Container --- */
+.filters-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+  /* 背景透明化一點，或是保持深色塊 */
+  background-color: transparent; 
+  margin-bottom: 20px;
 }
 
-/* --- Filter Group (單個輸入框組) --- */
+/* --- Filter Section (摺疊區塊) --- */
+.filter-section {
+  background-color: #1a202c; /* 深色背景 */
+  border-radius: 8px;
+  overflow: hidden; /* 確保圓角不被內容切斷 */
+  border: 1px solid #2d3748;
+}
+
+/* --- Header (點擊觸發區) --- */
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 15px;
+  cursor: pointer; /* 讓滑鼠變成手指 */
+  background-color: #2d3748; /* 比內容區稍亮一點的顏色 */
+  transition: background-color 0.2s;
+}
+
+.section-header:hover {
+  background-color: #4a5568; /* 滑鼠懸停變亮 */
+}
+
+/* 標題文字 */
+.section-title {
+  margin: 0;
+  color: #63b3ed;
+  font-size: 0.95rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 箭頭圖示 */
+.toggle-icon {
+  color: #a0aec0;
+  font-size: 0.8rem;
+  transition: transform 0.3s;
+}
+
+/* 當區塊展開時，箭頭旋轉 */
+.filter-section.active .toggle-icon {
+  transform: rotate(180deg);
+}
+
+/* --- Content (內容區) --- */
+.section-content {
+  display: none; /* 預設隱藏！這是關鍵 */
+  padding: 15px;
+  background-color: #1a202c;
+  border-top: 1px solid #2d3748;
+}
+
+/* 當區塊有 active class 時，顯示內容 */
+.filter-section.active .section-content {
+  display: block;
+  animation: slideDown 0.3s ease-out;
+}
+
+/* 下拉動畫 (選用) */
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* --- Filter Grid (內容排版) --- */
+.filter-grid {
+  display: grid;
+  /* 手機 2欄，電腦自動填滿 (最小 120px) */
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 12px;
+}
+
+/* --- Filter Group --- */
 .filter-group {
   display: flex;
   flex-direction: column;
-  /* 移除原本可能有的邊框或背景，讓它乾淨 */
-  border: none;
-  background: transparent;
-  padding: 0; 
 }
 
 .filter-group label {
-  font-size: 0.75rem; /* 標籤字體變小 */
+  font-size: 0.75rem;
   color: #a0aec0;
-  margin-bottom: 2px; /* 標籤跟輸入框靠緊一點 */
-  white-space: nowrap; /* 防止標籤換行 */
-  overflow: hidden;
-  text-overflow: ellipsis;
+  margin-bottom: 4px;
 }
 
 .filter-group select {
   background-color: #2d3748;
-  color: #e2e8f0;
+  color: #fff;
   border: 1px solid #4a5568;
-  border-radius: 4px; /* 圓角改小一點，比較俐落 */
-  padding: 4px 8px;   /* 內距縮小，讓高度變矮 */
-  font-size: 0.85rem; /* 內容字體縮小 */
-  height: 30px;       /* 固定高度，整齊劃一 */
+  border-radius: 4px;
+  padding: 4px 8px;
+  height: 30px;
+  font-size: 0.85rem;
   outline: none;
-  transition: all 0.2s;
-  cursor: pointer;
 }
-
-.filter-group select:hover {
-  border-color: #718096;
-}
-
 .filter-group select:focus {
   border-color: #63b3ed;
-  box-shadow: 0 0 0 1px #63b3ed;
 }
 
-/* --- Preset Buttons Area (一鍵策略區) --- */
+/* --- Preset Section (快速策略區) --- */
 .preset-section {
-  padding-top: 5px;
+  background-color: #1a202c;
+  padding: 10px 15px;
+  border-radius: 8px;
+  border: 1px solid #2d3748;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.preset-label {
+  color: #ecc94b; /* 黃色文字提示 */
+  font-weight: bold;
+  font-size: 0.9rem;
 }
 
 .preset-bar {
@@ -304,18 +379,19 @@ tr:hover {
 }
 
 .preset-btn {
-  background-color: #c53030;
+  background-color: #860e36;
+  border: 1px solid #8d8888;
   color: white;
-  border: none;
-  padding: 4px 12px; /* 按鈕變扁一點 */
+  padding: 4px 12px;
   border-radius: 15px;
   font-size: 0.8rem;
   cursor: pointer;
-  transition: transform 0.1s, background-color 0.2s;
+  transition: all 0.2s;
 }
 
 .preset-btn:hover {
-  background-color: #e53e3e;
+  background-color: #d11764;
+  transform: translateY(-2px);
 }
 
 /* 手機版適配：標題太長時搜尋框換行 */

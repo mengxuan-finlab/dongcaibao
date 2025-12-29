@@ -21,301 +21,112 @@
         </div>
     </div>
     <div class="filters-container">
-  
-  <div class="filter-section">
-    <h3 class="section-title">📊 基本面與產業</h3>
-    <div class="filter-grid">
-      <div class="filter-group">
-        <label for="capFilter">市值篩選</label>
-        <select id="capFilter">
-          <option value="all">全部市值</option>
-          <option value="mega">超大型 ≥ 3000 億</option>
-          <option value="large">大型 ≥ 1000 億</option>
-          <option value="mid">中型 ≥ 100 億</option>
-          <option value="small">小型 &lt; 100 億</option>
-        </select>
-      </div>
-      <div class="filter-group">
-        <label for="sectorFilter">產業 (Sector)</label>
-        <select id="sectorFilter">
-          <option value="all">全部產業</option>
-          <option value="Technology">科技</option>
-          <option value="Financial Services">金融</option>
-          <option value="Healthcare">醫療保健</option>
-          <option value="Consumer Cyclical">非必需消費</option>
-          <option value="Consumer Defensive">必需消費</option>
-          <option value="Communication Services">通訊服務</option>
-          <option value="Energy">能源</option>
-          <option value="Industrials">工業</option>
-          <option value="Utilities">公用事業</option>
-          <option value="Real Estate">房地產</option>
-          <option value="Basic Materials">原物料</option>
-        </select>
-      </div>
-      <div class="filter-group">
-        <label for="betaFilter">Beta (市場波動) ≤</label>
-        <select id="betaFilter">
-          <option value="all">不限</option>
-          <option value="1.5">1.5</option>
-          <option value="1.2">1.2</option>
-          <option value="1.0">1.0</option>
-          <option value="0.8">0.8</option>
-        </select>
-      </div>
-    </div>
-  </div>
-
-  <div class="filter-section">
-    <h3 class="section-title">💰 估值與價格指標</h3>
-    <div class="filter-grid">
-      <div class="filter-group">
-        <label for="peFilter">本益比 (PE) ≤</label>
-        <select id="peFilter">
-          <option value="all">不限</option>
-          <option value="40">40</option>
-          <option value="30">30</option>
-          <option value="20">20</option>
-          <option value="15">15</option>
-          <option value="10">10</option>
-        </select>
-      </div>
-      <div class="filter-group">
-        <label for="pegFilter">本益成長比 (PEG) ≤</label>
-        <select id="pegFilter">
-          <option value="all">不限</option>
-          <option value="2">2.0</option>
-          <option value="1.5">1.5</option>
-          <option value="1">1.0</option>
-          <option value="0.5">0.5</option>
-        </select>
-      </div>
-      <div class="filter-group">
-        <label for="pbFilter">股價淨值比 (P/B) ≤</label>
-        <select id="pbFilter">
-          <option value="all">不限</option>
-          <option value="5">5</option>
-          <option value="3">3</option>
-          <option value="2">2</option>
-          <option value="1">1</option>
-        </select>
-      </div>
-      <div class="filter-group">
-        <label for="psFilter">股價營收比 (P/S) ≤</label>
-        <select id="psFilter">
-          <option value="all">不限</option>
-          <option value="10">10</option>
-          <option value="5">5</option>
-          <option value="3">3</option>
-        </select>
-      </div>
-      <div class="filter-group">
-        <label for="pfcfFilter">股價/自由現金流 (P/FCF) ≤</label>
-        <select id="pfcfFilter">
-          <option value="all">不限</option>
-          <option value="30">30</option>
-          <option value="20">20</option>
-          <option value="15">15</option>
-        </select>
-      </div>
-      <div class="filter-group">
-        <label for="evFilter">EV / EBITDA ≤</label>
-        <select id="evFilter">
-          <option value="all">不限</option>
-          <option value="20">20</option>
-          <option value="15">15</option>
-          <option value="10">10</option>
-        </select>
-      </div>
-      <div class="filter-group">
-        <label for="eyFilter">盈餘殖利率 (Earnings Yield) ≥</label>
-        <select id="eyFilter">
-          <option value="0">不限</option>
-          <option value="0.04">4%</option>
-          <option value="0.06">6%</option>
-          <option value="0.08">8%</option>
-        </select>
-      </div>
-      <div class="filter-group">
-        <label for="fcfFilter">FCF 殖利率 ≥</label>
-        <select id="fcfFilter">
-          <option value="0">不限</option>
-          <option value="0.02">2%</option>
-          <option value="0.04">4%</option>
-          <option value="0.06">6%</option>
-        </select>
-      </div>
-    </div>
-  </div>
-
-  <div class="filter-section">
-    <h3 class="section-title">📈 獲利能力與效率</h3>
-    <div class="filter-grid">
-      <div class="filter-group">
-        <label for="roeFilter">ROE (股東權益報酬率) ≥</label>
-        <select id="roeFilter">
-          <option value="0">不限</option>
-          <option value="10">10%</option>
-          <option value="15">15%</option>
-          <option value="20">20%</option>
-          <option value="30">30%</option>
-        </select>
-      </div>
-      <div class="filter-group">
-        <label for="roicFilter">ROIC (投入資本報酬率) ≥</label>
-        <select id="roicFilter">
-          <option value="0">不限</option>
-          <option value="0.10">10%</option>
-          <option value="0.15">15%</option>
-          <option value="0.20">20%</option>
-        </select>
-      </div>
-      <div class="filter-group">
-        <label for="gmFilter">毛利率 (Gross Margin) ≥</label>
-        <select id="gmFilter">
-          <option value="0">不限</option>
-          <option value="0.3">30%</option>
-          <option value="0.4">40%</option>
-          <option value="0.5">50%</option>
-        </select>
-      </div>
-      <div class="filter-group">
-        <label for="omFilter">營益率 (Operating Margin) ≥</label>
-        <select id="omFilter">
-          <option value="0">不限</option>
-          <option value="0.1">10%</option>
-          <option value="0.15">15%</option>
-          <option value="0.2">20%</option>
-        </select>
-      </div>
-    </div>
-  </div>
-
-  <div class="filter-section">
-    <h3 class="section-title">🛡️ 財務健康狀況</h3>
-    <div class="filter-grid">
-      <div class="filter-group">
-        <label for="deFilter">負債 / 權益 (D/E) ≤</label>
-        <select id="deFilter">
-          <option value="all">不限</option>
-          <option value="2">2.0</option>
-          <option value="1.5">1.5</option>
-          <option value="1">1.0</option>
-          <option value="0.5">0.5</option>
-        </select>
-      </div>
-      <div class="filter-group">
-        <label for="daFilter">負債 / 資產 (D/A) ≤</label>
-        <select id="daFilter">
-          <option value="all">不限</option>
-          <option value="0.8">0.8</option>
-          <option value="0.6">0.6</option>
-          <option value="0.4">0.4</option>
-        </select>
-      </div>
-      <div class="filter-group">
-        <label for="ndFilter">淨負債 / EBITDA ≤</label>
-        <select id="ndFilter">
-          <option value="all">不限</option>
-          <option value="4">4 倍</option>
-          <option value="3">3 倍</option>
-          <option value="2">2 倍</option>
-          <option value="1">1 倍</option>
-        </select>
-      </div>
-      <div class="filter-group">
-        <label for="crFilter">流動比率 (Current Ratio) ≥</label>
-        <select id="crFilter">
-          <option value="0">不限</option>
-          <option value="1">1.0</option>
-          <option value="1.5">1.5</option>
-          <option value="2">2.0</option>
-        </select>
-      </div>
-      <div class="filter-group">
-        <label for="cccFilter">現金循環週期 (CCC)</label>
-        <select id="cccFilter">
-          <option value="all">不限</option>
-          <option value="neg">小於 0 (強勢通路)</option>
-          <option value="pos">大於等於 0</option>
-        </select>
-      </div>
-    </div>
-  </div>
-
-  <div class="filter-section">
-    <h3 class="section-title">🚀 成長動能與股息</h3>
-    <div class="filter-grid">
-      <div class="filter-group">
-        <label for="rgFilter">營收年增率 (Rev YoY) ≥</label>
-        <select id="rgFilter">
-          <option value="0">不限</option>
-          <option value="0.05">5%</option>
-          <option value="0.1">10%</option>
-          <option value="0.15">15%</option>
-        </select>
-      </div>
-      <div class="filter-group">
-        <label for="egFilter">EPS 年增率 ≥</label>
-        <select id="egFilter">
-          <option value="0">不限</option>
-          <option value="0.05">5%</option>
-          <option value="0.1">10%</option>
-          <option value="0.2">20%</option>
-        </select>
-      </div>
-      <div class="filter-group">
-        <label for="fgFilter">FCF 年增率 ≥</label>
-        <select id="fgFilter">
-          <option value="0">不限</option>
-          <option value="0.05">5%</option>
-          <option value="0.1">10%</option>
-          <option value="0.2">20%</option>
-        </select>
-      </div>
-      <div class="filter-group">
-        <label for="dyFilter">股息殖利率 (Yield) ≥</label>
-        <select id="dyFilter">
-          <option value="0">不限</option>
-          <option value="0.02">2%</option>
-          <option value="0.03">3%</option>
-          <option value="0.04">4%</option>
-          <option value="0.05">5%</option>
-        </select>
-      </div>
-      <div class="filter-group">
-        <label for="dpFilter">配息率 (Payout Ratio) ≤</label>
-        <select id="dpFilter">
-          <option value="all">不限</option>
-          <option value="0.8">80%</option>
-          <option value="0.6">60%</option>
-          <option value="0.4">40%</option>
-        </select>
-      </div>
-      <div class="filter-group">
-        <label for="dgFilter">股息年增率 ≥</label>
-        <select id="dgFilter">
-          <option value="0">不限</option>
-          <option value="0.03">3%</option>
-          <option value="0.05">5%</option>
-          <option value="0.1">10%</option>
-        </select>
-      </div>
-    </div>
-  </div>
 
   <div class="preset-section">
-    <h3 class="section-title">⚡ 一鍵大師策略</h3>
+    <div class="preset-label"> 快速策略：</div>
     <div class="preset-bar">
         <button class="preset-btn" data-preset="buffett">巴菲特風格</button>
-        <button class="preset-btn" data-preset="dividend">高股息策略</button>
-        <button class="preset-btn" data-preset="growth">高成長策略</button>
-        <button class="preset-btn" data-preset="value">價值股策略</button>
-        <button class="preset-btn" data-preset="lynch">彼得林區 PEG</button>
+        <button class="preset-btn" data-preset="dividend">高股息</button>
+        <button class="preset-btn" data-preset="growth">高成長</button>
+        <button class="preset-btn" data-preset="value">價值股</button>
+        <button class="preset-btn" data-preset="lynch">彼得林區</button>
         <button class="preset-btn" data-preset="magic">魔法公式</button>
-        <button class="preset-btn" data-preset="compounder">複利成長股</button>
-        <button class="preset-btn" data-preset="lowvol">低波動策略</button>
+        <button class="preset-btn" data-preset="compounder">複利成長</button>
+        <button class="preset-btn" data-preset="lowvol">低波動</button>
     </div>
   </div>
+
+  <div class="filter-section">
+    <div class="section-header" onclick="toggleSection(this)">
+      <h3 class="section-title"> 基本面與產業</h3>
+      <span class="toggle-icon">▼</span>
+    </div>
+    <div class="section-content">
+      <div class="filter-grid">
+        <div class="filter-group">
+            <label>市值篩選</label>
+            <select id="capFilter"><option value="all">全部</option><option value="mega">超大型</option><option value="large">大型</option><option value="mid">中型</option><option value="small">小型</option></select>
+        </div>
+        <div class="filter-group">
+            <label>產業</label>
+            <select id="sectorFilter"><option value="all">全部</option><option value="Technology">科技</option><option value="Financial Services">金融</option><option value="Healthcare">醫療</option><option value="Consumer Cyclical">循環消費</option><option value="Consumer Defensive">防禦消費</option><option value="Energy">能源</option><option value="Industrials">工業</option><option value="Utilities">公用</option><option value="Real Estate">地產</option><option value="Basic Materials">原物料</option></select>
+        </div>
+        <div class="filter-group">
+            <label>Beta</label>
+            <select id="betaFilter"><option value="all">不限</option><option value="1.5">1.5</option><option value="1.2">1.2</option><option value="1.0">1.0</option><option value="0.8">0.8</option></select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="filter-section">
+    <div class="section-header" onclick="toggleSection(this)">
+      <h3 class="section-title"> 估值與價格</h3>
+      <span class="toggle-icon">▼</span>
+    </div>
+    <div class="section-content">
+      <div class="filter-grid">
+        <div class="filter-group"><label>PE 本益比</label><select id="peFilter"><option value="all">不限</option><option value="40">40</option><option value="30">30</option><option value="20">20</option><option value="15">15</option><option value="10">10</option></select></div>
+        <div class="filter-group"><label>PEG</label><select id="pegFilter"><option value="all">不限</option><option value="2">2.0</option><option value="1.5">1.5</option><option value="1">1.0</option><option value="0.5">0.5</option></select></div>
+        <div class="filter-group"><label>PB 淨值比</label><select id="pbFilter"><option value="all">不限</option><option value="5">5</option><option value="3">3</option><option value="2">2</option><option value="1">1</option></select></div>
+        <div class="filter-group"><label>PS 營收比</label><select id="psFilter"><option value="all">不限</option><option value="10">10</option><option value="5">5</option><option value="3">3</option></select></div>
+        <div class="filter-group"><label>P/FCF</label><select id="pfcfFilter"><option value="all">不限</option><option value="30">30</option><option value="20">20</option><option value="15">15</option></select></div>
+        <div class="filter-group"><label>EV/EBITDA</label><select id="evFilter"><option value="all">不限</option><option value="20">20</option><option value="15">15</option><option value="10">10</option></select></div>
+        <div class="filter-group"><label>盈餘殖利率</label><select id="eyFilter"><option value="0">不限</option><option value="0.04">4%</option><option value="0.06">6%</option><option value="0.08">8%</option></select></div>
+        <div class="filter-group"><label>FCF 殖利率</label><select id="fcfFilter"><option value="0">不限</option><option value="0.02">2%</option><option value="0.04">4%</option><option value="0.06">6%</option></select></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="filter-section">
+    <div class="section-header" onclick="toggleSection(this)">
+      <h3 class="section-title"> 獲利能力</h3>
+      <span class="toggle-icon">▼</span>
+    </div>
+    <div class="section-content">
+      <div class="filter-grid">
+        <div class="filter-group"><label>ROE</label><select id="roeFilter"><option value="0">不限</option><option value="10">10%</option><option value="15">15%</option><option value="20">20%</option><option value="30">30%</option></select></div>
+        <div class="filter-group"><label>ROIC</label><select id="roicFilter"><option value="0">不限</option><option value="0.10">10%</option><option value="0.15">15%</option><option value="0.20">20%</option></select></div>
+        <div class="filter-group"><label>毛利率</label><select id="gmFilter"><option value="0">不限</option><option value="0.3">30%</option><option value="0.4">40%</option><option value="0.5">50%</option></select></div>
+        <div class="filter-group"><label>營益率</label><select id="omFilter"><option value="0">不限</option><option value="0.1">10%</option><option value="0.15">15%</option><option value="0.2">20%</option></select></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="filter-section">
+    <div class="section-header" onclick="toggleSection(this)">
+      <h3 class="section-title"> 財務體質</h3>
+      <span class="toggle-icon">▼</span>
+    </div>
+    <div class="section-content">
+      <div class="filter-grid">
+        <div class="filter-group"><label>負債/權益</label><select id="deFilter"><option value="all">不限</option><option value="2">2.0</option><option value="1.5">1.5</option><option value="1">1.0</option><option value="0.5">0.5</option></select></div>
+        <div class="filter-group"><label>負債/資產</label><select id="daFilter"><option value="all">不限</option><option value="0.8">0.8</option><option value="0.6">0.6</option><option value="0.4">0.4</option></select></div>
+        <div class="filter-group"><label>淨負債/EBITDA</label><select id="ndFilter"><option value="all">不限</option><option value="4">4</option><option value="3">3</option><option value="2">2</option><option value="1">1</option></select></div>
+        <div class="filter-group"><label>流動比率</label><select id="crFilter"><option value="0">不限</option><option value="1">1.0</option><option value="1.5">1.5</option><option value="2">2.0</option></select></div>
+        <div class="filter-group"><label>CCC 現金循環</label><select id="cccFilter"><option value="all">不限</option><option value="neg">小於 0</option><option value="pos">大於 0</option></select></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="filter-section">
+    <div class="section-header" onclick="toggleSection(this)">
+      <h3 class="section-title"> 成長與股息</h3>
+      <span class="toggle-icon">▼</span>
+    </div>
+    <div class="section-content">
+      <div class="filter-grid">
+        <div class="filter-group"><label>營收成長</label><select id="rgFilter"><option value="0">不限</option><option value="0.05">5%</option><option value="0.1">10%</option><option value="0.15">15%</option></select></div>
+        <div class="filter-group"><label>EPS 成長</label><select id="egFilter"><option value="0">不限</option><option value="0.05">5%</option><option value="0.1">10%</option><option value="0.2">20%</option></select></div>
+        <div class="filter-group"><label>FCF 成長</label><select id="fgFilter"><option value="0">不限</option><option value="0.05">5%</option><option value="0.1">10%</option><option value="0.2">20%</option></select></div>
+        <div class="filter-group"><label>股息殖利率</label><select id="dyFilter"><option value="0">不限</option><option value="0.02">2%</option><option value="0.03">3%</option><option value="0.04">4%</option><option value="0.05">5%</option></select></div>
+        <div class="filter-group"><label>配息率</label><select id="dpFilter"><option value="all">不限</option><option value="0.8">80%</option><option value="0.6">60%</option><option value="0.4">40%</option></select></div>
+        <div class="filter-group"><label>股息成長</label><select id="dgFilter"><option value="0">不限</option><option value="0.03">3%</option><option value="0.05">5%</option><option value="0.1">10%</option></select></div>
+      </div>
+    </div>
+  </div>
+
+</div>
 
 </div>
 
@@ -838,6 +649,23 @@
       goToSnapshot();
     }
   });
+
+  // === 新增：控制摺疊選單的函式 ===
+  function toggleSection(header) {
+  // 找到 header 的父層 (filter-section)
+    const section = header.parentElement;
+  
+  // 切換 active class
+  // 如果原本有關閉，現在打開；原本打開，現在關閉
+  section.classList.toggle("active");
+  
+  // (選用) 如果希望一次只開一個，可以先把其他的關掉：
+  /*
+  document.querySelectorAll('.filter-section').forEach(s => {
+    if (s !== section) s.classList.remove('active');
+  });
+  */
+}
 
   loadData();
   </script>
