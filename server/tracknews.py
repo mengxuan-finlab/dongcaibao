@@ -7,30 +7,34 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import google.generativeai as genai
 from supabase import create_client, Client
+from dotenv import load_dotenv
 
 # ==========================================
-# 🔑 設定區 (請確認這裡的 Key 都是最新的)
+# 🔑 設定區 (請確認這裡的資料正確)
 # ==========================================
 
-# 1. Supabase 設定 (從 Supabase 網站 Settings -> API 找)
-SUPABASE_URL = "https://zlkexplsleznuebighte.supabase.co"
-SUPABASE_KEY = "sb_secret_171sMx6_5jVQVw9jVeF-mg_mqPmW69k"
+# 1. 載入 .env 檔案裡的設定
+load_dotenv()
 
-# 2. Google Gemini 設定 (從 Google AI Studio 找)
-GEMINI_API_KEY = "AIzaSyDLPSWGnWyYRIABbOFYuUuKFe3gb1n2VNY"
+# 2. 讀取變數 (如果讀不到會是 None)
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+GEMINI_API_KEY = os.getenv("GEMINI_API_MAIN") 
+FMP_API_KEY = os.getenv("FMP_API_KEY")
+ADMIN_EMAIL = os.getenv("ADMIN_EMAIL")
+EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
 
-# 3. 新聞 API 設定 (Financial Modeling Prep)
-FMP_API_KEY = "PHTJpjhhPVzIdzjMEP84WKq5JiNRYxA6" 
-
-# 4. Email 設定 (寄件人與收件人)
-EMAIL_ACCOUNT = "ryanlee940904@gmail.com"
-EMAIL_PASSWORD = "hfpn ugwj nvjz azbt" 
+# 3. 防呆檢查 (怕您 .env 忘記存檔或寫錯)
+if not all([SUPABASE_URL, SUPABASE_KEY, GEMINI_API_KEY, FMP_API_KEY, ADMIN_EMAIL, EMAIL_PASSWORD]):
+    print("❌ 錯誤：無法讀取環境變數！")
+    print("請檢查您的 .env 檔案是否包含所有必要的設定 (SUPABASE_KEY, GEMINI_API_KEY...等)")
+    print("並確認 .env 檔案與 news.py 在同一個資料夾下。")
+    exit() 
 
 # ==========================================
-# 🚀 主程式邏輯
+# 🚀 主程式邏輯 (以下都不用改)
 # ==========================================
 
-# 初始化客戶端
 try:
     supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
     genai.configure(api_key=GEMINI_API_KEY)
@@ -39,21 +43,33 @@ except Exception as e:
     exit()
 
 def get_rules_from_db():
-    """從資料庫讀取監控規則 (news_tracking_rules)"""
-    print("正在連線 Supabase 讀取規則...")
+    """從資料庫讀取規則，並透過 user_id 自動抓取 profiles 裡的 email"""
+    print("正在連線 Supabase 讀取規則與用戶資料...")
     try:
-        # 這裡改成了讀取 news_tracking_rules 表格
-        response = supabase.table('news_tracking_rules').select('*').execute()
+        # 使用關聯查詢，抓取 profiles 裡的 email
+        response = supabase.table('news_tracking_rules').select('*, profiles(email)').execute()
+        
         rules = []
         for item in response.data:
             # 處理關鍵字
             raw_kw = item.get('keywords', '')
-            if raw_kw:
-                kw_list = [k.strip().lower() for k in raw_kw.split(',') if k.strip()]
-                rules.append({
-                    'keywords': kw_list,
-                    'reason': item.get('reason', '無特定理由')
-                })
+            if not raw_kw: continue
+            kw_list = [k.strip().lower() for k in raw_kw.split(',') if k.strip()]
+            
+            # 自動抓取關聯的 Email
+            client_email = None
+            if item.get('profiles') and item['profiles'].get('email'):
+                client_email = item['profiles']['email']
+            
+            # ✅ 如果抓不到客戶 Email，就使用上面定義的 ADMIN_EMAIL
+            target_email = client_email if client_email else ADMIN_EMAIL
+
+            rules.append({
+                'keywords': kw_list,
+                'reason': item.get('reason', '無特定理由'),
+                'target_email': target_email 
+            })
+            
         return rules
     except Exception as e:
         print(f"⚠️ 讀取規則失敗: {e}")
@@ -80,7 +96,7 @@ def mark_url_processed(url, title):
 
 def fetch_news():
     """抓取最新新聞"""
-    url = f"https://financialmodelingprep.com/stable/news/stock-latest?page=0&limit=50&apikey={FMP_API_KEY}"
+    url = f"https://financialmodelingprep.com/stable/news/stock-latest?page=0&limit=20&apikey={FMP_API_KEY}"
     print(f"正在抓取新聞來源...")
     try:
         response = requests.get(url)
@@ -92,13 +108,15 @@ def fetch_news():
 def analyze_and_send(news_item, rule):
     """AI 分析並寄信"""
     model = genai.GenerativeModel('gemini-2.5-flash')
+    
     keywords_str = ", ".join(rule['keywords'])
+    target_email = rule['target_email'] 
 
-    print(f"🤖 AI 正在分析: {news_item['title']} (規則: {keywords_str})")
+    print(f"🤖 AI 分析中... (將寄給: {target_email})")
 
     prompt = f"""
     你是一位專業投資助理。
-    【我的持股/監控理由】：{rule['reason']}
+    【客戶持股/監控理由】：{rule['reason']}
     【監控關鍵字】：{keywords_str}
 
     【新聞標題】：{news_item['title']}
@@ -116,7 +134,7 @@ def analyze_and_send(news_item, rule):
         text_resp = response.text.replace("```json", "").replace("```", "").strip()
         ai_result = json.loads(text_resp)
 
-        # 寄信
+        # 組裝 Email
         today = datetime.now().strftime("%Y-%m-%d")
         subject = f"🔔 投資快訊 ({keywords_str})：{ai_result.get('chinese_summary')[:15]}..."
 
@@ -141,16 +159,17 @@ def analyze_and_send(news_item, rule):
         """
 
         msg = MIMEMultipart()
-        msg['From'] = EMAIL_ACCOUNT
-        msg['To'] = EMAIL_ACCOUNT
+        msg['From'] = ADMIN_EMAIL
+        msg['To'] = target_email 
         msg['Subject'] = subject
         msg.attach(MIMEText(html_body, 'html'))
 
         server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
-        server.login(EMAIL_ACCOUNT, EMAIL_PASSWORD)
+        # ✅ 這裡使用 ADMIN_EMAIL 登入
+        server.login(ADMIN_EMAIL, EMAIL_PASSWORD)
         server.send_message(msg)
         server.quit()
-        print(f"✅ Email 已寄出！")
+        print(f"✅ Email 已寄出給: {target_email}")
 
         mark_url_processed(news_item['url'], news_item['title'])
 
@@ -158,7 +177,7 @@ def analyze_and_send(news_item, rule):
         print(f"❌ 處理失敗: {e}")
 
 def main():
-    print("=== 🚀 新聞追蹤機器人啟動 (新架構版) ===")
+    print("=== 🚀 新聞追蹤機器人 (DB關聯版) 啟動 ===")
 
     # 讀取規則
     rules = get_rules_from_db()
@@ -190,7 +209,7 @@ def main():
     if processed_count == 0:
         print("\n✅ 掃描完成，沒有符合的新聞。")
     else:
-        print(f"\n✅ 掃描完成，共處理 {processed_count} 則新聞。")
+        print(f"\n✅ 掃描完成，共發送 {processed_count} 封報告。")
 
 if __name__ == "__main__":
     main()
