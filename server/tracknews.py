@@ -177,39 +177,39 @@ def analyze_and_send(news_item, rule):
         print(f"❌ 處理失敗: {e}")
 
 def main():
-    print("=== 🚀 新聞追蹤機器人 (DB關聯版) 啟動 ===")
-
-    # 讀取規則
+    print("=== 🚀 新聞追蹤機器人 (GitHub Actions 版) 啟動 ===")
+    
+    # 1. 讀取規則
     rules = get_rules_from_db()
     if not rules:
-        print("⚠️ 從資料庫讀取不到規則，請檢查 Supabase 的 news_tracking_rules 表格是否有資料。")
+        print("⚠️ 無法讀取規則，結束。")
         return
-    print(f"已讀取 {len(rules)} 組監控規則。")
+    print(f"已讀取 {len(rules)} 組規則。")
 
-    # 抓取新聞
+    # 2. 抓取新聞
     all_news = fetch_news()
     print(f"抓到 {len(all_news)} 則新聞，開始比對...")
-
+    
     processed_count = 0
     for news in all_news:
         news_url = news.get('url')
         if is_url_processed(news_url):
             continue
-
+            
         news_content = (news.get('title', '') + " " + news.get('text', '')).lower()
         
-        # 檢查是否符合任一規則
         for rule in rules:
             if any(k in news_content for k in rule['keywords']):
                 print(f"\n⚡ 發現目標！新聞: {news['title'][:30]}...")
                 analyze_and_send(news, rule)
                 processed_count += 1
                 break 
-
+    
     if processed_count == 0:
         print("\n✅ 掃描完成，沒有符合的新聞。")
     else:
         print(f"\n✅ 掃描完成，共發送 {processed_count} 封報告。")
+
 
 if __name__ == "__main__":
     main()
