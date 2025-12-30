@@ -1,0 +1,196 @@
+import os
+import json
+import requests
+import smtplib
+from datetime import datetime
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+import google.generativeai as genai
+from supabase import create_client, Client
+
+# ==========================================
+# 🔑 設定區 (請確認這裡的 Key 都是最新的)
+# ==========================================
+
+# 1. Supabase 設定 (從 Supabase 網站 Settings -> API 找)
+SUPABASE_URL = "https://zlkexplsleznuebighte.supabase.co"
+SUPABASE_KEY = "sb_secret_171sMx6_5jVQVw9jVeF-mg_mqPmW69k"
+
+# 2. Google Gemini 設定 (從 Google AI Studio 找)
+GEMINI_API_KEY = "AIzaSyDLPSWGnWyYRIABbOFYuUuKFe3gb1n2VNY"
+
+# 3. 新聞 API 設定 (Financial Modeling Prep)
+FMP_API_KEY = "PHTJpjhhPVzIdzjMEP84WKq5JiNRYxA6" 
+
+# 4. Email 設定 (寄件人與收件人)
+EMAIL_ACCOUNT = "ryanlee940904@gmail.com"
+EMAIL_PASSWORD = "hfpn ugwj nvjz azbt" 
+
+# ==========================================
+# 🚀 主程式邏輯
+# ==========================================
+
+# 初始化客戶端
+try:
+    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+    genai.configure(api_key=GEMINI_API_KEY)
+except Exception as e:
+    print(f"❌ 初始化失敗: {e}")
+    exit()
+
+def get_rules_from_db():
+    """從資料庫讀取監控規則 (news_tracking_rules)"""
+    print("正在連線 Supabase 讀取規則...")
+    try:
+        # 這裡改成了讀取 news_tracking_rules 表格
+        response = supabase.table('news_tracking_rules').select('*').execute()
+        rules = []
+        for item in response.data:
+            # 處理關鍵字
+            raw_kw = item.get('keywords', '')
+            if raw_kw:
+                kw_list = [k.strip().lower() for k in raw_kw.split(',') if k.strip()]
+                rules.append({
+                    'keywords': kw_list,
+                    'reason': item.get('reason', '無特定理由')
+                })
+        return rules
+    except Exception as e:
+        print(f"⚠️ 讀取規則失敗: {e}")
+        return []
+
+def is_url_processed(url):
+    """檢查新聞是否已處理過"""
+    try:
+        res = supabase.table('processed_news').select('url').eq('url', url).execute()
+        return len(res.data) > 0
+    except:
+        return False
+
+def mark_url_processed(url, title):
+    """標記新聞為已處理"""
+    try:
+        supabase.table('processed_news').insert({
+            'url': url,
+            'title': title
+        }).execute()
+        print(f"📝 已記錄到資料庫: {title[:10]}...")
+    except Exception as e:
+        print(f"⚠️ 寫入紀錄失敗: {e}")
+
+def fetch_news():
+    """抓取最新新聞"""
+    url = f"https://financialmodelingprep.com/stable/news/stock-latest?page=0&limit=50&apikey={FMP_API_KEY}"
+    print(f"正在抓取新聞來源...")
+    try:
+        response = requests.get(url)
+        return response.json() if response.status_code == 200 else []
+    except Exception as e:
+        print(f"網路連線錯誤: {e}")
+        return []
+
+def analyze_and_send(news_item, rule):
+    """AI 分析並寄信"""
+    model = genai.GenerativeModel('gemini-2.5-flash')
+    keywords_str = ", ".join(rule['keywords'])
+
+    print(f"🤖 AI 正在分析: {news_item['title']} (規則: {keywords_str})")
+
+    prompt = f"""
+    你是一位專業投資助理。
+    【我的持股/監控理由】：{rule['reason']}
+    【監控關鍵字】：{keywords_str}
+
+    【新聞標題】：{news_item['title']}
+    【新聞內文】：{news_item['text']}
+
+    請以 JSON 格式回傳分析結果：
+    {{
+        "chinese_summary": "繁體中文一句話摘要(50字內)",
+        "html_report": "HTML代碼(包含<h2>二、關聯分析</h2>與<h2>三、完整翻譯，重點句請標色</h2>)"
+    }}
+    """
+
+    try:
+        response = model.generate_content(prompt)
+        text_resp = response.text.replace("```json", "").replace("```", "").strip()
+        ai_result = json.loads(text_resp)
+
+        # 寄信
+        today = datetime.now().strftime("%Y-%m-%d")
+        subject = f"🔔 投資快訊 ({keywords_str})：{ai_result.get('chinese_summary')[:15]}..."
+
+        html_body = f"""
+        <h2>投資快訊</h2>
+        <p style="font-size:12px; color:#666;">日期: {today}</p>
+        <div style="background:#f0f9ff; padding:10px; border-left:4px solid #0ea5e9; margin-bottom:15px;">
+            <strong>觸發規則：</strong> {keywords_str}<br>
+            <strong>您的筆記：</strong> {rule['reason']}
+        </div>
+        <p><strong>新聞標題：</strong> {news_item['title']}</p>
+        <div style="background:#fff7ed; padding:10px; border-left:4px solid #f97316; margin-bottom:15px;">
+            <strong>AI 摘要：</strong> {ai_result.get('chinese_summary')}
+        </div>
+        <hr>
+        {ai_result.get('html_report')}
+        <br>
+        <p><a href="{news_item['url']}">閱讀原文</a></p>
+        <div style="text-align:center; font-size:12px; color:#999; margin-top:20px;">
+            Generated by Python Backend
+        </div>
+        """
+
+        msg = MIMEMultipart()
+        msg['From'] = EMAIL_ACCOUNT
+        msg['To'] = EMAIL_ACCOUNT
+        msg['Subject'] = subject
+        msg.attach(MIMEText(html_body, 'html'))
+
+        server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
+        server.login(EMAIL_ACCOUNT, EMAIL_PASSWORD)
+        server.send_message(msg)
+        server.quit()
+        print(f"✅ Email 已寄出！")
+
+        mark_url_processed(news_item['url'], news_item['title'])
+
+    except Exception as e:
+        print(f"❌ 處理失敗: {e}")
+
+def main():
+    print("=== 🚀 新聞追蹤機器人啟動 (新架構版) ===")
+
+    # 讀取規則
+    rules = get_rules_from_db()
+    if not rules:
+        print("⚠️ 從資料庫讀取不到規則，請檢查 Supabase 的 news_tracking_rules 表格是否有資料。")
+        return
+    print(f"已讀取 {len(rules)} 組監控規則。")
+
+    # 抓取新聞
+    all_news = fetch_news()
+    print(f"抓到 {len(all_news)} 則新聞，開始比對...")
+
+    processed_count = 0
+    for news in all_news:
+        news_url = news.get('url')
+        if is_url_processed(news_url):
+            continue
+
+        news_content = (news.get('title', '') + " " + news.get('text', '')).lower()
+        
+        # 檢查是否符合任一規則
+        for rule in rules:
+            if any(k in news_content for k in rule['keywords']):
+                print(f"\n⚡ 發現目標！新聞: {news['title'][:30]}...")
+                analyze_and_send(news, rule)
+                processed_count += 1
+                break 
+
+    if processed_count == 0:
+        print("\n✅ 掃描完成，沒有符合的新聞。")
+    else:
+        print(f"\n✅ 掃描完成，共處理 {processed_count} 則新聞。")
+
+if __name__ == "__main__":
+    main()
