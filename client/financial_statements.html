@@ -449,28 +449,26 @@
       return;
     }
 
-    if (tracked.some(s => s.symbol === symbolRaw)) {
-      alert("這檔股票已經在追蹤清單中");
-      return;
-    }
-
+    // 關鍵修正：onConflict 必須包含兩個欄位
     const { error } = await supabaseClient
       .from("tracked_stocks")
-      .insert({
+      .upsert({
         user_id: currentUser.id,
         symbol: symbolRaw,
-        status: "pending",
-        summary: null // 確保 summary 為空
+        status: "pending", 
+        summary: null
+      }, { 
+        onConflict: 'user_id, symbol' // 這裡要改，對應你剛才在 SQL 建立的索引
       });
 
     if (error) {
-      alert("新增追蹤失敗：" + error.message);
+      alert("新增/更新失敗：" + error.message);
       return;
     }
 
     input.value = "";
     await loadTrackedStocks();
-  }
+}
 
   async function removeStock(id) {
     if(!confirm("確定要移除嗎？")) return;
