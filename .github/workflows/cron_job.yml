@@ -2,9 +2,10 @@ name: Two-Hourly Stock Analyzer
 
 on:
   schedule:
-    # 每隔兩小時跑一次 (UTC 時間，0, 2, 4... 以此類推)
-    - cron: '0 */2 * * *'
-  workflow_dispatch: # 讓你可以手動按按鈕測試執行
+    # 設定每 15 分鐘執行一次 (GitHub 免費版最快頻率)
+    - cron: '*/15 * * * *'
+  # 允許手動按按鈕觸發 (方便測試用)
+  workflow_dispatch:
 
 jobs:
   build:
