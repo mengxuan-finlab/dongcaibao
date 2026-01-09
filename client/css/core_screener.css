@@ -400,6 +400,28 @@ tr:hover {
   color: white;
   border-color: #ff4d4d;
 }
+/* 被策略選中的選單組，顯示亮色外框 */
+.filter-group.filter-active {
+    border: 1px solid #ff4d4d !important;
+    background: rgba(255, 77, 77, 0.05);
+    border-radius: 8px;
+    padding: 2px;
+    box-shadow: 0 0 8px rgba(255, 77, 77, 0.2);
+}
+
+.filter-group.filter-active label {
+    color: #ff4d4d;
+    font-weight: bold;
+}
+
+/* 控制摺疊選單展開的邏輯 (確保 active class 有效) */
+.filter-section.active .section-content {
+    display: block !important; /* 或是使用你的 max-height 動畫 */
+}
+
+.filter-section.active .toggle-icon {
+    transform: rotate(180deg);
+}
 
 /* 手機版適配：標題太長時搜尋框換行 */
 @media (max-width: 768px) {
