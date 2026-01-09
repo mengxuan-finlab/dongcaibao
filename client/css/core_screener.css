@@ -394,6 +394,13 @@ tr:hover {
   transform: translateY(-2px);
 }
 
+/* 讓被選中的策略按鈕變紅色 */
+.preset-btn.active {
+  background-color: #ff4d4d; 
+  color: white;
+  border-color: #ff4d4d;
+}
+
 /* 手機版適配：標題太長時搜尋框換行 */
 @media (max-width: 768px) {
     .header-row {

@@ -203,6 +203,13 @@
 
   // 🔹 一鍵策略：依名稱調整所有篩選器
   function applyPreset(name) {
+  // 1. 移除所有按鈕的 active 樣式，並把當前點擊的加上去
+  document.querySelectorAll(".preset-btn").forEach(btn => {
+    btn.classList.remove("active"); // 先清除所有紅色
+    if (btn.dataset.preset === name) {
+      btn.classList.add("active"); // 為被選中的加上紅色
+    }
+  });
     // 先重置成「不限 / 全部」
     setSelect("capFilter",   "all");
     setSelect("roeFilter",   "0");
