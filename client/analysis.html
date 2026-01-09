@@ -380,6 +380,62 @@
       font-size: 12px;
       opacity: .92;
     }
+
+    /* 指標解釋 Tooltip 主體 */
+    .item-help {
+      position: relative;
+      cursor: help;
+      border-bottom: 1px dotted var(--muted); /* 加上點狀底線提示可互動 */
+      display: inline-block;
+    }
+
+    /* Tooltip 彈出視窗 */
+    .item-help::before {
+      content: attr(data-tip); /* 取得標籤上的描述文字 */
+      position: absolute;
+      bottom: 125%;
+      left: 50%;
+      transform: translateX(-50%) scale(0.9);
+      padding: 8px 12px;
+      width: 220px;
+      background: #1e293b;
+      color: #fff;
+      font-size: 12px;
+      line-height: 1.5;
+      border-radius: 8px;
+      border: 1px solid var(--stroke);
+      box-shadow: 0 10px 15px -3px rgba(0,0,0,0.5);
+      z-index: 100;
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.2s ease;
+      pointer-events: none;
+      white-space: normal;
+      text-align: left;
+    }
+
+    /* Tooltip 小箭頭 */
+    .item-help::after {
+      content: "";
+      position: absolute;
+      bottom: 110%;
+      left: 50%;
+      transform: translateX(-50%);
+      border: 6px solid transparent;
+      border-top-color: #1e293b;
+      z-index: 100;
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.2s ease;
+    }
+
+    /* 滑鼠懸停顯示 */
+    .item-help:hover::before,
+    .item-help:hover::after {
+      opacity: 1;
+      visibility: visible;
+      transform: translateX(-50%) scale(1);
+    }
   </style>
 </head>
 
@@ -417,6 +473,25 @@ let _revChart = null;
 let _epsChart = null;
 let _fcfChart = null;
 
+// --- 在這裡加入指標定義 ---
+const METRIC_DEFINITIONS = {
+  "營收成長 ≥ 10%": "反映公司業務擴張速度，兩位數成長通常被視為成長股的門檻。",
+  "EPS 成長 ≥ 10%": "純益成長率，確保公司不只是營收增加，獲利能力也同步提升。",
+  "FCF 成長 > 0%": "自由現金流成長，代表公司有更多真金白銀可用於投資或發股息。",
+  "PEG ≤ 2.0": "本益成長比。將估值與成長性結合，數值越低代表成長成本越便宜。",
+  "現金殖利率 ≥ 4%": "投資人每年可獲得的現金分紅佔股價的比率。",
+  "配息率 ≤ 90%": "盈餘發放成股利的比例，過高(>100%)可能代表在吃老本。",
+  "股息成長 > 0": "公司是否有能力且願意逐年增加發放的股息。",
+  "低波動 (β < 1)": "貝塔係數，小於1代表股價波動比大盤穩定。",
+  "PE ≤ 15": "本益比。代表回本年數，價值型投資通常追求較低的倍數。",
+  "EV/EBITDA ≤ 12": "企業價值倍數。比 PE 更能排除會計折舊影響，衡量營運現金流估值。",
+  "P/FCF ≤ 20": "股價相對於自由現金流的倍數，衡量每股賺取實質現金的能力。",
+  "PB ≤ 1.5": "股價淨值比。衡量股價是否接近其清算價值。",
+  "流動比 ≥ 1": "短期資產是否足以支付短期負債，衡量短期破產風險。",
+  "淨負債/EBITDA ≤ 4": "衡量公司靠本業獲利還清所有債務需要幾年。",
+  "負債權益比 ≤ 2": "衡量公司財務槓桿高低，比例過高代表借錢過多。",
+  "ROE > 0": "股東權益報酬率。最基本的獲利要求，代表公司沒在虧錢。"
+};
 async function fetchIncomeStatementFY(sym) {
   const url = `https://financialmodelingprep.com/stable/income-statement?symbol=${encodeURIComponent(sym)}&apikey=${encodeURIComponent(FMP_API_KEY)}`;
   const res = await fetch(url);
@@ -778,31 +853,37 @@ function renderHealthSection(d){
 
   const blocks = buildHealthChecks(d);
 
+  // 修改 renderHealthSection 函式內部的 blocks.map 部分
   host.innerHTML = `
-    <div class="healthCard">
-      <div class="healthHeader">
-        <h3>投資風格適配度分析</h3>
-      </div>
+      <div class="healthCard">
+        <div class="healthHeader">
+          <h3>投資風格適配度分析</h3>
+        </div>
 
-      <div class="healthGrid">
-        ${blocks.map(b => `
-          <div class="healthBox">
-            <div class="healthBoxTitle">
-              <b>${b.title}</b>
-              <span class="hpill ${b.level}">${b.pass}/${b.total} · ${b.label}</span>
+        <div class="healthGrid">
+          ${blocks.map(b => `
+            <div class="healthBox">
+              <div class="healthBoxTitle">
+                <b>${b.title}</b>
+                <span class="hpill ${b.level}">${b.pass}/${b.total} · ${b.label}</span>
+              </div>
+              <ul class="healthList">
+                ${b.checks.map(c => {
+                  // 取得對應的解釋，如果沒有定義則不顯示 Tooltip
+                  const tip = METRIC_DEFINITIONS[c.label] || "";
+                  return `
+                    <li>
+                      ${yn(c.ok)} 
+                      <span class="${tip ? 'item-help' : ''}" data-tip="${tip}">
+                        ${c.label}
+                      </span>
+                    </li>`;
+                }).join("")}
+              </ul>
             </div>
-            <ul class="healthList">
-              ${b.checks.map(c => `<li>${yn(c.ok)} ${c.label}</li>`).join("")}
-            </ul>
-          </div>
-        `).join("")}
-      </div>
-
-      <div class="healthNote">
-        註：此為規則式快篩，用於快速比較，不構成投資建議。
-      </div>
-    </div>
-  `;
+          `).join("")}
+        </div>
+        `;
 }
 
 async function loadSnapshot() {
