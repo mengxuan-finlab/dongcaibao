@@ -276,12 +276,23 @@
   }
     
     if (name === "lynch") {
-      // 彼得林區：PEG + 適度成長 + 低負債
-      setSelect("pegFilter", "1.5");
-      setSelect("rgFilter",  "0.10");
-      setSelect("egFilter",  "0.10");
-      setSelect("roeFilter", "15");
-      setSelect("deFilter",  "0.8");  // 加強：低負債
+    // 1. 估值：PEG 必須低於 1.0 是林區的招牌
+    setSelect("pegFilter", "1"); 
+
+    // 2. 成長：穩健成長，不需要爆發性，但要及格
+    setSelect("rgFilter",  "0.1");  // 營收成長 >= 10%
+    setSelect("egFilter",  "0.1");  // EPS 成長 >= 10%
+    
+    // 3. 品質：高 ROE 與 良好的獲利能力
+    setSelect("roeFilter", "15");   // ROE >= 15%
+    setSelect("omFilter",  "0.1");  // 營業利益率 >= 10% (確保不是靠業外)
+
+    // 4. 財務體質：林區討厭負債
+    setSelect("deFilter",  "0.5");  // 負債權益比更嚴格 (<= 0.5)
+    setSelect("crFilter",  "1.5");  // 流動比率 >= 1.5 (短期償債能力)
+
+    // 5. 現金流：他強調現金是真實的
+    setSelect("fcfFilter", "0.04"); // FCF 殖利率 >= 4%
     }
 
     if (name === "magic") {
