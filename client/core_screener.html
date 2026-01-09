@@ -220,6 +220,9 @@ function setSelect(id, value) {
 
   // 🔹 一鍵策略：依名稱調整所有篩選器
 function applyPreset(name) {
+  // === 新增：將選擇的策略儲存到 sessionStorage ===
+  sessionStorage.setItem("activePreset", name);
+
   // 1. 處理按鈕高亮
   document.querySelectorAll(".preset-btn").forEach(btn => {
     btn.classList.remove("active");
@@ -696,6 +699,22 @@ function applyPreset(name) {
   });
   */
 }
+
+// === 新增：頁面載入時恢復上次點選的風格 ===
+window.addEventListener('pageshow', (event) => {
+    // 檢查是否有儲存的策略名稱
+    const savedPreset = sessionStorage.getItem("activePreset");
+    
+    if (savedPreset) {
+        // 為了確保數據已載入完成，稍微延遲一點點執行或直接執行
+        // 這裡我們直接呼叫，因為 applyPreset 內部會處理 UI
+        applyPreset(savedPreset);
+    }
+});
+
+// 建議在原本的 loadData 之後執行，或者併入 loadData 的結尾
+// 這樣可以確保數據回來後，策略過濾能正確生效
+loadData();
 
   loadData();
   </script>
