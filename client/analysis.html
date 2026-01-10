@@ -112,7 +112,69 @@ function requireProOrShowCard() {
   return false;
 }
 
+async function getAccessToken() {
+  const { data } = await sbAuth.auth.getSession();
+  return data?.session?.access_token || null;
+}
 
+function fmtPct100(x, digits=1){
+  if (x == null || Number.isNaN(Number(x))) return "—";
+  return (Number(x)*100).toFixed(digits) + "%";
+}
+function fmtNum2(x, digits=2){
+  if (x == null || Number.isNaN(Number(x))) return "—";
+  return Number(x).toFixed(digits);
+}
+
+async function loadProMetrics(sym){
+  const token = await getAccessToken();
+  if (!token) throw new Error("未登入");
+
+  // 你的 Node server 位址（本機開發）
+  const apiBase = "http://localhost:3000";
+
+  const res = await fetch(`${apiBase}/api/pro-metrics?symbol=${encodeURIComponent(sym)}`, {
+    method: "GET",
+    headers: { "Authorization": `Bearer ${token}` }
+  });
+
+  const json = await res.json();
+  if (!res.ok) throw new Error(json?.error || `HTTP ${res.status}`);
+  return json;
+}
+
+// 修正後的變數對應（假設後端回傳的是扁平的欄位名稱）
+// 前端分析頁面 (analysis.html)
+function renderProCard(p) {
+  const host = document.getElementById("trends");
+  if (!host) return;
+
+  // 注意：這裡要從 p.profitability 裡面拿資料
+  const prof = p.profitability || {}; 
+
+  host.insertAdjacentHTML("beforeend", `
+    <div class="card" style="margin-top:14px; border:1px solid #ffd700;">
+      <div class="cardHeader">
+        <h3 class="cardTitle">Pro 進階指標</h3>
+        <span class="pill" style="background:#ffd700; color:#000;">Pro Only</span>
+      </div>
+      <div class="kpiGrid">
+        <div class="kpi">
+          <div class="kLabel">毛利率</div>
+          <div class="kVal">${fmtPct(prof.gross_margin, 1)}</div> <div class="kHint">Gross Margin</div>
+        </div>
+        <div class="kpi">
+          <div class="kLabel">營益率</div>
+          <div class="kVal">${fmtPct(prof.operating_margin, 1)}</div> <div class="kHint">Operating Margin</div>
+        </div>
+        <div class="kpi">
+          <div class="kLabel">EV/EBITDA</div>
+          <div class="kVal">${fmtNum(p.ev_ebitda, 2)}</div> <div class="kHint">Enterprise Value</div>
+        </div>
+      </div>
+    </div>
+  `);
+}
 // ===== FMP (Income / Cash Flow) =====
 const FMP_API_KEY = "PHTJpjhhPVzIdzjMEP84WKq5JiNRYxA6";
 let _revChart = null;
@@ -705,8 +767,20 @@ async function loadSnapshot() {
 
   // ===== Pro-only 區塊（先留入口，之後加指標就放這裡）=====
   if (requireProOrShowCard()) {
-    // TODO: 未來你新增進階指標/圖表：
-    // await loadProTrends(symbol);
+    try {
+      const pro = await loadProMetrics(symbol);
+      renderProCard(pro);
+    } catch (e) {
+      // Pro 但抓不到資料：顯示錯誤（不影響其他區塊）
+      const host = document.getElementById("trends");
+      if (host) {
+        host.insertAdjacentHTML("beforeend", `
+          <div class="card" style="margin-top:14px;">
+            <div class="note">Pro 指標載入失敗：${e.message}</div>
+          </div>
+        `);
+      }
+    }
   }
 });
 }
