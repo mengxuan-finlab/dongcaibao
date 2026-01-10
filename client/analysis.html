@@ -131,7 +131,9 @@ async function loadProMetrics(sym){
   if (!token) throw new Error("未登入");
 
   // 你的 Node server 位址（本機開發）
-  const apiBase = "http://localhost:3000";
+  const apiBase = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
+  ? "http://localhost:3000"
+  : "https://doncaibao.onrender.com"; 
 
   const res = await fetch(`${apiBase}/api/pro-metrics?symbol=${encodeURIComponent(sym)}`, {
     method: "GET",
