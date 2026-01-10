@@ -15,6 +15,9 @@
       <div>
         <h1 class="title" id="title">載入中...</h1>
         <div class="subtitle" id="subTitle">懂才抱 · 財報快照（Snapshot）</div>
+        <div class="subtitle" id="planBadge" style="opacity:.85; font-size:13px; margin-top:6px;">
+          方案：載入中…
+        </div>
       </div>
 
       <div class="actions">
@@ -30,12 +33,85 @@
   </div>
 
 <script>
-const SUPABASE_URL = "https://ojeirmqxborwxhuwuems.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_wur9F2qRW0NFyZpijPub2A__IsGlpgZ";
-// 改個名字，例如 supabaseClient
-const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// === Auth/Portfolio Supabase（用來讀登入與方案）===
+const SB_AUTH_URL = "https://zlkexplsleznuebighte.supabase.co";
+const SB_AUTH_ANON = "sb_publishable_KvJtQN9R6YC5PpsKLFtu0Q_43LqiQN-";
+const sbAuth = window.supabase.createClient(SB_AUTH_URL, SB_AUTH_ANON);
+
+// === Stock Data Supabase（用來讀股票資料）===
+const SB_DATA_URL = "https://ojeirmqxborwxhuwuems.supabase.co";
+const SB_DATA_ANON = "sb_publishable_wur9F2qRW0NFyZpijPub2A__IsGlpgZ";
+const sbData = window.supabase.createClient(SB_DATA_URL, SB_DATA_ANON);
+
+
 const params = new URLSearchParams(window.location.search);
 const symbol = (params.get("symbol") || "").toUpperCase();
+
+// ============================
+// Plan / Permission
+// ============================
+let __plan = "free";   // free | plus | pro
+let __isPro = false;
+let __user = null;
+
+async function getCurrentUserPlan() {
+  const { data: sessionData } = await sbAuth.auth.getSession();
+  const session = sessionData?.session;
+
+  if (!session?.user) return { user: null, plan: "free" };
+
+  const user = session.user;
+
+  const { data: profile, error } = await sbAuth
+    .from("profiles")
+    .select("plan")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  // 如果 RLS 或資料缺失，至少不要炸掉
+  const plan = (!error && profile?.plan) ? profile.plan : "free";
+  return { user, plan };
+}
+
+
+
+function setPlanUI(plan){
+  const el = document.getElementById("planBadge");
+  if (!el) return;
+
+  const text =
+    plan === "pro"  ? "方案：Pro（已解鎖進階）" :
+    plan === "plus" ? "方案：Plus" :
+                      "方案：Free";
+
+  el.textContent = text;
+}
+
+// 這個函式是「未來新增 Pro 指標」時的入口：只允許 Pro 呼叫
+function requireProOrShowCard() {
+  if (__isPro) return true;
+
+  const host = document.getElementById("trends");
+  if (host && !document.getElementById("proOnlyCard")) {
+    host.insertAdjacentHTML("beforeend", `
+      <div id="proOnlyCard" class="card" style="margin-top:14px;">
+        <div class="cardHeader">
+          <h3 class="cardTitle">高資產模式（Pro 限定）</h3>
+          <span class="pill">Pro Only</span>
+        </div>
+        <div class="note">
+          進階指標（如：毛利率/營益率趨勢、ROIC 趨勢、資本結構、股本稀釋）僅限 Pro 方案使用。
+        </div>
+        <div class="note">
+          若要解鎖，請升級至 Pro 方案。
+        </div>
+      </div>
+    `);
+  }
+  return false;
+}
+
 
 // ===== FMP (Income / Cash Flow) =====
 const FMP_API_KEY = "PHTJpjhhPVzIdzjMEP84WKq5JiNRYxA6";
@@ -463,12 +539,19 @@ async function loadSnapshot() {
     document.getElementById("snapshot").innerText = "網址缺少 symbol，例如：analysis.html?symbol=AAPL";
     return;
   }
+  
+    // ===== 先讀方案（權限基礎）=====
+  const planInfo = await getCurrentUserPlan();
+  __user = planInfo.user;
+  __plan = planInfo.plan || "free";
+  __isPro = (__plan === "pro");
+  setPlanUI(__plan);
 
   document.getElementById("tvLink").href = `https://www.tradingview.com/symbols/NASDAQ-${symbol}/`;
   document.getElementById("yfLink").href = `https://finance.yahoo.com/quote/${symbol}`;
 
   // 這裡也要跟著改名
-    const { data, error } = await supabaseClient
+    const { data, error } = await sbData
     .from("core_metrics")
     .select("*")
     .eq("symbol", symbol)
@@ -617,7 +700,15 @@ async function loadSnapshot() {
   renderHealthSection(data);
 
   // 再載入趨勢圖（只呼叫一次）
-  requestAnimationFrame(() => loadQuickTrends(symbol));
+  requestAnimationFrame(async () => {
+  await loadQuickTrends(symbol);
+
+  // ===== Pro-only 區塊（先留入口，之後加指標就放這裡）=====
+  if (requireProOrShowCard()) {
+    // TODO: 未來你新增進階指標/圖表：
+    // await loadProTrends(symbol);
+  }
+});
 }
 
 loadSnapshot();
