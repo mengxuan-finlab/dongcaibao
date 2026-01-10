@@ -177,6 +177,82 @@ app.post('/api/analyze-stock', async (req, res) => {
   }
 });
 
+// === 額外：Stock Data Supabase（讀 core_metrics 用）===
+const sbData = createClient(
+  process.env.SB_DATA_URL,          // 你的股票資料庫 URL
+  process.env.SB_DATA_SERVICE_KEY   // 你的股票資料庫 Service Role Key
+);
+
+// 小工具：從 token 取 user + plan
+async function getUserAndPlanFromToken(token) {
+  const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+  if (authError || !user) throw new Error('身分驗證失敗');
+
+  // 查 core_metrics（股票資料庫）
+  const { data, error: dataErr } = await sbData
+    .from("core_metrics")
+    .select("gross_margin, operating_margin, roic")
+    .eq("symbol", symbol)
+    .single();
+
+  if (profileError) throw new Error('讀取方案失敗');
+  return { user, plan: profile?.plan || 'free' };
+}
+
+// ===== Pro-only 指標 API =====
+app.get('/api/pro-metrics', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    const { symbol } = req.query;
+    if (!authHeader) return res.status(401).json({ error: "未登入" });
+
+    const token = authHeader.split(" ")[1];
+    const { data: { user }, error: authErr } = await supabase.auth.getUser(token);
+    if (authErr || !user) return res.status(401).json({ error: "驗證失敗" });
+
+    // 1. 查方案
+    const { data: profile } = await supabase.from("profiles").select("plan").eq("id", user.id).single();
+    if (profile?.plan !== "pro") return res.status(403).json({ error: "權限不足" });
+
+    // 2. 查資料 (根據您的 Supabase 截圖修正欄位名稱)
+    const { data, error: dbErr } = await sbData 
+      .from("core_metrics")
+      .select(`
+        grossmargin, 
+        operatingmargin, 
+        evtoebitda
+      `) // ❌ 移除資料庫中沒有的 roic, net_margin 等，修正為無底線名稱
+      .eq("symbol", symbol)
+      .single();
+
+    // 增加 Debug 日誌，若出錯可在終端機看到原因
+    if (dbErr || !data) {
+      console.error(`[DB Error] Symbol: ${symbol}, Error:`, dbErr?.message);
+      return res.status(404).json({ error: "資料不存在或欄位錯誤" }); //
+    }
+
+    // 3. 回傳前端期待的結構 (Key 值維持有底線，方便前端讀取)
+    res.json({
+      profitability: {
+        gross_margin: data.grossmargin, // 這裡對接資料庫的無底線欄位
+        operating_margin: data.operatingmargin,
+        net_margin: null // 資料庫目前沒這欄位，先給 null
+      },
+      balance: {
+        net_debt_to_ebitda: null, // 資料庫目前沒這欄位
+        current_ratio: null
+      },
+      capital: {
+        dilution_yoy: null
+      },
+      ev_ebitda: data.evtoebitda // 截圖中有看到的欄位
+    });
+  } catch (e) {
+    console.error("[Server Error]", e);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`後端伺服器啟動中： http://localhost:${PORT}`);
