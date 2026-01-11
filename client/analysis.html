@@ -149,99 +149,74 @@ async function loadProMetrics(sym){
 // 前端分析頁面 (analysis.html)
 function renderProCard(p) {
   const host = document.getElementById("trends");
-  // 確保資料存在，且包含 snapshot 與 history
   if (!host || !p.snapshot || !p.history) return;
 
   const s = p.snapshot;
   const h = p.history; 
 
-  // --- 1. 進階評價邏輯 (白話判斷) ---
+  // --- 1. 強化版評價邏輯 ---
   
-  // A. 計算 PE 均值與安全邊際
+  // A. PE 均值與警示
   const peList = h.map(item => item.pe).filter(v => v > 0);
   const avgPe = peList.length > 0 ? peList.reduce((a, b) => a + b, 0) / peList.length : 0;
   const isPeCheap = s.pe > 0 && s.pe < avgPe;
+  // 警示：PE 高於均值 20% OR PE 絕對值過高 (> 60)
+  const isPeWarning = s.pe > (avgPe * 1.2) || s.pe > 60;
 
-  // B. 計算 P/FCF 均值與評價
+  // B. P/FCF 均值與警示 (針對 LLY 這種現金流異常的情況)
   const fcfList = h.map(item => item.p_fcf).filter(v => v > 0);
   const avgFcf = fcfList.length > 0 ? fcfList.reduce((a, b) => a + b, 0) / fcfList.length : 0;
   const fcfEval = s.p_fcf > avgFcf ? "（高於歷史均值）" : "（具備安全邊際）";
+  // 警示：P/FCF 高於均值 20% OR P/FCF 絕對值極端 (> 80)
+  const isFcfWarning = s.p_fcf > (avgFcf * 1.2) || s.p_fcf > 80;
 
   // C. ROIC 效率評價
   const roicEval = s.roic > 0.4 ? "（資本效率極高）" : s.roic > 0.15 ? "（獲利品質優）" : "（效率待觀察）";
 
-  // D. FCF Margin (現金含金量) 評價 - 假設數據中有此欄位，若無則以 20% 為基準判斷
-  const fcfMargin = s.fcfMargin || 0; // 對接後端計算好的真實數據
+  // D. FCF Margin (現金含金量)
+  const fcfMargin = s.fcfMargin || 0;
   const fcfMarginEval = fcfMargin > 0.25 ? "（現金轉化極強）" : 
-                      fcfMargin > 0.15 ? "（現金轉化優良）" : 
-                      fcfMargin > 0 ? "（現金流穩定）" : "（需注意現金缺口）";
+                        fcfMargin > 0.15 ? "（現金轉化優良）" : 
+                        fcfMargin > 0 ? "（現金流穩定）" : "（需注意現金缺口）";
 
   // --- 2. 插入 HTML 結構 ---
   host.insertAdjacentHTML("beforeend", `
       <div class="card" style="margin-top:16px; border:2px solid #ffd700; background: rgba(255, 215, 0, 0.05);">
         <div class="cardHeader">
-          <h3 class="cardTitle" style="color:#ffd700;"> Pro 進階分析：護城河與估值安全邊際</h3>
+          <h3 class="cardTitle" style="color:#ffd700;">💎 Pro 進階分析：護城河與估值安全邊際</h3>
           <span class="pill" style="background:#ffd700; color:#000;">Pro Only</span>
         </div>
 
         <div style="margin: 12px 0; display: flex; gap: 8px; flex-wrap: wrap;">
-          ${s.roic > 0.15 ? `
-            <span class="hpill good item-help" 
-                  data-tip="複利機器：ROIC > 15% 代表公司配置資本極其高效，具備長期成長的「核心護城河」。">
-              複利機器 ✅
-            </span>` : ''}
+          ${s.roic > 0.15 ? 
+            `<span class="hpill good item-help" data-tip="複利機器：ROIC > 15%，具備核心護城河。">複利機器 ✅</span>` : 
+            (s.roic < 0.05 && s.roic !== null ? `<span class="hpill bad item-help" data-tip="效率堪憂：ROIC < 5%，資金回報過低。">效率堪憂 ⚠️</span>` : '')
+          }
             
-          ${s.net_debt_to_ebitda < 1 ? `
-            <span class="hpill good item-help" 
-                  data-tip="財務堡壘：淨負債/EBITDA < 1 代表公司財務極度健壯，只需不到一年的獲利即可還清債務。">
-              財務堡壘 ✅
-            </span>` : ''}
+          ${s.net_debt_to_ebitda < 1 ? 
+            `<span class="hpill good item-help" data-tip="財務堡壘：淨負債比 < 1，財務極度健壯。">財務堡壘 ✅</span>` : 
+            (s.net_debt_to_ebitda > 3 ? `<span class="hpill bad item-help" data-tip="負債沉重：淨負債比 > 3，注意利息壓力。">負債警訊 ⚠️</span>` : '')
+          }
             
-          ${isPeCheap ? `
-            <span class="hpill good item-help" 
-                  data-tip="估值相對便宜：目前 PE 低於 5 年歷史平均 (${fmtNum(avgPe, 1)})，代表目前股價具備安全邊際。">
-              估值相對便宜 ✅
-            </span>` : ''}
+          ${isPeCheap ? 
+            `<span class="hpill good item-help" data-tip="目前 PE 低於 5 年均值，具備安全邊際。">估值便宜 ✅</span>` : 
+            (isPeWarning || isFcfWarning ? `<span class="hpill bad item-help" data-tip="估值偏高：PE 或 P/FCF 顯著高於歷史均值，追高風險大。">估值偏高 ⚠️</span>` : '')
+          }
         </div>
 
         <div class="chartGrid">
-          <div class="chartBox">
-            <div class="chartTitle">獲利效率趨勢 (毛利 vs 營益 %)</div>
-            <div class="chartCanvasWrap"><canvas id="proMarginChart"></canvas></div>
-          </div>
-          <div class="chartBox">
-            <div class="chartTitle">ROIC 資本回報趨勢 (%)</div>
-            <div class="chartCanvasWrap"><canvas id="proRoicChart"></canvas></div>
-          </div>
-          <div class="chartBox">
-            <div class="chartTitle">估值水位趨勢 (PE vs P/FCF)</div>
-            <div class="chartCanvasWrap"><canvas id="proValuationChart"></canvas></div>
-          </div>
+          <div class="chartBox"><div class="chartTitle">獲利效率趨勢 (毛利 vs 營益 %)</div><div class="chartCanvasWrap"><canvas id="proMarginChart"></canvas></div></div>
+          <div class="chartBox"><div class="chartTitle">ROIC 資本回報趨勢 (%)</div><div class="chartCanvasWrap"><canvas id="proRoicChart"></canvas></div></div>
+          <div class="chartBox"><div class="chartTitle">估值水位趨勢 (PE vs P/FCF)</div><div class="chartCanvasWrap"><canvas id="proValuationChart"></canvas></div></div>
         </div>
         
-        <div class="pro-snapshot-footer" style="
-          margin-top: 20px; 
-          padding: 16px; 
-          background: rgba(255, 215, 0, 0.1); 
-          border-radius: 8px; 
-          border-left: 4px solid #ffd700;
-        ">
+        <div class="pro-snapshot-footer" style="margin-top: 20px; padding: 16px; background: rgba(255, 215, 0, 0.1); border-radius: 8px; border-left: 4px solid #ffd700;">
           <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
-            <div style="font-size: 16px; font-weight: 600; color: #ffd700;">
-               最新快照數據 (Latest Snapshot)
-            </div>
+            <div style="font-size: 16px; font-weight: 600; color: #ffd700;">📌 最新快照數據 (Latest Snapshot)</div>
             <div style="display: flex; gap: 24px; flex-wrap: wrap; font-size: 15px; color: #eee;">
-              <div>ROIC: <b style="color:#fff; font-size:20px;">${fmtPct(s.roic, 1)}</b>
-                <span style="color:#ffd700; font-size:13px; margin-left:4px;">${roicEval}</span>
-              </div>
-              
-              <div>FCF Margin: <b style="color:#fff; font-size:20px;">${fmtPct(fcfMargin, 1)}</b>
-                <span style="color:#ffd700; font-size:13px; margin-left:4px;">${fcfMarginEval}</span>
-              </div>
-
-              <div>P/FCF: <b style="color:#fff; font-size:20px;">${fmtNum(s.p_fcf, 1)}</b> 
-                <span style="opacity:0.8; font-size:13px; margin-left:4px;">${fcfEval}</span>
-              </div>
+              <div>ROIC: <b style="color:#fff; font-size:20px;">${fmtPct(s.roic, 1)}</b><span style="color:#ffd700; font-size:13px; margin-left:4px;">${roicEval}</span></div>
+              <div>FCF Margin: <b style="color:#fff; font-size:20px;">${fmtPct(fcfMargin, 1)}</b><span style="color:#ffd700; font-size:13px; margin-left:4px;">${fcfMarginEval}</span></div>
+              <div>P/FCF: <b style="color:#fff; font-size:20px;">${fmtNum(s.p_fcf, 1)}</b><span style="opacity:0.8; font-size:13px; margin-left:4px;">${fcfEval}</span></div>
             </div>
           </div>
         </div>

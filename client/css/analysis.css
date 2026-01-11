@@ -426,3 +426,10 @@ body{
     visibility: visible;
     transform: translateX(-50%) scale(1);
 }
+/* 警示標籤樣式：使用紅色底 */
+.hpill.bad {
+  background: rgba(255, 68, 68, 0.15);
+  color: #ecdfdf;
+  border: 1px solid rgba(255, 68, 68, 0.4);
+}
+
