@@ -200,56 +200,74 @@ async function getUserAndPlanFromToken(token) {
 }
 
 // ===== Pro-only 指標 API =====
+// 後端 (server.js)
 app.get('/api/pro-metrics', async (req, res) => {
   try {
-    const authHeader = req.headers.authorization;
     const { symbol } = req.query;
+    const authHeader = req.headers.authorization;
+    const FMP_KEY = process.env.FMP_API_KEY;
+
     if (!authHeader) return res.status(401).json({ error: "未登入" });
 
+    // 1. 權限與方案驗證
     const token = authHeader.split(" ")[1];
     const { data: { user }, error: authErr } = await supabase.auth.getUser(token);
-    if (authErr || !user) return res.status(401).json({ error: "驗證失敗" });
-
-    // 1. 查方案
     const { data: profile } = await supabase.from("profiles").select("plan").eq("id", user.id).single();
-    if (profile?.plan !== "pro") return res.status(403).json({ error: "權限不足" });
+    if (profile?.plan !== "pro") return res.status(403).json({ error: "限 Pro 方案解鎖高品質趨勢" });
 
-    // 2. 查資料 (根據您的 Supabase 截圖修正欄位名稱)
-    const { data, error: dbErr } = await sbData 
-      .from("core_metrics")
-      .select(`
-        grossmargin, 
-        operatingmargin, 
-        evtoebitda
-      `) // ❌ 移除資料庫中沒有的 roic, net_margin 等，修正為無底線名稱
-      .eq("symbol", symbol)
-      .single();
+    // 2. 抓取五年歷史數據 (使用 Stable 端點)
+    const [kmRes, ratioRes] = await Promise.all([
+      axios.get(`https://financialmodelingprep.com/stable/key-metrics?symbol=${symbol}&apikey=${FMP_KEY}`),
+      axios.get(`https://financialmodelingprep.com/stable/ratios?symbol=${symbol}&apikey=${FMP_KEY}`)
+    ]);
 
-    // 增加 Debug 日誌，若出錯可在終端機看到原因
-    if (dbErr || !data) {
-      console.error(`[DB Error] Symbol: ${symbol}, Error:`, dbErr?.message);
-      return res.status(404).json({ error: "資料不存在或欄位錯誤" }); //
-    }
+    const kmFull = kmRes.data.slice(0, 5).reverse(); // 2021 -> 2025
+    const ratioFull = ratioRes.data.slice(0, 5).reverse();
 
-    // 3. 回傳前端期待的結構 (Key 值維持有底線，方便前端讀取)
+    const latestKm = kmFull[kmFull.length - 1] || {};
+    const latestRatio = ratioFull[ratioFull.length - 1] || {};
+    // --- 關鍵修正：在這裡計算最新一年的 FCF Margin ---
+    // 優先使用 ratio 的比率相乘，若無則用每股數值相除
+    const latestFcfMargin = 
+      (latestRatio.operatingCashFlowSalesRatio * latestRatio.freeCashFlowOperatingCashFlowRatio) || 
+      (latestRatio.freeCashFlowPerShare / latestRatio.revenuePerShare) || 
+      (latestKm.freeCashFlowYield * latestRatio.priceToSalesRatio) || 0;
+    
+    // 3. 回傳整合後的格式
     res.json({
-      profitability: {
-        gross_margin: data.grossmargin, // 這裡對接資料庫的無底線欄位
-        operating_margin: data.operatingmargin,
-        net_margin: null // 資料庫目前沒這欄位，先給 null
+      symbol,
+      snapshot: {
+        roic: latestKm.returnOnCapitalEmployed,         // 51.97%
+        ccc: latestKm.cashConversionCycle,              // -41.97 天
+        operating_margin: latestRatio.operatingProfitMargin, 
+        net_debt_to_ebitda: latestKm.netDebtToEBITDA,   // 0.55
+        fcf_yield: latestKm.freeCashFlowYield,          // 2.59%
+        ev_ebitda: latestKm.evToEBITDA, 
+        pe: latestRatio.priceToEarningsRatio,      //
+        p_fcf: latestRatio.priceToFreeCashFlowRatio, //  
+        fcfMargin: latestFcfMargin             
       },
-      balance: {
-        net_debt_to_ebitda: null, // 資料庫目前沒這欄位
-        current_ratio: null
-      },
-      capital: {
-        dilution_yoy: null
-      },
-      ev_ebitda: data.evtoebitda // 截圖中有看到的欄位
+      history: kmFull.map((km, i) => {
+        const r = ratioFull[i] || {};
+        // --- 新增：計算每一年的 FCF Margin (用於折線圖) ---
+        const historyFcfMargin = 
+          (r.operatingCashFlowSalesRatio * r.freeCashFlowOperatingCashFlowRatio) || 
+          (r.freeCashFlowPerShare / r.revenuePerShare) || 0;
+        return {
+          year: km.date.slice(0, 4),
+          roic: km.returnOnCapitalEmployed,
+          operatingMargin: r.operatingProfitMargin,
+          grossMargin: r.grossProfitMargin,
+          ccc: km.cashConversionCycle,
+          pe: r.priceToEarningsRatio,      //
+          p_fcf: r.priceToFreeCashFlowRatio,
+          fcfMargin: historyFcfMargin // 傳給前端歷史陣列
+        };
+      })
     });
   } catch (e) {
-    console.error("[Server Error]", e);
-    res.status(500).json({ error: "Internal Server Error" });
+    console.error("[Pro API Error]", e.message);
+    res.status(500).json({ error: "抓取數據失敗，請確認 API Key 有效性" });
   }
 });
 
