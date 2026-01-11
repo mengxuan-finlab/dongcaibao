@@ -33,6 +33,7 @@
         <button class="preset-btn" data-preset="magic">魔法公式</button>
         <button class="preset-btn" data-preset="compounder">複利成長</button>
         <button class="preset-btn" data-preset="lowvol">低波動</button>
+        <button id="btnClearAll" class="preset-btn" style="background-color: #6c757d;"> 清空全部條件</button>
     </div>
   </div>
 
@@ -383,6 +384,37 @@ function applyPreset(name) {
   saveAllStates(); // <-- 新增這一行
 }
 
+function resetFilters() {
+    const filterIds = [
+        "capFilter","roeFilter","roicFilter","fcfFilter","eyFilter","crFilter",
+        "ndFilter","cccFilter","peFilter","pegFilter","psFilter","pbFilter",
+        "pfcfFilter","deFilter","daFilter","dyFilter","dpFilter","gmFilter",
+        "omFilter","evFilter","rgFilter","egFilter","fgFilter","dgFilter",
+        "sectorFilter","betaFilter"
+    ];
+
+    filterIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.value = el.querySelector('option[value="0"]') ? "0" : "all";
+            const group = el.closest('.filter-group');
+            if (group) group.classList.remove("filter-active");
+        }
+    });
+
+    document.querySelectorAll(".preset-btn").forEach(btn => btn.classList.remove("active"));
+    sessionStorage.removeItem("activePreset");
+    sessionStorage.removeItem("screener_state");
+
+    applyFiltersAndRender();
+    saveAllStates();
+    
+    // (選用) 讓所有摺疊區塊也一起收起來：
+    document.querySelectorAll('.filter-section').forEach(s => s.classList.remove("active"));
+    
+    alert("已清空所有篩選條件！");
+}
+
  async function loadData() {
   const pageSize = 1000;
   let from = 0;
@@ -707,6 +739,7 @@ function applyPreset(name) {
 
   // 綁定按鈕點擊事件
   document.getElementById("btnGoSnapshot").addEventListener("click", goToSnapshot);
+  document.getElementById("btnClearAll").addEventListener("click", resetFilters);
 
   // 綁定 Enter 鍵事件 (讓使用者按 Enter 也能搜尋)
   document.getElementById("stockInput").addEventListener("keydown", (e) => {
