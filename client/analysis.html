@@ -149,33 +149,156 @@ async function loadProMetrics(sym){
 // 前端分析頁面 (analysis.html)
 function renderProCard(p) {
   const host = document.getElementById("trends");
-  if (!host) return;
+  // 確保資料存在，且包含 snapshot 與 history
+  if (!host || !p.snapshot || !p.history) return;
 
-  // 注意：這裡要從 p.profitability 裡面拿資料
-  const prof = p.profitability || {}; 
+  const s = p.snapshot;
+  const h = p.history; 
 
+  // --- 1. 進階評價邏輯 (白話判斷) ---
+  
+  // A. 計算 PE 均值與安全邊際
+  const peList = h.map(item => item.pe).filter(v => v > 0);
+  const avgPe = peList.length > 0 ? peList.reduce((a, b) => a + b, 0) / peList.length : 0;
+  const isPeCheap = s.pe > 0 && s.pe < avgPe;
+
+  // B. 計算 P/FCF 均值與評價
+  const fcfList = h.map(item => item.p_fcf).filter(v => v > 0);
+  const avgFcf = fcfList.length > 0 ? fcfList.reduce((a, b) => a + b, 0) / fcfList.length : 0;
+  const fcfEval = s.p_fcf > avgFcf ? "（高於歷史均值）" : "（具備安全邊際）";
+
+  // C. ROIC 效率評價
+  const roicEval = s.roic > 0.4 ? "（資本效率極高）" : s.roic > 0.15 ? "（獲利品質優）" : "（效率待觀察）";
+
+  // D. FCF Margin (現金含金量) 評價 - 假設數據中有此欄位，若無則以 20% 為基準判斷
+  const fcfMargin = s.fcfMargin || 0; // 對接後端計算好的真實數據
+  const fcfMarginEval = fcfMargin > 0.25 ? "（現金轉化極強）" : 
+                      fcfMargin > 0.15 ? "（現金轉化優良）" : 
+                      fcfMargin > 0 ? "（現金流穩定）" : "（需注意現金缺口）";
+
+  // --- 2. 插入 HTML 結構 ---
   host.insertAdjacentHTML("beforeend", `
-    <div class="card" style="margin-top:14px; border:1px solid #ffd700;">
-      <div class="cardHeader">
-        <h3 class="cardTitle">Pro 進階指標</h3>
-        <span class="pill" style="background:#ffd700; color:#000;">Pro Only</span>
+      <div class="card" style="margin-top:16px; border:2px solid #ffd700; background: rgba(255, 215, 0, 0.05);">
+        <div class="cardHeader">
+          <h3 class="cardTitle" style="color:#ffd700;"> Pro 進階分析：護城河與估值安全邊際</h3>
+          <span class="pill" style="background:#ffd700; color:#000;">Pro Only</span>
+        </div>
+
+        <div style="margin: 12px 0; display: flex; gap: 8px; flex-wrap: wrap;">
+          ${s.roic > 0.15 ? `
+            <span class="hpill good item-help" 
+                  data-tip="複利機器：ROIC > 15% 代表公司配置資本極其高效，具備長期成長的「核心護城河」。">
+              複利機器 ✅
+            </span>` : ''}
+            
+          ${s.net_debt_to_ebitda < 1 ? `
+            <span class="hpill good item-help" 
+                  data-tip="財務堡壘：淨負債/EBITDA < 1 代表公司財務極度健壯，只需不到一年的獲利即可還清債務。">
+              財務堡壘 ✅
+            </span>` : ''}
+            
+          ${isPeCheap ? `
+            <span class="hpill good item-help" 
+                  data-tip="估值相對便宜：目前 PE 低於 5 年歷史平均 (${fmtNum(avgPe, 1)})，代表目前股價具備安全邊際。">
+              估值相對便宜 ✅
+            </span>` : ''}
+        </div>
+
+        <div class="chartGrid">
+          <div class="chartBox">
+            <div class="chartTitle">獲利效率趨勢 (毛利 vs 營益 %)</div>
+            <div class="chartCanvasWrap"><canvas id="proMarginChart"></canvas></div>
+          </div>
+          <div class="chartBox">
+            <div class="chartTitle">ROIC 資本回報趨勢 (%)</div>
+            <div class="chartCanvasWrap"><canvas id="proRoicChart"></canvas></div>
+          </div>
+          <div class="chartBox">
+            <div class="chartTitle">估值水位趨勢 (PE vs P/FCF)</div>
+            <div class="chartCanvasWrap"><canvas id="proValuationChart"></canvas></div>
+          </div>
+        </div>
+        
+        <div class="pro-snapshot-footer" style="
+          margin-top: 20px; 
+          padding: 16px; 
+          background: rgba(255, 215, 0, 0.1); 
+          border-radius: 8px; 
+          border-left: 4px solid #ffd700;
+        ">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+            <div style="font-size: 16px; font-weight: 600; color: #ffd700;">
+               最新快照數據 (Latest Snapshot)
+            </div>
+            <div style="display: flex; gap: 24px; flex-wrap: wrap; font-size: 15px; color: #eee;">
+              <div>ROIC: <b style="color:#fff; font-size:20px;">${fmtPct(s.roic, 1)}</b>
+                <span style="color:#ffd700; font-size:13px; margin-left:4px;">${roicEval}</span>
+              </div>
+              
+              <div>FCF Margin: <b style="color:#fff; font-size:20px;">${fmtPct(fcfMargin, 1)}</b>
+                <span style="color:#ffd700; font-size:13px; margin-left:4px;">${fcfMarginEval}</span>
+              </div>
+
+              <div>P/FCF: <b style="color:#fff; font-size:20px;">${fmtNum(s.p_fcf, 1)}</b> 
+                <span style="opacity:0.8; font-size:13px; margin-left:4px;">${fcfEval}</span>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
-      <div class="kpiGrid">
-        <div class="kpi">
-          <div class="kLabel">毛利率</div>
-          <div class="kVal">${fmtPct(prof.gross_margin, 1)}</div> <div class="kHint">Gross Margin</div>
-        </div>
-        <div class="kpi">
-          <div class="kLabel">營益率</div>
-          <div class="kVal">${fmtPct(prof.operating_margin, 1)}</div> <div class="kHint">Operating Margin</div>
-        </div>
-        <div class="kpi">
-          <div class="kLabel">EV/EBITDA</div>
-          <div class="kVal">${fmtNum(p.ev_ebitda, 2)}</div> <div class="kHint">Enterprise Value</div>
-        </div>
-      </div>
-    </div>
   `);
+
+  // --- 3. 呼叫 Chart.js 渲染圖表 ---
+  const labels = h.map(item => item.year);
+  
+  // 圖表 A：獲利率趨勢
+  new Chart(document.getElementById('proMarginChart'), {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [
+        { label: '毛利率', data: h.map(i => (i.grossMargin * 100).toFixed(1)), borderColor: '#ffd700', tension: 0.3 },
+        { label: '營益率', data: h.map(i => (i.operatingMargin * 100).toFixed(1)), borderColor: '#4bc0c0', tension: 0.3 }
+      ]
+    },
+    options: { responsive: true, maintainAspectRatio: false }
+  });
+
+  // 圖表 B：ROIC 趨勢
+  new Chart(document.getElementById('proRoicChart'), {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'ROIC',
+        data: h.map(i => (i.roic * 100).toFixed(1)),
+        borderColor: '#ff6384',
+        backgroundColor: 'rgba(255, 99, 132, 0.1)',
+        fill: true,
+        tension: 0.3
+      }]
+    },
+    options: { responsive: true, maintainAspectRatio: false }
+  });
+
+  // 圖表 C：估值趨勢 (PE vs P/FCF)
+  new Chart(document.getElementById('proValuationChart'), {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [
+        { label: 'PE', data: h.map(i => i.pe.toFixed(1)), borderColor: '#ffd700', tension: 0.3 },
+        { label: 'P/FCF', data: h.map(i => i.p_fcf.toFixed(1)), borderColor: '#ff6384', tension: 0.3 }
+      ]
+    },
+    options: { 
+      responsive: true, 
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: true, labels: { color: '#ccc', font: { size: 10 } } }
+      }
+    }
+  });
 }
 // ===== FMP (Income / Cash Flow) =====
 const FMP_API_KEY = "PHTJpjhhPVzIdzjMEP84WKq5JiNRYxA6";
