@@ -218,6 +218,43 @@ function setSelect(id, value) {
   }
 }
 
+// --- 新增 1：儲存目前的完整狀態 ---
+function saveAllStates() {
+  const state = {
+    filters: {},
+    activePreset: sessionStorage.getItem("activePreset") || "" 
+  };
+
+  // 抓取所有選單的值
+  document.querySelectorAll('.filter-section select').forEach(select => {
+    state.filters[select.id] = select.value;
+  });
+
+  sessionStorage.setItem("screener_state", JSON.stringify(state));
+}
+
+// --- 新增 2：還原完整狀態 ---
+function restoreAllStates() {
+  const savedData = sessionStorage.getItem("screener_state");
+  if (!savedData) return false;
+
+  const state = JSON.parse(savedData);
+
+  // 1. 還原所有下拉選單的值
+  Object.keys(state.filters).forEach(id => {
+    const val = state.filters[id];
+    setSelect(id, val); // 這會觸發你原本寫好的高亮與展開邏輯
+  });
+
+  // 2. 還原風格按鈕的高亮狀態
+  if (state.activePreset) {
+    document.querySelectorAll(".preset-btn").forEach(btn => {
+      btn.classList.remove("active");
+      if (btn.dataset.preset === state.activePreset) btn.classList.add("active");
+    });
+  }
+  return true;
+}
   // 🔹 一鍵策略：依名稱調整所有篩選器
 function applyPreset(name) {
   // === 新增：將選擇的策略儲存到 sessionStorage ===
@@ -343,6 +380,7 @@ function applyPreset(name) {
 
   // 4. 立即渲染
   applyFiltersAndRender();
+  saveAllStates(); // <-- 新增這一行
 }
 
  async function loadData() {
@@ -610,32 +648,25 @@ function applyPreset(name) {
   }
 
   // 篩選器 change 事件
-  document.getElementById("capFilter").addEventListener("change", applyFiltersAndRender); 
-  document.getElementById("roeFilter").addEventListener("change", applyFiltersAndRender);
-  document.getElementById("roicFilter").addEventListener("change", applyFiltersAndRender);
-  document.getElementById("fcfFilter").addEventListener("change", applyFiltersAndRender);
-  document.getElementById("eyFilter").addEventListener("change", applyFiltersAndRender);   
-  document.getElementById("crFilter").addEventListener("change", applyFiltersAndRender);   
-  document.getElementById("ndFilter").addEventListener("change", applyFiltersAndRender); 
-  document.getElementById("cccFilter").addEventListener("change", applyFiltersAndRender);
-  document.getElementById("peFilter").addEventListener("change", applyFiltersAndRender);
-  document.getElementById("pegFilter").addEventListener("change", applyFiltersAndRender);
-  document.getElementById("psFilter").addEventListener("change", applyFiltersAndRender);
-  document.getElementById("pbFilter").addEventListener("change", applyFiltersAndRender);
-  document.getElementById("pfcfFilter").addEventListener("change", applyFiltersAndRender);
-  document.getElementById("deFilter").addEventListener("change", applyFiltersAndRender);
-  document.getElementById("daFilter").addEventListener("change", applyFiltersAndRender);
-  document.getElementById("dyFilter").addEventListener("change", applyFiltersAndRender);
-  document.getElementById("dpFilter").addEventListener("change", applyFiltersAndRender);
-  document.getElementById("gmFilter").addEventListener("change", applyFiltersAndRender);
-  document.getElementById("omFilter").addEventListener("change", applyFiltersAndRender);
-  document.getElementById("evFilter").addEventListener("change", applyFiltersAndRender);
-  document.getElementById("rgFilter").addEventListener("change", applyFiltersAndRender);
-  document.getElementById("egFilter").addEventListener("change", applyFiltersAndRender);
-  document.getElementById("fgFilter").addEventListener("change", applyFiltersAndRender);
-  document.getElementById("dgFilter").addEventListener("change", applyFiltersAndRender);
-  document.getElementById("sectorFilter").addEventListener("change", applyFiltersAndRender);
-  document.getElementById("betaFilter").addEventListener("change", applyFiltersAndRender);
+  // 這裡定義所有選單的 ID
+  const filterIds = [
+    "capFilter","roeFilter","roicFilter","fcfFilter","eyFilter","crFilter",
+    "ndFilter","cccFilter","peFilter","pegFilter","psFilter","pbFilter",
+    "pfcfFilter","deFilter","daFilter","dyFilter","dpFilter","gmFilter",
+    "omFilter","evFilter","rgFilter","egFilter","fgFilter","dgFilter",
+    "sectorFilter","betaFilter"
+  ];
+  
+  // 批次綁定：手動更改選單時「過濾」＋「存檔微調結果」
+  filterIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.addEventListener("change", () => {
+        applyFiltersAndRender();
+        saveAllStates(); // <-- 這是記住「手動微調」的關鍵！
+      });
+    }
+  });
 
   // 一鍵策略按鈕事件
   document.querySelectorAll(".preset-btn").forEach(btn => {
@@ -656,6 +687,7 @@ function applyPreset(name) {
         sortState.dir = "desc";
       }
       applyFiltersAndRender();
+      saveAllStates();
     });
   });
 
@@ -701,20 +733,56 @@ function applyPreset(name) {
 }
 
 // === 新增：頁面載入時恢復上次點選的風格 ===
+// 修改頁面返回時的邏輯
 window.addEventListener('pageshow', (event) => {
-    // 檢查是否有儲存的策略名稱
-    const savedPreset = sessionStorage.getItem("activePreset");
-    
-    if (savedPreset) {
-        // 為了確保數據已載入完成，稍微延遲一點點執行或直接執行
-        // 這裡我們直接呼叫，因為 applyPreset 內部會處理 UI
-        applyPreset(savedPreset);
+    // 優先嘗試還原完整存檔
+    const hasRestored = restoreAllStates();
+    if (hasRestored) {
+        applyFiltersAndRender();
     }
 });
 
+// 修改資料載入函式的結尾
+async function loadData() {
+  const pageSize = 1000;
+  let from = 0;
+  let all = []; // 關鍵：定義 all 變數
+
+  while (true) {
+    const { data, error } = await supabaseClient
+      .from("core_metrics")
+      .select(`
+        symbol, market_cap, roa, roe, roic, fcf_yield, earnings_yield,
+        current_ratio, net_debt_to_ebitda, ccc, pe, peg, ps, pb, p_fcf,
+        debt_to_equity, debt_to_asset, dividendpayoutratio, dividendyield,
+        dividendpershare, grossmargin, operatingmargin, evtoebitda,
+        revenue_growth, eps_growth, fcf_growth, dividend_growth, beta, sector
+      `)
+      .range(from, from + pageSize - 1);
+
+    if (error) {
+      console.error(error);
+      document.getElementById("summaryText").textContent = "載入失敗，請稍後再試。";
+      return;
+    }
+
+    if (!data || data.length === 0) break;
+    all = all.concat(data);
+
+    if (data.length < pageSize) break;
+    from += pageSize;
+  }
+
+  allRows = all;
+  document.getElementById("summaryText").textContent = `已載入：${allRows.length} 檔`;
+  
+  // 核心：載入資料後，先還原上次儲存的選單狀態，再進行篩選與渲染
+  restoreAllStates(); 
+  applyFiltersAndRender();
+}
+
 // 建議在原本的 loadData 之後執行，或者併入 loadData 的結尾
 // 這樣可以確保數據回來後，策略過濾能正確生效
-loadData();
 
   loadData();
   </script>
