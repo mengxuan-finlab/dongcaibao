@@ -155,25 +155,20 @@ function renderProCard(p) {
   const h = p.history; 
 
   // --- 1. 強化版評價邏輯 ---
-  
-  // A. PE 均值與警示
   const peList = h.map(item => item.pe).filter(v => v > 0);
   const avgPe = peList.length > 0 ? peList.reduce((a, b) => a + b, 0) / peList.length : 0;
-  const isPeCheap = s.pe > 0 && s.pe < avgPe;
-  // 警示：PE 高於均值 20% OR PE 絕對值過高 (> 60)
-  const isPeWarning = s.pe > (avgPe * 1.2) || s.pe > 60;
-
-  // B. P/FCF 均值與警示 (針對 LLY 這種現金流異常的情況)
+  
   const fcfList = h.map(item => item.p_fcf).filter(v => v > 0);
   const avgFcf = fcfList.length > 0 ? fcfList.reduce((a, b) => a + b, 0) / fcfList.length : 0;
-  const fcfEval = s.p_fcf > avgFcf ? "（高於歷史均值）" : "（具備安全邊際）";
-  // 警示：P/FCF 高於均值 20% OR P/FCF 絕對值極端 (> 80)
+
+  // 判定變數
+  const isPeCheap = s.pe > 0 && s.pe < avgPe;
+  const isPeWarning = s.pe > (avgPe * 1.2) || s.pe > 60;
   const isFcfWarning = s.p_fcf > (avgFcf * 1.2) || s.p_fcf > 80;
 
-  // C. ROIC 效率評價
+  // 評價文字
+  const fcfEval = s.p_fcf > avgFcf ? "（高於歷史均值）" : "（具備安全邊際）";
   const roicEval = s.roic > 0.4 ? "（資本效率極高）" : s.roic > 0.15 ? "（獲利品質優）" : "（效率待觀察）";
-
-  // D. FCF Margin (現金含金量)
   const fcfMargin = s.fcfMargin || 0;
   const fcfMarginEval = fcfMargin > 0.25 ? "（現金轉化極強）" : 
                         fcfMargin > 0.15 ? "（現金轉化優良）" : 
@@ -183,24 +178,31 @@ function renderProCard(p) {
   host.insertAdjacentHTML("beforeend", `
       <div class="card" style="margin-top:16px; border:2px solid #ffd700; background: rgba(255, 215, 0, 0.05);">
         <div class="cardHeader">
-          <h3 class="cardTitle" style="color:#ffd700;">💎 Pro 進階分析：護城河與估值安全邊際</h3>
+          <h3 class="cardTitle" style="color:#ffd700;"> Pro 進階分析：護城河與估值安全邊際</h3>
           <span class="pill" style="background:#ffd700; color:#000;">Pro Only</span>
         </div>
 
         <div style="margin: 12px 0; display: flex; gap: 8px; flex-wrap: wrap;">
+          
           ${s.roic > 0.15 ? 
             `<span class="hpill good item-help" data-tip="複利機器：ROIC > 15%，具備核心護城河。">複利機器 ✅</span>` : 
-            (s.roic < 0.05 && s.roic !== null ? `<span class="hpill bad item-help" data-tip="效率堪憂：ROIC < 5%，資金回報過低。">效率堪憂 ⚠️</span>` : '')
+            (s.roic < 0.05 && s.roic !== null ? 
+              `<span class="hpill bad item-help" data-tip="效率堪憂：ROIC < 5%，資金回報過低。">效率堪憂 ⚠️</span>` : 
+              `<span class="hpill mid item-help" data-tip="獲利平穩：ROIC 處於 5%~15% 之間，運作正常。">獲利平穩</span>`)
           }
             
           ${s.net_debt_to_ebitda < 1 ? 
             `<span class="hpill good item-help" data-tip="財務堡壘：淨負債比 < 1，財務極度健壯。">財務堡壘 ✅</span>` : 
-            (s.net_debt_to_ebitda > 3 ? `<span class="hpill bad item-help" data-tip="負債沉重：淨負債比 > 3，注意利息壓力。">負債警訊 ⚠️</span>` : '')
+            (s.net_debt_to_ebitda > 3 ? 
+              `<span class="hpill bad item-help" data-tip="負債沉重：淨負債比 > 3，注意利息壓力。">負債警訊 ⚠️</span>` : 
+              `<span class="hpill mid item-help" data-tip="財務尚可：債務水位處於安全範圍。">財務尚可</span>`)
           }
             
           ${isPeCheap ? 
-            `<span class="hpill good item-help" data-tip="目前 PE 低於 5 年均值，具備安全邊際。">估值便宜 ✅</span>` : 
-            (isPeWarning || isFcfWarning ? `<span class="hpill bad item-help" data-tip="估值偏高：PE 或 P/FCF 顯著高於歷史均值，追高風險大。">估值偏高 ⚠️</span>` : '')
+            `<span class="hpill good item-help" data-tip="估值便宜：目前 PE 低於 5 年均值。">估值便宜 ✅</span>` : 
+            (isPeWarning || isFcfWarning ? 
+              `<span class="hpill bad item-help" data-tip="估值偏高：PE 或 P/FCF 顯著高於歷史均值。">估值偏高 ⚠️</span>` : 
+              `<span class="hpill mid item-help" data-tip="估值合理：股價處於歷史合理波段。">估值合理</span>`)
           }
         </div>
 
@@ -212,7 +214,7 @@ function renderProCard(p) {
         
         <div class="pro-snapshot-footer" style="margin-top: 20px; padding: 16px; background: rgba(255, 215, 0, 0.1); border-radius: 8px; border-left: 4px solid #ffd700;">
           <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
-            <div style="font-size: 16px; font-weight: 600; color: #ffd700;">📌 最新快照數據 (Latest Snapshot)</div>
+            <div style="font-size: 16px; font-weight: 600; color: #ffd700;"> 最新快照數據 (Latest Snapshot)</div>
             <div style="display: flex; gap: 24px; flex-wrap: wrap; font-size: 15px; color: #eee;">
               <div>ROIC: <b style="color:#fff; font-size:20px;">${fmtPct(s.roic, 1)}</b><span style="color:#ffd700; font-size:13px; margin-left:4px;">${roicEval}</span></div>
               <div>FCF Margin: <b style="color:#fff; font-size:20px;">${fmtPct(fcfMargin, 1)}</b><span style="color:#ffd700; font-size:13px; margin-left:4px;">${fcfMarginEval}</span></div>
@@ -222,7 +224,6 @@ function renderProCard(p) {
         </div>
       </div>
   `);
-
   // --- 3. 呼叫 Chart.js 渲染圖表 ---
   const labels = h.map(item => item.year);
   
