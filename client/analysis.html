@@ -151,6 +151,12 @@ function renderProCard(p) {
   const host = document.getElementById("trends");
   if (!host || !p.snapshot || !p.history) return;
 
+  // 修正 2：銷毀舊圖表實例（這部分你原本寫得很好，保留它）
+  ['proMarginChart', 'proRoicChart', 'proValuationChart'].forEach(id => {
+    const chartStatus = Chart.getChart(id);
+    if (chartStatus) chartStatus.destroy();
+  });
+
   const s = p.snapshot;
   const h = p.history; 
 

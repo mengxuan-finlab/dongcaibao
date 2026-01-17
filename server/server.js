@@ -221,9 +221,16 @@ app.get('/api/pro-metrics', async (req, res) => {
       axios.get(`https://financialmodelingprep.com/stable/ratios?symbol=${symbol}&apikey=${FMP_KEY}`)
     ]);
 
-    const kmFull = kmRes.data.slice(0, 5).reverse(); // 2021 -> 2025
-    const ratioFull = ratioRes.data.slice(0, 5).reverse();
+    // 1. 先進行降序排序 (最新的日期在 index 0)
+    const sortedKm = kmRes.data.sort((a, b) => new Date(b.date) - new Date(a.date));
+    const sortedRatio = ratioRes.data.sort((a, b) => new Date(b.date) - new Date(a.date));
 
+    // 2. 取前 5 筆最新的資料
+    // 3. 使用 reverse() 轉回 2021 -> 2025 的順序，供圖表從左到右繪製
+    const kmFull = sortedKm.slice(0, 5).reverse(); 
+    const ratioFull = sortedRatio.slice(0, 5).reverse();
+
+    // 4. 定義最新的一筆資料 (Snapshot 使用)
     const latestKm = kmFull[kmFull.length - 1] || {};
     const latestRatio = ratioFull[ratioFull.length - 1] || {};
     // --- 關鍵修正：在這裡計算最新一年的 FCF Margin ---
