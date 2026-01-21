@@ -32,77 +32,8 @@ const model = genAI.getGenerativeModel({
 // 方案限制設定
 const PLAN_LIMIT = { free: 2, plus: 10, pro: Infinity };
 
-// --- 主要 API ---
-app.post('/api/analyze-stock', async (req, res) => {
-  const { symbol } = req.body;
-  const authHeader = req.headers.authorization;
-
-  // 1. 檢查有沒有帶 Token
-  if (!authHeader) {
-    return res.status(401).json({ error: '未登入' });
-  }
-  
-  try {
-    // 2. 驗證使用者身分
-    const token = authHeader.split(' ')[1];
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    
-    if (authError || !user) {
-      throw new Error('身分驗證失敗');
-    }
-
-    // 3. 檢查方案與額度
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('plan')
-      .eq('id', user.id)
-      .single();
-    
-    const userPlan = profile?.plan || 'free';
-    const limit = PLAN_LIMIT[userPlan];
-
-    // 檢查本週用量
-    if (limit !== Infinity) {
-      const startOfWeek = new Date();
-      startOfWeek.setHours(0, 0, 0, 0);
-      startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay()); // 週日為起始
-
-      const { count } = await supabase
-        .from('usage_logs')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('action', 'company_intro')
-        .gte('created_at', startOfWeek.toISOString());
-
-      if (count >= limit) {
-        return res.status(403).json({ error: `已達本週使用上限 (${count}/${limit})，請升級方案。` });
-      }
-    }
-
-    // ==========================================
-    // ★ 核心邏輯：還原 n8n 的深度分析
-    // ==========================================
-    console.log(`[${new Date().toISOString()}] 用戶 ${user.email} 查詢: ${symbol} (n8n 還原模式)`);
-
-    // A. 搜尋階段：為了支撐 n8n 那樣的長文，我們需要更豐富的資料
-    // 我們一次搜尋 15 筆，包含商業模式、風險、競爭對手
-    const searchQuery = `${symbol} stock business model revenue competitive advantage risks competitors analysis financial report`;
-    
-    // 設定 num=15 以獲取更多資料
-    const serpApiUrl = `https://serpapi.com/search.json?engine=google&q=${encodeURIComponent(searchQuery)}&api_key=${process.env.SERPAPI_KEY}&num=15&hl=zh-tw&gl=tw`;
-    
-    const searchResponse = await axios.get(serpApiUrl);
-    const searchResults = searchResponse.data.organic_results || [];
-
-    // B. 資料整理：把搜尋結果轉成 AI 看得懂的文字
-    const searchContext = searchResults.map((item, index) => {
-      const date = item.date || "近期";
-      return `[資料 ${index + 1}] 標題: ${item.title}\n來源: ${item.source} (${date})\n摘要: ${item.snippet}\n連結: ${item.link}`;
-    }).join("\n\n");
-
-    // C. 設定 Prompt：完全移植 n8n 的詳細指令 (合併上半部與下半部)
-    const prompt = `
-      請閱讀以下的搜尋結果資料：
+// --- 這裡放 Prompt 產生器 (定義在路由外面) ---
+const getBasePrompt = (symbol, searchContext) => `請閱讀以下的搜尋結果資料：
       ${searchContext}
 
       請根據上述「搜尋結果」，撰寫一份關於 "${symbol}" 的完整深度分析報告。
@@ -150,33 +81,96 @@ app.post('/api/analyze-stock', async (req, res) => {
       ## 4. 三大核心風險
       (具體指出監管、供應鏈或技術替代風險，不要寫籠統的「市場波動」。)
       ## 5. 管理層與公司治理
-      (分析該公司的領導風格，例如「工程師文化」或「行銷導向」。)
-    `;
+      (分析該公司的領導風格，例如「工程師文化」或「行銷導向」。)`;
+// --- [Pro / 專業版] 建議指令：更硬核、更戰略 ---
+const getProPrompt = (symbol, searchContext) => `
+  請閱讀以下搜尋資料：${searchContext}
+  你現在是頂尖對沖基金的資深分析師。請針對 "${symbol}" 撰寫【深度戰略評級報告】。
 
-    // D. 呼叫 Gemini
-    const aiResult = await model.generateContent(prompt);
+  【🚫 嚴格要求】
+  1. 拒絕百科資訊：嚴禁寫公司歷史、願景或基礎產品介紹。
+  2. 專注戰略：直接切入議價權、護城河與未來催化劑。
+  3. 語氣冷靜專業：不要免責聲明，直接給出你的判斷。
+
+  # ⚖️ ${symbol} 深度戰略投資評等報告
+
+  ## 一、 核心投資策略 (Investment Thesis)
+  (直接點出該公司目前最核心的「獲利變局」與市場尚未察覺的潛力或風險。)
+
+  ## 二、 產業鏈生態位與議價權
+  (請使用 Markdown 表格，分析上游供應商、主要客戶、替代者的議價權)
+  | 角色 | 關鍵廠商 | 議價權評級 | 戰略影響力分析 |
+  | :--- | :--- | :--- | :--- |
+
+  ## 三、 護城河量化評級 (Economic Moat)
+  (針對：1.無形資產 2.轉換成本 3.網絡效應 4.成本優勢 給予 1-5 星評等並解釋。)
+
+  ## 四、 未來 12 個月關鍵催化劑 (Catalysts)
+  (具體列出 3 個可能導致股價重估的具體事件。)
+
+  ## 五、 牛熊情境分析 (Scenario Analysis)
+  ### 1. 📈 牛市路徑 (Bull Case) - 觸發條件與增長天花板
+  ### 2. 📉 熊市預警 (Bear Case) - 關鍵風險與防禦底線
+`;
+// --- 主要 API ---
+// --- 主要 API ---
+app.post('/api/analyze-stock', async (req, res) => {
+  const { symbol } = req.body;
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader) return res.status(401).json({ error: '未登入' });
+  
+  try {
+    const token = authHeader.split(' ')[1];
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    if (authError || !user) throw new Error('身分驗證失敗');
+
+    const { data: profile } = await supabase.from('profiles').select('plan').eq('id', user.id).single();
+    
+    // --- ★ 關鍵修正 1：統一轉小寫，防止 PRO/pro 判定錯誤 ---
+    const userPlan = (profile?.plan || 'free').toLowerCase();
+    const isPro = (userPlan === 'pro');
+    
+    // --- ★ 關鍵修正 2：修正模型名稱 (Gemini 無 2.5 版本) ---
+    const modelName = isPro ? "gemini-2.5-flash" : "gemini-2.5-flash"; 
+    const searchNum = isPro ? 20 : 10;
+
+    // 診斷用：請在部署後的 Log 觀察這裡輸出什麼
+    console.log(`[系統診斷] 用戶方案: ${userPlan} | 調用模型: ${modelName} | 是否為 Pro 模式: ${isPro}`);
+
+    // A. 搜尋階段
+    const searchQuery = `${symbol} stock business model competitive advantage risks analysis`;
+    const serpApiUrl = `https://serpapi.com/search.json?engine=google&q=${encodeURIComponent(searchQuery)}&api_key=${process.env.SERPAPI_KEY}&num=${searchNum}&hl=zh-tw&gl=tw`;
+    
+    const searchResponse = await axios.get(serpApiUrl);
+    const searchResults = searchResponse.data.organic_results || [];
+
+    const searchContext = searchResults.map((item, index) => 
+      `[資料 ${index + 1}] ${item.title}: ${item.snippet}`
+    ).join("\n\n");
+
+    // B. 選擇 Prompt (確認調用外部定義的函數)
+    const finalPrompt = isPro 
+      ? getProPrompt(symbol, searchContext) 
+      : getBasePrompt(symbol, searchContext);
+
+    // C. 呼叫動態模型
+    const dynamicModel = genAI.getGenerativeModel({ model: modelName });
+    const aiResult = await dynamicModel.generateContent(finalPrompt);
     const responseText = aiResult.response.text();
 
-    // 4. 成功後，寫入使用紀錄
-    await supabase.from('usage_logs').insert({
-      user_id: user.id,
-      action: 'company_intro'
-    });
+    await supabase.from('usage_logs').insert({ user_id: user.id, action: 'company_intro' });
 
-    // 5. 回傳結果
-    res.json({ text: responseText });
+    res.json({ 
+      text: responseText, 
+      plan: userPlan 
+    });
 
   } catch (err) {
     console.error("後端錯誤:", err);
-    // 區分錯誤類型回傳
-    if (err.response && err.response.status === 401) {
-        res.status(401).json({ error: '權限不足' });
-    } else {
-        res.status(500).json({ error: err.message || '伺服器忙碌中，請稍後再試' });
-    }
+    res.status(500).json({ error: err.message || '伺服器忙碌中' });
   }
 });
-
 // === 額外：Stock Data Supabase（讀 core_metrics 用）===
 const sbData = createClient(
   process.env.SB_DATA_URL,          // 你的股票資料庫 URL

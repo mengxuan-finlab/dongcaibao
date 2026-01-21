@@ -196,7 +196,11 @@
     
     // 讀取目前使用量
     const used = await getWeeklyUsage(user.id);
-    usageInfoEl.textContent = `目前方案：${plan}｜本週已使用 ${used} / ${limitText} 次`;
+    // ★ 使用 HTML 標籤讓方案顯示更漂亮
+    usageInfoEl.innerHTML = `
+      目前方案：<span class="plan-tag plan-${plan}">${plan}</span> 
+      ｜ 本週已使用 ${used} / ${limitText} 次
+    `;
   }
 
   // 頁面載入時更新一次資訊
@@ -256,11 +260,22 @@
         // 其他錯誤 (401, 500 等)
         throw new Error(data.error || "伺服器發生錯誤");
       }
+      
 
-      // 6. 成功：顯示結果
-      // 假設後端回傳格式是 { text: "Markdown內容..." }
+      // --- ★ 修改開始：判斷方案並套用樣式 ---
+      const resultEl = document.getElementById("result");
+
+      if (data.plan === 'pro') {
+          resultEl.classList.add("pro-report-style"); // 套用金色樣式
+      } else {
+          resultEl.classList.remove("pro-report-style"); // 移除樣式 (避免上次查詢殘留)
+      }
+
+      // 渲染結果
       const htmlContent = marked.parse(data.text);
       resultEl.innerHTML = htmlContent;
+      // --- ★ 修改結束 ---
+
       debugEl.textContent = "查詢完成 ✔";
 
       // 7. 更新介面上的使用次數 (重新抓一次資料庫)
