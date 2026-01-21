@@ -130,7 +130,38 @@ app.post('/api/analyze-stock', async (req, res) => {
     // --- ★ 關鍵修正 1：統一轉小寫，防止 PRO/pro 判定錯誤 ---
     const userPlan = (profile?.plan || 'free').toLowerCase();
     const isPro = (userPlan === 'pro');
+
+    // ==========================================
+    // ★ 新增：限流攔截器 (放在搜尋之前)
+    // ==========================================
     
+    // 1. 計算本週起始時間 (週日凌晨)
+    const startOfWeek = new Date();
+    startOfWeek.setHours(0, 0, 0, 0);
+    startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+
+    // 2. 向 Supabase 查詢該用戶本週已使用次數
+    const { count: usedCount, error: countError } = await supabase
+      .from("usage_logs")
+      .select("*", { count: 'exact', head: true })
+      .eq("user_id", user.id)
+      .eq("action", "company_intro")
+      .gte("created_at", startOfWeek.toISOString());
+
+    if (countError) throw new Error("無法讀取使用紀錄");
+
+    // 3. 檢查是否超過限制 (Pro 方案為 Infinity，永遠不會進入此 if)
+    const limit = PLAN_LIMIT[userPlan] || 2;
+    if (usedCount >= limit) {
+      return res.status(403).json({ 
+        error: `已達本週使用上限。您的 ${userPlan} 方案額度為每週 ${limit} 次，請升級方案以繼續使用。`,
+        plan: userPlan 
+      });
+    }
+    // ==========================================
+    // 往下才是原本的執行邏輯 (通過檢查才執行)
+    // ==========================================
+
     // --- ★ 關鍵修正 2：修正模型名稱 (Gemini 無 2.5 版本) ---
     const modelName = isPro ? "gemini-2.5-flash" : "gemini-2.5-flash"; 
     const searchNum = isPro ? 20 : 10;
