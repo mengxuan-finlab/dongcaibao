@@ -355,7 +355,8 @@
   }
 
   // ------- 5. 右邊內容渲染邏輯 (主要修改處) -------
-  function renderDashboards() {
+  // 🎯 記得這裡要加上 async
+async function renderDashboards() {
     const container = document.getElementById("dashboards");
 
     if (tracked.length === 0 || !selectedStockId) {
@@ -377,26 +378,26 @@
       return;
     }
 
-    if (s.status === "review") {
-      container.innerHTML = `
-        <div class="dash-card" style="text-align:center; padding: 60px;">
-          <div style="font-size:40px; margin-bottom:10px;">🧐</div>
-          <h2>${s.symbol} 分析報告審核中</h2>
-          <p>AI 已完成摘要，目前正由分析師進行最終確認與圖表校正。</p>
-        </div>`;
-      return;
-    }
+    // --- 狀態為 ready 時的邏輯 ---
+    
+    // 🎯 核心修改：取得主站目前的 Session Token
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    const accessToken = session?.access_token || "";
+    const refreshToken = session?.refresh_token || "";
 
-    // --- 狀態為 ready (已完成) ---
-    // 1. 處理 Summary (Markdown -> HTML)
+    // 🎯 核心修改：將 Token 附加到 Iframe 網址後方
+    // 因為你的 report_url 已經有 ?symbol=TSLA，所以後面要用 & 連接
+    const authenticatedUrl = s.report_url 
+      ? `${s.report_url}&access_token=${accessToken}&refresh_token=${refreshToken}`
+      : null;
+
     const summaryHtml = s.summary ? marked.parse(s.summary) : "<p>暫無文字摘要。</p>";
     
-    // 2. 處理 Iframe (財報連結)
-    const iframeHtml = s.report_url 
-      ? `<iframe src="${s.report_url}"></iframe>` 
+    // 使用 authenticatedUrl 作為 iframe 的 src
+    const iframeHtml = authenticatedUrl 
+      ? `<iframe src="${authenticatedUrl}"></iframe>` 
       : `<div style="text-align:center; padding:40px; background:#f9fafb; border-radius:8px;">尚未連結圖表數據</div>`;
 
-    // 3. 組合 HTML：上方 Tab + 下方兩個內容區塊
     container.innerHTML = `
       <div class="dash-card">
         <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -405,12 +406,8 @@
         </div>
 
         <div class="tab-container">
-          <button id="btn-financial" class="tab-btn active" onclick="switchView('financial')">
-          三大財報及估值分析
-          </button>
-          <button id="btn-doc" class="tab-btn" onclick="switchView('doc')">
-          最新季度官方文件
-          </button>
+          <button id="btn-financial" class="tab-btn active" onclick="switchView('financial')">三大財報及估值分析</button>
+          <button id="btn-doc" class="tab-btn" onclick="switchView('doc')">最新季度官方文件</button>
         </div>
 
         <div id="view-financial" class="view-section active">
@@ -418,14 +415,11 @@
         </div>
 
         <div id="view-doc" class="view-section">
-          <div class="summary-content">
-            ${summaryHtml}
-          </div>
+          <div class="summary-content">${summaryHtml}</div>
         </div>
-
       </div>
     `;
-  }
+}
 
   function updateAddButtonState() {
     const addBtn = document.getElementById("addBtn");
