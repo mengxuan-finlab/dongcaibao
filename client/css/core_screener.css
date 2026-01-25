@@ -423,16 +423,85 @@ tr:hover {
     transform: rotate(180deg);
 }
 
-/* 手機版適配：標題太長時搜尋框換行 */
+/* =============================================
+   懂才抱．選股器手機版終極優化 (整合版)
+   ============================================= */
 @media (max-width: 768px) {
-    .header-row {
-        flex-direction: column;
-        align-items: flex-start;
-    }
-    .search-section {
-        width: 100%;
-    }
-    .search-section input {
-        width: 100%;
-    }
+  
+  /* 1. 標題與搜尋區塊：改為垂直排列並撐滿螢幕 */
+  .header-row {
+    flex-direction: column !important;
+    align-items: stretch !important; /* 讓內容水平撐滿 */
+    gap: 15px !important;
+    margin-top: 0 !important;
+  }
+
+  .search-section {
+    width: 100% !important;
+    display: flex !important;
+    gap: 8px;
+  }
+
+  .search-section input {
+    flex: 1 !important; /* 輸入框佔滿剩餘寬度 */
+    width: auto !important;
+    height: 44px !important; /* 符合手指點擊高度 */
+  }
+
+  /* 2. 快速策略：改為「橫向捲動列」，不再佔據垂直空間 */
+  .preset-bar {
+    display: flex !important;
+    flex-wrap: nowrap !important; /* 強制不換行 */
+    overflow-x: auto !important; /* 開啟橫向滑動 */
+    padding: 5px 0 15px !important;
+    gap: 10px !important;
+    -webkit-overflow-scrolling: touch; /* iOS 滑動優化 */
+  }
+
+  .preset-btn {
+    flex-shrink: 0 !important; /* 防止按鈕被壓扁 */
+    padding: 8px 16px !important;
+    font-size: 14px !important;
+  }
+  
+  .preset-bar::-webkit-scrollbar {
+    display: none; /* 隱藏捲軸讓畫面更乾淨 */
+  }
+
+  /* 3. 篩選網格：改為一排兩個，方便點選 */
+  .filter-grid {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 12px !important;
+  }
+
+  .filter-group select {
+    height: 40px !important;
+    font-size: 14px !important;
+  }
+
+  /* 4. 數據表格：橫向滑動 + 釘住股票代號 */
+  .container {
+    overflow-x: hidden; /* 防止整個網頁左右晃動 */
+  }
+  
+  table {
+    display: block !important;
+    overflow-x: auto !important;
+    white-space: nowrap !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* 核心黑科技：釘住第一欄（股票代號） */
+  th:first-child, td:first-child {
+    position: sticky !important;
+    left: 0 !important;
+    z-index: 10 !important;
+    background-color: #1a202c !important; /* 確保滑動時背景不透明 */
+    box-shadow: 2px 0 5px rgba(0,0,0,0.5); /* 增加層次感 */
+  }
+
+  th, td {
+    padding: 12px 10px !important;
+    font-size: 13px !important;
+  }
 }
