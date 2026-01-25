@@ -142,3 +142,23 @@ section {
   padding: 12px;
   text-align: left;
 }
+
+/* 針對手機版 (螢幕寬度小於 768px) 的視覺優化 */
+@media (max-width: 768px) {
+  body::before {
+    /* 1. 縮小網格間距，讓它在小螢幕看起來更細緻 */
+    background-size: 30px 30px; 
+    
+    /* 2. 大幅調低透明度 (從 0.03 降到 0.012) 
+       這樣網格會變成「若隱若現」，背景的漸層色才會透出來 */
+    background-image: 
+      linear-gradient(rgba(9, 237, 245, 0.012) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.012) 1px, transparent 1px);
+    
+    /* 3. 放慢動畫速度，減少手機 CPU 的負擔與視覺壓力 */
+    animation: moveGrid 40s linear infinite;
+    
+    /* 4. 加入一點點模糊，讓網格線不要那麼生硬 */
+    filter: blur(0.3px);
+  }
+}
