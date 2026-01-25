@@ -335,7 +335,7 @@
     overflow: hidden !important;
     height: 100% !important;
     width: 100% !important;
-    position: fixed; /* 徹底固定背景 */
+    position: static !important; /* ✅ 關鍵修正 */
   }
 
   /* 2. 首頁容器優化 */
@@ -347,7 +347,7 @@
     justify-content: center !important;
     align-items: center !important;
     overflow: hidden !important; /* 內部也不准滑動 */
-    position: fixed; /* 徹底鎖死，防止橡皮筋回彈效果 */
+    position: relative !important;
   }
 
   #home .subtitle, #home .lead {
