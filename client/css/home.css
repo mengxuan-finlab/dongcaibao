@@ -413,7 +413,7 @@
   /* 縮減 Email 長度：解決「卡到」的關鍵 */
   .auth-user {
     font-size: 0.7rem !important;
-    max-width: 1000px !important; /* 給它一個明確的超窄上限 */
+    max-width: 300px !important; /* 給它一個明確的超窄上限 */
     overflow: hidden !important;
     text-overflow: ellipsis !important; /* 長字串變 ... */
     white-space: nowrap !important;
