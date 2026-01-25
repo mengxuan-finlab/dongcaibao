@@ -333,7 +333,7 @@
   /* 新增：強制鎖死最外層，不准滑動 */
   html, body {
     overflow-x: hidden !important;
-    overflow-y: auto !important;
+    overflow-y: hidden !important;
     height: 100% !important;
     width: 100% !important;
     position: static !important; /* ✅ 關鍵修正 */
