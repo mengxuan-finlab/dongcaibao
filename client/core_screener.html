@@ -170,9 +170,9 @@
       <tbody id="tableBody"></tbody>
     </table>
     <div id="loadMoreContainer" style="text-align: center; margin: 30px 0; display: none;">
-        <button id="btnLoadMore" type="button" class="preset-btn" style="background-color: #2563eb; padding: 12px 40px; font-size: 1rem;">
-            顯示更多股票 (目前已顯示 <span id="currentCountText">0</span> 檔)
-        </button>
+        <button id="btnLoadMore" type="button" class="load-more-btn" style="background-color: #2563eb; padding: 12px 40px; font-size: 1rem; color: white; border: none; border-radius: 999px; cursor: pointer;">
+          顯示更多股票 (目前已顯示 <span id="currentCountText">0</span> 檔)
+      </button>
     </div>
   </div>
 
@@ -738,6 +738,8 @@ function resetFilters() {
   document.querySelectorAll(".preset-btn").forEach(btn => {
     btn.addEventListener("click", () => {
       const name = btn.dataset.preset;  // buffett / dividend / growth / value
+      // 🚩 關鍵修正：如果這個按鈕沒有 data-preset 屬性（像是顯示更多按鈕），就不要執行策略
+      if (!name) return;
       applyPreset(name);
     });
   });
