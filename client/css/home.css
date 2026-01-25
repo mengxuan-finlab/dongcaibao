@@ -339,7 +339,8 @@
     flex-direction: column !important;
     justify-content: center !important;
     align-items: center !important;
-    overflow: hidden;
+    overflow: hidden !important; /* 內部也不准滑動 */
+    position: fixed; /* 徹底鎖死，防止橡皮筋回彈效果 */
   }
 
   #home .subtitle, #home .lead {
