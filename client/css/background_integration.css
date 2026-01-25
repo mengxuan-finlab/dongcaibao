@@ -147,37 +147,46 @@ section {
    針對手機版 (iOS/Android) 的最終視覺修正
    ============================================= */
 @media (max-width: 768px) {
-  /* 1. 解決「格子」問題：徹底讓它變成隱約的底紋 */
+  /* 1. 徹底消滅格子感：手機版直接停用網格線條，只保留純淨漸層 */
   body::before {
-    /* 🚩 將格子放大到 200px，這樣螢幕上只會出現 1-2 條線，不會有一格一格的感覺 */
-    background-size: 200px 200px; 
-    
-    /* 🚩 透明度再降到 0.003（幾乎看不見），只保留一點點科技質感 */
-    background-image: 
-      linear-gradient(rgba(255, 255, 255, 0.003) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255, 255, 255, 0.003) 1px, transparent 1px);
-    
-    /* 🚩 增加模糊度，讓線條邊緣完全化開 */
-    filter: blur(5px); 
-    
-    animation: moveGrid 100s linear infinite; /* 動畫慢到像沒在動，才不會頭暈 */
+    /* 🚩 改法：直接把網格圖案拿掉，僅保留背景漸層色 */
+    background-image: none !important; 
+    background: linear-gradient(135deg, #4a4ab6 0%, #7e7ee2 100%) !important;
+    animation: none !important; /* 關閉動畫，讓手機跑起來更順 */
   }
 
-  /* 2. 解決「離太遠」問題：把間距縮小 */
+  /* 2. 解決「離太遠」問題：緊縮所有上方間距 */
+  body {
+    padding: 15px 15px 40px !important; /* 縮小網頁四周邊距 */
+  }
+
+  h1 {
+    font-size: 20px !important; /* 縮小標題 */
+    margin-bottom: 10px !important;
+  }
+
+  /* 縮小輸入框跟按鈕的佔位空間 */
+  #symbolInput, #fetchBtn {
+    margin-bottom: 8px !important;
+  }
+
+  #usageInfo, #debug {
+    font-size: 12px !important;
+    margin-top: 4px !important;
+    margin-bottom: 4px !important;
+  }
+
+  /* 🚩 關鍵：取消 `#result` 的所有內距，讓內容緊貼在「查詢完成」下方 */
   #result {
-    /* 🚩 從 180px 改為 40px，讓「核心摘要」緊貼在按鈕下方 */
-    padding-top: 40px !important; 
-    padding-left: 20px !important;
-    padding-right: 20px !important;
-    
-    /* 確保在 Pro 樣式下也有呼吸空間 */
-    margin-top: 20px; 
+    padding-top: 5px !important; 
+    margin-top: 0 !important;
+    padding-left: 10px;
+    padding-right: 10px;
   }
 
-  /* 3. 修正手機版文字排版 */
-  #result h1 { 
-    font-size: 1.6rem; 
-    margin-top: 10px;
-    line-height: 1.4;
+  /* 調整摘要標題，避免它離頂部太遠 */
+  #result h1:first-child {
+    margin-top: 5px !important;
+    font-size: 1.4rem !important;
   }
 }
