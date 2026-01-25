@@ -427,6 +427,11 @@ tr:hover {
    懂才抱．選股器手機版終極優化 (整合版)
    ============================================= */
 @media (max-width: 768px) {
+  /* 關閉手機版的毛玻璃效果，減輕 GPU 負擔 */
+  .filter-section, .hero-actions .btn {
+    backdrop-filter: none !important;
+    background: rgba(30, 41, 59, 0.95) !important;
+  }
   
   /* 1. 標題與搜尋區塊：改為垂直排列並撐滿螢幕 */
   .header-row {
