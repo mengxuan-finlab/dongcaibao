@@ -12,6 +12,8 @@ body {
   position: relative;
   overflow-x: hidden;
   /* 不特別指定 overflow-y，交給瀏覽器自動算就好 */
+  /* 確保滾動順暢 */
+  -webkit-overflow-scrolling: touch;
 }
 
 /* --- 移動網格線（背景動畫） --- */
@@ -28,6 +30,9 @@ body::before {
   animation: moveGrid 20s linear infinite;
   pointer-events: none;
   z-index: -1;         /* 如果需要，讓它永遠在內容後面 */
+  /* 強制開啟硬體加速但保持穩定 */
+  will-change: transform;
+  transform: translateZ(0);
 }
 
 
@@ -74,11 +79,10 @@ body::before {
 }
 html {
   scroll-behavior: smooth; /* 平滑滾動 */
-  scroll-snap-type: y mandatory; 
+  height: -webkit-fill-available; /* 讓 iOS 更好地計算高度 */
 }
 
 section {
-  scroll-snap-align: start; 
   min-height: 100vh;        /* 確保每頁都是滿版 */
 }
 
@@ -137,4 +141,10 @@ section {
   border-bottom: 2px solid #D4AF37;
   padding: 12px;
   text-align: left;
+}
+
+#result {
+  max-width: 900px; /* 電腦版閱讀最舒適的寬度 */
+  margin: 0 auto;   /* 置中 */
+  padding: 20px;
 }
