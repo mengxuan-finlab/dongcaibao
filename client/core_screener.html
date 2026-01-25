@@ -169,6 +169,11 @@
       </thead>
       <tbody id="tableBody"></tbody>
     </table>
+    <div id="loadMoreContainer" style="text-align: center; margin: 30px 0; display: none;">
+        <button id="btnLoadMore" class="preset-btn" style="background-color: #2563eb; padding: 12px 40px; font-size: 1rem;">
+            顯示更多股票 (目前已顯示 <span id="currentCountText">0</span> 檔)
+        </button>
+    </div>
   </div>
 
   <script>
@@ -181,6 +186,9 @@
 
   let allRows = [];
   let sortState = { key: "market_cap", dir: "desc" };
+  // --- 新增這兩行 ---
+  let displayedCount = 50;       // 手機版預設顯示 50 筆
+  let currentFilteredRows = [];  // 儲存目前篩選完後的完整資料
 
   function formatCap(x) {
     if (x == null) return "-";
@@ -624,59 +632,89 @@ function resetFilters() {
       // 數字
       return sortState.dir === "asc" ? va - vb : vb - va;
     });
+    // === 【以下是核心修改內容】 ===
 
-    renderTable(rows);
+    // A. 將篩選排序完的「完整結果」存起來
+    currentFilteredRows = rows; 
+
+    // B. 判斷裝置，重置初始顯示筆數
+    const isMobile = window.innerWidth <= 768;
+    if (isMobile) {
+        displayedCount = 50; // 手機版：先給 50 檔，解決卡頓
+    } else {
+        displayedCount = currentFilteredRows.length; // 電腦版：一次全開，效能較佳
+    }
+
+    // C. 呼叫渲染函式 (現在不需要傳參數，讓 renderTable 直接讀取 currentFilteredRows)
+    renderTable();
+
+  
   }
 
-  function renderTable(rows) {
-    const tbody = document.getElementById("tableBody");
-    const summary = document.getElementById("summaryText");
-    tbody.innerHTML = "";
-    summary.textContent = `符合條件的股票：${rows.length} 檔`;
+  function renderTable() {
+      const tbody = document.getElementById("tableBody");
+      const summary = document.getElementById("summaryText");
+      const loadMoreContainer = document.getElementById("loadMoreContainer");
+      const currentCountText = document.getElementById("currentCountText");
 
-    rows.forEach(r => {
-      const cccClass = r.ccc != null && r.ccc < 0 ? "pill-pos" : "";
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>
-          <a 
-            href="analysis.html?symbol=${r.symbol}" 
-            class="symbol-link"
-          >
-            <span class="badge">${r.symbol}</span>
-          </a>
-        </td>
-        <td>${formatCap(r.market_cap)}</td>
-        <td>${r.sector || "-"}</td>
-        <td>${r.beta != null ? r.beta.toFixed(2) : "-"}</td>
-        <td>${pct(r.roa)}</td>
-        <td>${pct(r.roe)}</td>
-        <td>${pct(r.roic)}</td>
-        <td>${pct(r.fcf_yield)}</td>
-        <td>${pct(r.earnings_yield)}</td>
-        <td>${r.current_ratio != null ? r.current_ratio.toFixed(2) : "-"}</td>
-        <td>${r.net_debt_to_ebitda != null ? r.net_debt_to_ebitda.toFixed(2) : "-"}</td>
-        <td class="${cccClass}">${r.ccc != null ? r.ccc.toFixed(2) : "-"}</td>
-        <td>${r.pe != null ? r.pe.toFixed(2) : "-"}</td>
-        <td>${r.peg != null ? r.peg.toFixed(2) : "-"}</td>
-        <td>${r.ps != null ? r.ps.toFixed(2) : "-"}</td>
-        <td>${r.pb != null ? r.pb.toFixed(2) : "-"}</td>
-        <td>${r.p_fcf != null ? r.p_fcf.toFixed(2) : "-"}</td>
-        <td>${r.debt_to_equity != null ? r.debt_to_equity.toFixed(2) : "-"}</td>
-        <td>${r.debt_to_asset != null ? r.debt_to_asset.toFixed(2) : "-"}</td>
-        <td>${pct(r.dividendyield)}</td>
-        <td>${r.dividendpershare != null ? r.dividendpershare.toFixed(2) : "-"}</td>
-        <td>${pct(r.dividendpayoutratio)}</td>
-        <td>${pct(r.grossmargin)}</td>
-        <td>${pct(r.operatingmargin)}</td>
-        <td>${r.evtoebitda != null ? r.evtoebitda.toFixed(2) : "-"}</td>
-        <td>${pct(r.revenue_growth)}</td>
-        <td>${pct(r.eps_growth)}</td>
-        <td>${pct(r.fcf_growth)}</td>
-        <td>${pct(r.dividend_growth)}</td>
-      `;
-      tbody.appendChild(tr);
-    });
+      // 1. 清空舊的內容
+      tbody.innerHTML = "";
+      
+      // 2. 更新總筆數提示
+      summary.textContent = `符合條件的股票：${currentFilteredRows.length} 檔`;
+
+      // 3. 【關鍵修改】使用 slice 只取出目前要顯示的筆數 (例如 0 到 50)
+      const slice = currentFilteredRows.slice(0, displayedCount);
+
+      // 4. 只循環 slice 出來的資料
+      slice.forEach(r => {
+        const cccClass = r.ccc != null && r.ccc < 0 ? "pill-pos" : "";
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>
+            <a href="analysis.html?symbol=${r.symbol}" class="symbol-link">
+              <span class="badge">${r.symbol}</span>
+            </a>
+          </td>
+          <td>${formatCap(r.market_cap)}</td>
+          <td>${r.sector || "-"}</td>
+          <td>${r.beta != null ? r.beta.toFixed(2) : "-"}</td>
+          <td>${pct(r.roa)}</td>
+          <td>${pct(r.roe)}</td>
+          <td>${pct(r.roic)}</td>
+          <td>${pct(r.fcf_yield)}</td>
+          <td>${pct(r.earnings_yield)}</td>
+          <td>${r.current_ratio != null ? r.current_ratio.toFixed(2) : "-"}</td>
+          <td>${r.net_debt_to_ebitda != null ? r.net_debt_to_ebitda.toFixed(2) : "-"}</td>
+          <td class="${cccClass}">${r.ccc != null ? r.ccc.toFixed(2) : "-"}</td>
+          <td>${r.pe != null ? r.pe.toFixed(2) : "-"}</td>
+          <td>${r.peg != null ? r.peg.toFixed(2) : "-"}</td>
+          <td>${r.ps != null ? r.ps.toFixed(2) : "-"}</td>
+          <td>${r.pb != null ? r.pb.toFixed(2) : "-"}</td>
+          <td>${r.p_fcf != null ? r.p_fcf.toFixed(2) : "-"}</td>
+          <td>${r.debt_to_equity != null ? r.debt_to_equity.toFixed(2) : "-"}</td>
+          <td>${r.debt_to_asset != null ? r.debt_to_asset.toFixed(2) : "-"}</td>
+          <td>${pct(r.dividendyield)}</td>
+          <td>${r.dividendpershare != null ? r.dividendpershare.toFixed(2) : "-"}</td>
+          <td>${pct(r.dividendpayoutratio)}</td>
+          <td>${pct(r.grossmargin)}</td>
+          <td>${pct(r.operatingmargin)}</td>
+          <td>${r.evtoebitda != null ? r.evtoebitda.toFixed(2) : "-"}</td>
+          <td>${pct(r.revenue_growth)}</td>
+          <td>${pct(r.eps_growth)}</td>
+          <td>${pct(r.fcf_growth)}</td>
+          <td>${pct(r.dividend_growth)}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      // 5. 【關鍵修改】判斷是否還有更多資料可以載入
+      if (currentFilteredRows.length > displayedCount) {
+          loadMoreContainer.style.display = "block"; // 還有剩餘，顯示按鈕
+          currentCountText.textContent = slice.length; // 更新按鈕上的顯示數字
+      } else {
+          loadMoreContainer.style.display = "none"; // 全部載完了，藏起按鈕
+      }
   }
 
   // 篩選器 change 事件
@@ -814,8 +852,11 @@ async function loadData() {
   applyFiltersAndRender();
 }
 
-// 建議在原本的 loadData 之後執行，或者併入 loadData 的結尾
-// 這樣可以確保數據回來後，策略過濾能正確生效
+// 在 script 區塊最後面加入
+  document.getElementById("btnLoadMore").addEventListener("click", () => {
+    displayedCount += 50; // 每次點擊多顯示 50 檔
+    renderTable();
+  });
 
   loadData();
   </script>
