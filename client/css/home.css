@@ -330,10 +330,17 @@
     position: absolute !important;
     top: -9999px;
   }
+  /* 新增：強制鎖死最外層，不准滑動 */
+  html, body {
+    overflow: hidden !important;
+    height: 100% !important;
+    width: 100% !important;
+    position: fixed; /* 徹底固定背景 */
+  }
 
   /* 2. 首頁容器優化 */
   #home {
-    min-height: 100vh;
+    height: 100vh !important;
     padding: 80px 20px 80px 20px !important; /* 留出頂部與底部導覽空間 */
     display: flex !important;
     flex-direction: column !important;
