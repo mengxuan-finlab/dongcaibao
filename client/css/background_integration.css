@@ -142,9 +142,3 @@ section {
   padding: 12px;
   text-align: left;
 }
-
-#result {
-  max-width: 900px; /* 電腦版閱讀最舒適的寬度 */
-  margin: 0 auto;   /* 置中 */
-  padding: 20px;
-}
