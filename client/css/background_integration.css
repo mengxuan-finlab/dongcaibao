@@ -143,35 +143,45 @@ section {
   text-align: left;
 }
 
-/* 針對手機版 (螢幕寬度小於 768px) 的視覺與佈局優化 */
+/* =============================================
+   針對手機版 (iOS/Android) 的最終視覺修正
+   ============================================= */
 @media (max-width: 768px) {
+  /* 1. 徹底消滅「一格一格」感：放大網格並模糊化 */
   body::before {
-    /* 1. 放大網格間距：從 30px 放大到 80px，讓它不像格子，更像背景紋理 */
-    background-size: 80px 80px; 
-    
-    /* 2. 極低透明度：從 0.012 降到 0.006，讓漸層色真正透出來 */
+    /* 🚩 關鍵：將網格放大到 120px，並降到極致透明 (0.005) */
+    background-size: 120px 120px; 
     background-image: 
-      linear-gradient(rgba(9, 237, 245, 0.006) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255, 255, 255, 0.006) 1px, transparent 1px);
+      linear-gradient(rgba(9, 237, 245, 0.005) 1.5px, transparent 1.5px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.005) 1.5px, transparent 1.5px);
     
-    /* 3. 加入顯著模糊：讓網格線條邊緣消失，變成柔和的發光感 */
-    filter: blur(1.5px);
+    /* 🚩 加入強效模糊，讓格線變成「光暈」而不是「格子」 */
+    filter: blur(3px); 
     
-    animation: moveGrid 60s linear infinite; /* 進一步放慢，減少視覺干擾 */
+    /* 讓背景在手機上不要動得太快，減少視覺壓力 */
+    animation: moveGrid 80s linear infinite;
   }
 
-  /* 4. 解決「切到」問題：幫報告容器增加頂部間距 */
+  /* 2. 解決「切到內容」：大幅增加避讓空間 */
   #result {
-    /* 🚩 關鍵：根據你的輸入框高度，給予足夠的頂部間距 (例如 120px 到 150px) */
-    padding-top: 140px !important; 
-    padding-left: 15px;
-    padding-right: 15px;
-    max-width: 100%; /* 確保手機版不會橫向溢出 */
-    box-sizing: border-box;
+    /* 🚩 關鍵：頂部間距加到 180px，確保絕對不會被按鈕擋住 */
+    padding-top: 180px !important; 
+    padding-left: 20px !important;
+    padding-right: 20px !important;
+    padding-bottom: 50px !important;
+    
+    /* 確保文字在小螢幕上不會擠成一團 */
+    line-height: 1.8;
+    word-break: break-word;
   }
 
-  /* 5. 調整報告文字大小，避免標題太大導致斷行不美觀 */
-  #result h1 { font-size: 1.5rem; margin-bottom: 1rem; }
-  #result h2 { font-size: 1.3rem; margin-top: 1.2rem; }
-  #result p { font-size: 0.95rem; line-height: 1.7; }
+  /* 3. 調整文字大小：讓閱讀更像 App */
+  #result h1 { font-size: 1.5rem; margin-bottom: 15px; color: #fff; }
+  #result h2 { font-size: 1.3rem; margin-top: 25px; margin-bottom: 10px; color: #63b3ed; }
+  #result p, #result li { font-size: 1rem; color: #e2e8f0; margin-bottom: 12px; }
+
+  /* 4. 解決底部可能出現的奇怪斷層 (iOS 網址列縮放問題) */
+  body {
+    min-height: 100dvh; /* 使用動態高度單位 */
+  }
 }
