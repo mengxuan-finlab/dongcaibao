@@ -147,41 +147,37 @@ section {
    針對手機版 (iOS/Android) 的最終視覺修正
    ============================================= */
 @media (max-width: 768px) {
-  /* 1. 徹底消滅「一格一格」感：放大網格並模糊化 */
+  /* 1. 解決「格子」問題：徹底讓它變成隱約的底紋 */
   body::before {
-    /* 🚩 關鍵：將網格放大到 120px，並降到極致透明 (0.005) */
-    background-size: 120px 120px; 
+    /* 🚩 將格子放大到 200px，這樣螢幕上只會出現 1-2 條線，不會有一格一格的感覺 */
+    background-size: 200px 200px; 
+    
+    /* 🚩 透明度再降到 0.003（幾乎看不見），只保留一點點科技質感 */
     background-image: 
-      linear-gradient(rgba(9, 237, 245, 0.005) 1.5px, transparent 1.5px),
-      linear-gradient(90deg, rgba(255, 255, 255, 0.005) 1.5px, transparent 1.5px);
+      linear-gradient(rgba(255, 255, 255, 0.003) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.003) 1px, transparent 1px);
     
-    /* 🚩 加入強效模糊，讓格線變成「光暈」而不是「格子」 */
-    filter: blur(3px); 
+    /* 🚩 增加模糊度，讓線條邊緣完全化開 */
+    filter: blur(5px); 
     
-    /* 讓背景在手機上不要動得太快，減少視覺壓力 */
-    animation: moveGrid 80s linear infinite;
+    animation: moveGrid 100s linear infinite; /* 動畫慢到像沒在動，才不會頭暈 */
   }
 
-  /* 2. 解決「切到內容」：大幅增加避讓空間 */
+  /* 2. 解決「離太遠」問題：把間距縮小 */
   #result {
-    /* 🚩 關鍵：頂部間距加到 180px，確保絕對不會被按鈕擋住 */
-    padding-top: 180px !important; 
+    /* 🚩 從 180px 改為 40px，讓「核心摘要」緊貼在按鈕下方 */
+    padding-top: 40px !important; 
     padding-left: 20px !important;
     padding-right: 20px !important;
-    padding-bottom: 50px !important;
     
-    /* 確保文字在小螢幕上不會擠成一團 */
-    line-height: 1.8;
-    word-break: break-word;
+    /* 確保在 Pro 樣式下也有呼吸空間 */
+    margin-top: 20px; 
   }
 
-  /* 3. 調整文字大小：讓閱讀更像 App */
-  #result h1 { font-size: 1.5rem; margin-bottom: 15px; color: #fff; }
-  #result h2 { font-size: 1.3rem; margin-top: 25px; margin-bottom: 10px; color: #63b3ed; }
-  #result p, #result li { font-size: 1rem; color: #e2e8f0; margin-bottom: 12px; }
-
-  /* 4. 解決底部可能出現的奇怪斷層 (iOS 網址列縮放問題) */
-  body {
-    min-height: 100dvh; /* 使用動態高度單位 */
+  /* 3. 修正手機版文字排版 */
+  #result h1 { 
+    font-size: 1.6rem; 
+    margin-top: 10px;
+    line-height: 1.4;
   }
 }
