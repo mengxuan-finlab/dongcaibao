@@ -170,7 +170,7 @@
       <tbody id="tableBody"></tbody>
     </table>
     <div id="loadMoreContainer" style="text-align: center; margin: 30px 0; display: none;">
-        <button id="btnLoadMore" class="preset-btn" style="background-color: #2563eb; padding: 12px 40px; font-size: 1rem;">
+        <button id="btnLoadMore" type="button" class="preset-btn" style="background-color: #2563eb; padding: 12px 40px; font-size: 1rem;">
             顯示更多股票 (目前已顯示 <span id="currentCountText">0</span> 檔)
         </button>
     </div>
@@ -639,11 +639,7 @@ function resetFilters() {
 
     // B. 判斷裝置，重置初始顯示筆數
     const isMobile = window.innerWidth <= 768;
-    if (isMobile) {
-        displayedCount = 50; // 手機版：先給 50 檔，解決卡頓
-    } else {
-        displayedCount = currentFilteredRows.length; // 電腦版：一次全開，效能較佳
-    }
+    displayedCount = isMobile ? 50 : currentFilteredRows.length;
 
     // C. 呼叫渲染函式 (現在不需要傳參數，讓 renderTable 直接讀取 currentFilteredRows)
     renderTable();
@@ -710,10 +706,10 @@ function resetFilters() {
 
       // 5. 【關鍵修改】判斷是否還有更多資料可以載入
       if (currentFilteredRows.length > displayedCount) {
-          loadMoreContainer.style.display = "block"; // 還有剩餘，顯示按鈕
-          currentCountText.textContent = slice.length; // 更新按鈕上的顯示數字
+          loadMoreContainer.style.display = "block";
+          currentCountText.textContent = slice.length;
       } else {
-          loadMoreContainer.style.display = "none"; // 全部載完了，藏起按鈕
+          loadMoreContainer.style.display = "none";
       }
   }
 
@@ -853,9 +849,10 @@ async function loadData() {
 }
 
 // 在 script 區塊最後面加入
-  document.getElementById("btnLoadMore").addEventListener("click", () => {
-    displayedCount += 50; // 每次點擊多顯示 50 檔
-    renderTable();
+  document.getElementById("btnLoadMore").addEventListener("click", (e) => {
+      e.preventDefault(); // 雙重保險：防止任何預設提交行為
+      displayedCount += 50; 
+      renderTable(); // 🚩 關鍵：只重新畫圖，不重新跑 applyFiltersAndRender
   });
 
   loadData();
