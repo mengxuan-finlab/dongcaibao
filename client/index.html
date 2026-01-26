@@ -111,29 +111,44 @@
 
   <!-- 首頁內容 -->
   <section id="home">
-    <div class="container">
-      <div class="subtitle">從選股到賣出的股票資訊整合平台</div>
-        <div class="content">
-        <p class="lead">
-        懂才抱從選股、公司資訊整合，到財報追蹤與新聞監控一次包辦，打造屬於你的全方位股票研究流程
-        </p>
+      <div class="container">
+          
+          <div class="pc-layout">
+              <div class="subtitle">從選股到賣出的股票資訊整合平台</div>
+              <div class="content">
+                  <p class="lead">
+                      懂才抱從選股、公司資訊整合，到財報追蹤與新聞監控一次包辦，打造屬於你的全方位股票研究流程
+                  </p>
+                  <div class="hero-actions">
+                      <a href="#select" class="btn primary" id="link-select">選出屬於你的優質公司</a>
+                      <a href="#integration" class="btn secondary" id="link-integration">查看公司及產業報告</a>
+                      <a href="#service" class="btn primary" id="link-service">三大財報自動追蹤</a>
+                      <a href="#news" class="btn secondary" id="link-news">客製化新聞追蹤</a>
+                  </div>
+              </div>
+              <button class="cta-button" onclick="scrollDown()">
+                  <svg viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z" /></svg>
+              </button>
+          </div>
 
-        <!-- 兩個主要行動按鈕 -->
-        <div class="hero-actions">
-          <a href="#select" class="btn primary" id="link-select">選出屬於你的優質公司</a>
-          <a href="#integration" class="btn secondary" id="link-integration">查看公司及產業報告</a>
-          <a href="#service" class="btn primary" id="link-service">三大財報自動追蹤</a>
-          <a href="#news" class="btn secondary" id="link-news">客製化新聞追蹤</a>
-        </div>
+          <div class="mobile-hero-layout">
+              <div class="hero-brand">
+                  <div class="brand-logo">📈</div> 
+                  <h2>穩健的報酬<br>更悠閒的生活</h2>
+              </div>
+              <div class="mobile-search-bar">
+                  <input type="text" placeholder="輸入美股代號，查看公司快照" id="stockSearch">
+                  <button id="doSearch">🔍</button>
+              </div>
+              <div class="hot-tags">
+                  <span class="tag">輝達 NVDA</span>
+                  <span class="tag">蘋果 AAPL</span>
+                  <span class="tag">特斯拉 TSLA</span>
+              </div>
+          </div>
+
       </div>
-
-      <!-- 向下箭頭 -->
-      <button class="cta-button" onclick="scrollDown()">
-        <svg viewBox="0 0 24 24">
-          <path d="M7 10l5 5 5-5z" />
-        </svg>
-      </button>
-    </div>
+      <div class="mountain-bg"></div>
   </section>
 
   <section id="select">

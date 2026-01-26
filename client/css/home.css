@@ -8,6 +8,7 @@
   align-items: center;         /* 水平置中 */
   position: relative;
   overflow: hidden;            /* 避免背景動畫超出邊界 */
+  padding-top: 120px;  /* 視覺上看起來舒服即可，可微調 */
 }
 
 #home .container {
@@ -315,145 +316,74 @@
 }
 
 
-  /* 讓首頁內容往下推，不會被固定 header 蓋住 */
-  #home {
-    padding-top: 120px;  /* 視覺上看起來舒服即可，可微調 */
-  }
-/* 只有手機版生效 (768px 以下) */
-@media (max-width: 768px) {
-  
-  /* 1. 強力清空：徹底隱藏所有非首頁區域與頁尾，解決重疊問題 */
-  #select, #integration, #service, #news, #fee, footer, .cta-button {
-    display: none !important;
-    height: 0 !important;
-    overflow: hidden !important;
-    position: absolute !important;
-    top: -9999px;
-  }
-  /* 新增：強制鎖死最外層，不准滑動 */
-  html, body {
-    overflow-x: hidden !important;
-    overflow-y: hidden !important;
-    height: 100% !important;
-    width: 100% !important;
-    position: static !important; /* ✅ 關鍵修正 */
-  }
+/* 預設隱藏手機版專用組件，確保電腦看不到 */
+.mobile-hero-layout, .mountain-bg {
+    display: none;
+}
 
-  /* 2. 首頁容器優化 */
-  #home {
-    height: 100vh !important;
-    padding: 80px 20px 80px 20px !important; /* 留出頂部與底部導覽空間 */
-    display: flex !important;
-    flex-direction: column !important;
-    justify-content: center !important;
-    align-items: center !important;
-    overflow: hidden !important; /* 內部也不准滑動 */
-    position: relative !important;
-  }
+/* 這裡保留你原本設定好的電腦版標題、按鈕等 CSS ... (如 .subtitle, .btn) */
 
-  #home .subtitle, #home .lead {
-    display: none !important;
-  }
+/* ==========================================
+   2. 手機版專屬 (螢幕 768px 以下才生效)
+   ========================================== */
+@media screen and (max-width: 768px) {
+    
+    /* 🛑 徹底關閉電腦版原本的容器 */
+    .pc-layout, .cta-button {
+        display: none !important;
+    }
 
-  /* 3. 按鈕區塊：2x2 方塊選單 */
-  .hero-actions {
-    display: grid !important;
-    grid-template-columns: 1fr 1fr !important;
-    gap: 16px !important;
-    width: 100% !important;
-    max-width: 420px;
-    margin: 0 auto !important;
-  }
+    /* 🟢 啟動手機版仿財報狗佈局 */
+    .mobile-hero-layout {
+        display: flex !important;
+        flex-direction: column;
+        align-items: center;
+        width: 100%;
+        color: white;
+    }
 
-  .hero-actions .btn {
-    width: 100% !important;
-    height: 110px !important;
-    margin: 0 !important;
-    padding: 15px !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    text-align: center !important;
-    font-size: 0.95rem !important;
-    font-weight: 600 !important;
-    line-height: 1.4 !important;
-    border-radius: 16px !important;
-    background: rgba(30, 41, 59, 0.7) !important; 
-    border: 1px solid rgba(255, 255, 255, 0.1) !important;
-    backdrop-filter: blur(10px); 
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3) !important;
-    white-space: normal !important;
-    transition: transform 0.1s ease;
-  }
+    #home {
+        /* 背景換成財報狗藍綠漸層 */
+        background: linear-gradient(180deg, #0093E9 0%, #27ae60 100%) !important;
+        justify-content: flex-start !important;
+        padding-top: 100px !important;
+    }
 
-  .hero-actions .btn:active {
-    transform: scale(0.95);
-    background: rgba(51, 65, 85, 0.9) !important;
-  }
+    .hero-brand h2 { font-size: 28px; line-height: 1.3; margin-top: 10px; }
+    .brand-logo { font-size: 50px; }
 
-  /* 4. 讓 Header 變成乾淨的「一橫槓」 */
-  .top-logo {
-    display: flex !important;
-    flex-direction: row !important;
-    justify-content: space-between !important; /* 左右各據一方 */
-    align-items: center !important;
-    padding: 0 12px !important;
-    height: 60px !important;
-    box-sizing: border-box; /* 確保 padding 不會撐開寬度 */
-  }
-  .logo-text {
-    font-size: 1.2rem !important;
-    white-space: nowrap !important;
-    flex-shrink: 0; /* 防止 Logo 被擠壓 */
-  }
+    /* 搜尋框 */
+    .mobile-search-bar {
+        background: white;
+        width: 90%;
+        border-radius: 12px;
+        display: flex;
+        padding: 5px 15px;
+        margin: 25px 0;
+        box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+    }
+    .mobile-search-bar input { border: none; flex: 1; height: 44px; outline: none; font-size: 16px; color: #333; }
+    .mobile-search-bar button { background: transparent; border: none; font-size: 20px; }
 
-  /* 登入資訊區塊優化：確保內容不會超出 */
-  .auth-area {
-    display: flex !important;
-    flex-direction: row !important;
-    align-items: center !important;
-    gap: 8px !important;
-    flex: 1;              /* 佔據剩餘空間 */
-    justify-content: flex-end; /* 靠右對齊 */
-    min-width: 0;         /* 關鍵！允許內部文字縮減 */
-    max-width: 70%;       /* 避免用戶資訊區塊把 Logo 擠扁 */
-  }
+    /* 熱門標籤 */
+    .tag {
+        background: rgba(255, 255, 255, 0.2);
+        color: white;
+        padding: 6px 14px;
+        border-radius: 50px;
+        font-size: 12px;
+        margin: 4px;
+        display: inline-block;
+    }
 
-  /* 縮減 Email 長度：解決「卡到」的關鍵 */
-  .auth-user {
-    font-size: 0.7rem !important;
-    max-width: 300px !important; /* 給它一個明確的超窄上限 */
-    overflow: hidden !important;
-    text-overflow: ellipsis !important; /* 長字串變 ... */
-    white-space: nowrap !important;
-    text-align: left !important;   /* 文字靠左對齊 */
-    margin-left: -10px !important;  /* 與右邊的「登出」按鈕保持距離 */
-    line-height: 1.2 !important;
-    color: #cbd5f5 !important;
-
-  }
-
-  .auth-btn {
-    padding: 4px 10px !important;
-    font-size: 0.75rem !important;
-    min-width: 45px !important;
-    height: 30px !important;
-    border-radius: 20px !important;
-    flex-shrink: 0;
-  }
-
-  /* 5. 底部導覽列精修 */
-  .mobile-bottom-nav {
-    display: flex !important;
-    position: fixed !important;
-    bottom: 0 !important;
-    left: 0 !important;
-    width: 100% !important;
-    background: rgba(15, 23, 42, 0.95) !important;
-    backdrop-filter: blur(10px);
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-    justify-content: space-around !important;
-    padding: 10px 0 25px 0 !important;
-    z-index: 9999 !important;
-  }
+    /* 山脈裝飾 */
+    .mountain-bg {
+        display: block !important;
+        position: absolute;
+        bottom: 0; left: 0; width: 100%; height: 180px;
+        background: url('https://statementdog.com/images/home/mountain.svg') no-repeat bottom;
+        background-size: cover;
+        opacity: 0.4;
+        z-index: 0;
+    }
 }
