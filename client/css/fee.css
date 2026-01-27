@@ -216,6 +216,7 @@
     
     /* 確保 flex 不會強制壓縮卡片高度 */
     display: block; 
+    scroll-snap-align: none;
   }
 
   /* 2. 標題調整 */
