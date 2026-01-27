@@ -201,3 +201,72 @@
   background: rgba(130,110,255,.20);
   border-color: rgba(130,110,255,.35);
 }
+/* --- 📱 手機版專屬樣式 (max-width: 768px) --- */
+@media (max-width: 768px) {
+
+  /* 1. 區塊高度自適應，避免 100vh 在手機上導致內容切斷 */
+  #fee {
+    height: auto;
+    min-height: 100vh;
+    padding: 100px 20px 60px; /* 增加頂部留白防止與 Header 重疊 */
+  }
+
+  /* 2. 標題縮小 */
+  #fee h2 {
+    font-size: 32px;
+    margin-bottom: 30px;
+  }
+
+  /* 3. 卡片容器：強制單欄排列並調整間距 */
+  .fee-grid {
+    grid-template-columns: 1fr;
+    gap: 24px;
+    width: 100%;
+  }
+
+  /* 4. 卡片內容優化：減少過大的內距 */
+  .fee-item {
+    padding: 35px 25px; /* 從電腦版的 50px 75px 大幅縮小 */
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* 5. 方案標題與價格縮小 */
+  .fee-title {
+    font-size: 22px;
+    margin-top: -10px;
+  }
+  
+  .money {
+    font-size: 24px;
+  }
+
+  /* 6. 特色列表優化：確保 Badge 不會擠壓文字 */
+  .feat-head {
+    flex-direction: row; /* 保持橫向排列 */
+    flex-wrap: wrap;     /* 若標題太長自動折行 */
+    justify-content: space-between;
+  }
+
+  .feat-head h4 {
+    font-size: 16px;
+  }
+
+  .feature-list p {
+    font-size: 14px;
+    line-height: 1.6;
+    margin-top: 4px;
+  }
+
+  /* 7. 按鈕改為手機適合的滿寬度 */
+  .cta-row {
+    width: 100%;
+  }
+
+  .btn {
+    width: 100%;
+    height: 54px;
+    font-size: 16px;
+    border-radius: 12px;
+  }
+}

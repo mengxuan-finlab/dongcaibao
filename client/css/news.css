@@ -117,3 +117,78 @@
 #news .sample-button:active {
   transform: scale(0.97);
 }
+/* --- 基礎設定：隱藏手機文字 --- */
+.mobile-text { display: none; }
+
+/* --- 📱 手機版專屬樣式 (max-width: 768px) --- */
+@media (max-width: 768px) {
+  
+  /* 1. 切換文字顯示 */
+  .pc-text { display: none; }
+  .mobile-text { display: block; }
+
+  /* 2. 區塊高度自適應與留白 */
+  #news {
+    height: auto;
+    min-height: 100vh;
+    padding: 100px 0 60px;
+  }
+
+  /* 3. 標題縮小：避免 85px 破版 */
+  #news h1 {
+    font-size: 34px;      
+    letter-spacing: 2px;   
+    line-height: 1.3;      
+    margin-bottom: 35px;   
+  }
+
+  /* 4. 手機版短句排版 */
+  .mobile-text p {
+    font-size: 16px;
+    line-height: 1.6;
+    margin-bottom: 22px;
+    text-align: left;
+    display: flex;
+    justify-content: center;
+    color: rgba(255, 255, 255, 0.9);
+  }
+
+  /* 5. 🎯 按鈕組優化：讓兩個按鈕間距更舒適 */
+  #news .button-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    gap: 15px; /* 按鈕之間的距離 */
+  }
+
+  #news .sample-button {
+    width: 85%;            
+    height: 58px;          
+    margin-top: 0 !important; /* 歸零電腦版的負間距 */
+    margin-bottom: 0 !important;
+    font-size: 17px;
+    font-weight: 600;
+    color: #fff;
+    background: rgba(124, 110, 246, 0.2); 
+    border: 1.5px solid rgba(255, 255, 255, 0.7);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    border-radius: 999px;
+  }
+
+  /* 調整按鈕區塊與上方文字的總間距 */
+  #news .button-group {
+    margin-top: 35px;
+    margin-bottom: 30px;
+  }
+
+  #news .sample-button:active {
+    transform: scale(0.96);
+    background: rgba(124, 110, 246, 0.4);
+  }
+
+  /* 6. 箭頭微調 */
+  #news .cta-button {
+    margin-top: 10px;
+  }
+}

@@ -117,3 +117,79 @@
 #select .sample-button:active {
   transform: scale(0.97);
 }
+/* --- 基礎設定 --- */
+.mobile-text { display: none; } /* 預設隱藏手機版文字 */
+
+/* --- 電腦版樣式保持你原本的設定 --- */
+#select .content {
+  font-size: 18px;
+  line-height: 2.05;
+  color: rgba(255,255,255,.86);
+  margin: 0 auto 0px;
+}
+
+/* --- 📱 手機版專屬樣式 (max-width: 768px) --- */
+@media (max-width: 768px) {
+  
+  /* 1. 切換文字顯示 */
+  .pc-text { display: none; }    /* 隱藏長文 */
+  .mobile-text { display: block; } /* 顯示短句 */
+
+  /* 2. 區塊高度自適應，防止重疊 */
+  #select {
+    height: auto;
+    min-height: 100vh;
+    padding: 80px 0 60px; /* 增加頂部留白防止與 Header 重疊 */
+  }
+
+  /* 3. 標題縮小（原本 85px 在手機上絕對會壞掉） */
+  #select h1 {
+    font-size: 32px;      
+    letter-spacing: 2px;   
+    line-height: 1.3;      
+    margin-bottom: 40px;   
+  }
+
+  /* 4. 手機版短句排版優化 */
+  .mobile-text p {
+    font-size: 18px;
+    margin-bottom: 20px;
+    text-align: left; /* 條列式建議靠左較易閱讀 */
+    display: flex;
+    justify-content: center; /* 讓短句整體居中 */
+  }
+
+  
+  #select .sample-button {
+    width: 85%;            /* 寬度稍微加寬，更好按 */
+    height: 58px;          /* 高度增加，提升點擊手感 */
+    margin-top: 20px !important; /* 強制取消電腦版的 -30px */
+    margin-bottom: 30px;
+    
+    font-size: 17px;
+    font-weight: 600;
+    color: #fff;           /* 文字改為純白，對比度更高 */
+    
+    /* 🎨 背景優化：帶一點深藍半透明，防止背景干擾 */
+    background: rgba(124, 110, 246, 0.2); 
+    border: 1.5px solid rgba(255, 255, 255, 0.7);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2); /* 增加陰影提升立體感 */
+    
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* 🖱️ 手機版點擊回饋（觸控時變亮） */
+  #select .sample-button:active {
+    transform: scale(0.96);
+    background: rgba(124, 110, 246, 0.4);
+    border-color: #fff;
+  }
+
+  /* ⬇️ 下向箭頭按鈕微調 */
+  #select .cta-button {
+    margin-top: 10px;
+    opacity: 0.8;
+  }
+}
