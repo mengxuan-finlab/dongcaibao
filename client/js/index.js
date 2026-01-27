@@ -25,3 +25,44 @@ document.addEventListener("DOMContentLoaded", function() {
   
   }
 });
+document.addEventListener('DOMContentLoaded', () => {
+    const searchInput = document.getElementById('stockSearch');
+    const searchBtn = document.getElementById('doSearch');
+
+    // 執行搜尋跳轉的函式
+    function performSearch() {
+        const symbol = searchInput.value.trim().toUpperCase();
+        
+        if (symbol) {
+            // 跳轉至財報快照頁面，並帶上 symbol 參數
+            window.location.href = `analysis.html?symbol=${symbol}`;
+        } else {
+            alert("請輸入美股代號（例如：AAPL）");
+        }
+    }
+
+    // 點擊按鈕搜尋
+    if (searchBtn) {
+        searchBtn.addEventListener('click', performSearch);
+    }
+
+    // 按下 Enter 鍵也能搜尋
+    if (searchInput) {
+        searchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                performSearch();
+            }
+        });
+    }
+
+    // 針對下方熱門標籤 (hot-tags) 點擊直接搜尋
+    const hotTags = document.querySelectorAll('.hot-tags .tag');
+    hotTags.forEach(tag => {
+        tag.addEventListener('click', () => {
+            // 取得標籤文字最後一個單字 (即代號，如 NVDA)
+            const parts = tag.innerText.split(' ');
+            const symbol = parts[parts.length - 1];
+            window.location.href = `analysis.html?symbol=${symbol}`;
+        });
+    });
+});
