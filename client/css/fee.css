@@ -206,11 +206,18 @@
 
   /* 1. 區塊高度自適應：取消 Flex 置中，改用自然流動 */
   #fee {
-    height: auto !important;     /* 強制解除 100vh 鎖死 */
+    /* 1. 核心修正：取消強制的 100vh，讓高度隨內容增長 */
+    height: auto !important; 
     min-height: 100vh;
-    display: block;              /* 重要：從 flex 改為 block，滾動才會順 */
-    padding: 100px 20px 80px;    /* 增加底部留白 */
-    text-align: center;
+    
+    /* 2. 取消垂直居中：防止 Footer 出現時計算錯誤 */
+    display: block !important; 
+    
+    /* 3. 確保 Padding 足夠，Footer 才會在最後面正常出現 */
+    padding: 100px 20px 40px; 
+    
+    /* 4. 移除這行（如果原本有的話）：這行會導致手機版滾動異常 */
+    scroll-snap-align: none; 
   }
 
   /* 2. 標題調整 */
