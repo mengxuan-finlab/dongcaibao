@@ -204,69 +204,70 @@
 /* --- 📱 手機版專屬樣式 (max-width: 768px) --- */
 @media (max-width: 768px) {
 
-  /* 1. 區塊高度自適應，避免 100vh 在手機上導致內容切斷 */
+  /* 1. 區塊高度自適應：取消 Flex 置中，改用自然流動 */
   #fee {
-    height: auto;
+    height: auto !important;     /* 強制解除 100vh 鎖死 */
     min-height: 100vh;
-    padding: 100px 20px 60px; /* 增加頂部留白防止與 Header 重疊 */
+    display: block;              /* 重要：從 flex 改為 block，滾動才會順 */
+    padding: 100px 20px 80px;    /* 增加底部留白 */
+    text-align: center;
   }
 
-  /* 2. 標題縮小 */
+  /* 2. 標題調整 */
   #fee h2 {
     font-size: 32px;
-    margin-bottom: 30px;
+    margin-bottom: 40px;
   }
 
-  /* 3. 卡片容器：強制單欄排列並調整間距 */
+  /* 3. 卡片容器：改用 Flex 垂直排列，最不會有跳格感 */
   .fee-grid {
-    grid-template-columns: 1fr;
-    gap: 24px;
+    display: flex;
+    flex-direction: column;      /* 垂直排列 */
+    gap: 30px;                   /* 增加卡片間距 */
     width: 100%;
+    max-width: 480px;            /* 防止卡片在寬手機上太寬 */
+    margin: 0 auto;              /* 居中容器 */
   }
 
-  /* 4. 卡片內容優化：減少過大的內距 */
+  /* 4. 卡片內容優化 */
   .fee-item {
-    padding: 35px 25px; /* 從電腦版的 50px 75px 大幅縮小 */
+    padding: 40px 24px;          /* 調整內距 */
     width: 100%;
+    height: auto !important;     /* 確保卡片高度隨內容長高 */
     box-sizing: border-box;
   }
 
-  /* 5. 方案標題與價格縮小 */
+  /* 5. 方案標題與價格 */
   .fee-title {
-    font-size: 22px;
-    margin-top: -10px;
+    font-size: 24px;
+    margin-top: 0;               /* 取消電腦版的負間距 */
+    margin-bottom: 10px;
   }
   
   .money {
-    font-size: 24px;
+    font-size: 28px;             /* 價格在手機上要夠大 */
   }
 
-  /* 6. 特色列表優化：確保 Badge 不會擠壓文字 */
+  /* 6. 特色列表優化 */
   .feat-head {
-    flex-direction: row; /* 保持橫向排列 */
-    flex-wrap: wrap;     /* 若標題太長自動折行 */
-    justify-content: space-between;
+    flex-wrap: wrap;             /* 防止標題與 Badge 撞在一起 */
+    gap: 8px;
   }
 
   .feat-head h4 {
-    font-size: 16px;
+    font-size: 17px;
   }
 
-  .feature-list p {
-    font-size: 14px;
-    line-height: 1.6;
-    margin-top: 4px;
-  }
-
-  /* 7. 按鈕改為手機適合的滿寬度 */
+  /* 7. 按鈕優化 */
   .cta-row {
     width: 100%;
+    margin-top: 25px;
   }
 
   .btn {
     width: 100%;
-    height: 54px;
-    font-size: 16px;
-    border-radius: 12px;
+    height: 56px;                /* 稍微加高，更好按 */
+    font-size: 17px;
+    font-weight: 700;
   }
 }
