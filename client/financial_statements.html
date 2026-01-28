@@ -213,6 +213,75 @@
       background: #fff7ed;
       color: #c2410c;
     }
+    /* --- 📱 手機版 RWD 優化 --- */
+@media (max-width: 768px) {
+  /* 1. 將左右佈局改為上下堆疊 */
+  .layout {
+    grid-template-columns: 1fr; 
+    display: block;
+  }
+
+  /* 2. 側邊欄改為頂部選單感 */
+  .sidebar {
+    padding: 16px;
+    border-bottom: 4px solid #4f46e5;
+  }
+
+  /* 3. 股票清單改為「橫向滾動」或「按鈕組」，節省垂直空間 */
+  .stock-list {
+    display: flex;
+    overflow-x: auto;
+    gap: 8px;
+    padding-bottom: 8px;
+    -webkit-overflow-scrolling: touch; /* 讓 iOS 滑動更順 */
+  }
+
+  .stock-item {
+    flex: 0 0 auto; /* 防止被擠壓 */
+    margin-bottom: 0;
+    min-width: 120px;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 10px;
+  }
+
+  .stock-item button {
+    margin-top: 8px;
+    width: 100%;
+  }
+
+  /* 4. 主內容區縮小內距 */
+  .content {
+    padding: 12px;
+  }
+
+  .dash-card {
+    padding: 16px;
+    min-height: auto;
+  }
+
+  /* 5. 讓 Tab 按鈕更適合手指點擊 */
+  .tab-container {
+    flex-direction: column; /* 手機上按鈕上下排或撐滿 */
+  }
+
+  .tab-btn {
+    width: 100%;
+    text-align: center;
+    padding: 12px;
+    font-size: 16px;
+  }
+
+  /* 6. Iframe 高度調整 */
+  iframe {
+    height: 500px; /* 手機上不要太長 */
+  }
+
+  /* 7. 文字字體調整 */
+  .summary-content {
+    font-size: 15px;
+  }
+}
   </style>
 </head>
 <body>
