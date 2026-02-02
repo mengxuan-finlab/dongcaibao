@@ -305,6 +305,40 @@ app.get('/api/pro-metrics', async (req, res) => {
   }
 });
 
+app.get("/api/fmp/income-statement", async (req, res) => {
+  try {
+    const symbol = String(req.query.symbol || "").toUpperCase();
+    if (!/^[A-Z.\-]{1,10}$/.test(symbol)) {
+      return res.status(400).json({ error: "Bad symbol" });
+    }
+
+    const url = `https://financialmodelingprep.com/stable/income-statement?symbol=${encodeURIComponent(symbol)}&apikey=${encodeURIComponent(process.env.FMP_API_KEY)}`;
+    const r = await fetch(url);
+    const data = await r.json();
+
+    return res.status(r.ok ? 200 : r.status).json(data);
+  } catch (e) {
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.get("/api/fmp/cash-flow-statement", async (req, res) => {
+  try {
+    const symbol = String(req.query.symbol || "").toUpperCase();
+    if (!/^[A-Z.\-]{1,10}$/.test(symbol)) {
+      return res.status(400).json({ error: "Bad symbol" });
+    }
+
+    const url = `https://financialmodelingprep.com/stable/cash-flow-statement?symbol=${encodeURIComponent(symbol)}&apikey=${encodeURIComponent(process.env.FMP_API_KEY)}`;
+    const r = await fetch(url);
+    const data = await r.json();
+
+    return res.status(r.ok ? 200 : r.status).json(data);
+  } catch (e) {
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`後端伺服器啟動中： http://localhost:${PORT}`);
