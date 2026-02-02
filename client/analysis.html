@@ -283,7 +283,7 @@ function renderProCard(p) {
   });
 }
 // ===== FMP (Income / Cash Flow) =====
-const FMP_API_KEY = "PHTJpjhhPVzIdzjMEP84WKq5JiNRYxA6";
+
 let _revChart = null;
 let _epsChart = null;
 let _fcfChart = null;
@@ -307,10 +307,16 @@ const METRIC_DEFINITIONS = {
   "負債權益比 ≤ 2": "衡量公司財務槓桿高低，比例過高代表借錢過多。",
   "ROE > 0": "股東權益報酬率。最基本的獲利要求，代表公司沒在虧錢。"
 };
+function getApiBase(){
+  return (location.hostname === "localhost" || location.hostname === "127.0.0.1")
+    ? "http://localhost:3000"
+    : "https://dongcaibao.onrender.com";
+}
+
 async function fetchIncomeStatementFY(sym) {
-  const url = `https://financialmodelingprep.com/stable/income-statement?symbol=${encodeURIComponent(sym)}&apikey=${encodeURIComponent(FMP_API_KEY)}`;
+  const url = `${getApiBase()}/api/fmp/income-statement?symbol=${encodeURIComponent(sym)}`;
   const res = await fetch(url);
-  if (!res.ok) throw new Error(`FMP income HTTP ${res.status}`);
+  if (!res.ok) throw new Error(`API income HTTP ${res.status}`);
   const json = await res.json();
   if (!Array.isArray(json)) return [];
 
@@ -326,9 +332,9 @@ async function fetchIncomeStatementFY(sym) {
 }
 
 async function fetchCashFlowFY(sym) {
-  const url = `https://financialmodelingprep.com/stable/cash-flow-statement?symbol=${encodeURIComponent(sym)}&apikey=${encodeURIComponent(FMP_API_KEY)}`;
+  const url = `${getApiBase()}/api/fmp/cash-flow-statement?symbol=${encodeURIComponent(sym)}`;
   const res = await fetch(url);
-  if (!res.ok) throw new Error(`FMP cashflow HTTP ${res.status}`);
+  if (!res.ok) throw new Error(`API cashflow HTTP ${res.status}`);
   const json = await res.json();
   if (!Array.isArray(json)) return [];
 
@@ -341,6 +347,7 @@ async function fetchCashFlowFY(sym) {
     .filter(r => Number.isFinite(r.year))
     .sort((a,b) => a.year - b.year);
 }
+
 
 function destroyCharts(){
   if (_revChart) { _revChart.destroy(); _revChart = null; }
