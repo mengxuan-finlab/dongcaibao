@@ -2,7 +2,8 @@
   const supabaseUrl = "https://zlkexplsleznuebighte.supabase.co";
   const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpsa2V4cGxzbGV6bnVlYmlnaHRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0MzAwNjUsImV4cCI6MjA4MTAwNjA2NX0.HPVn3jcN88M4U3-RCVW-YO-b65rDOKv6pxEaVWwbm68";
 
-  const supabaseClient = supabase.createClient(supabaseUrl, supabaseAnonKey);
+  // 💡 加上 window. 讓它變成全域變數，Console 才能讀到
+  window.supabaseClient = supabase.createClient(supabaseUrl, supabaseAnonKey);
 
   // ✅ 1. 登入後幫他確保 profiles 有一筆資料
   async function ensureProfile() {
