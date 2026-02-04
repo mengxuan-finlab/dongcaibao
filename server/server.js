@@ -341,17 +341,26 @@ app.get("/api/fmp/cash-flow-statement", async (req, res) => {
 
 app.post('/lemonsqueezy-webhook', express.json(), async (req, res) => {
   try {
-    console.log("📩 收到事件:", req.body.meta?.event_name);
+    const eventName = req.body.meta?.event_name;
+    console.log("📩 收到事件:", eventName);
 
-    // 🔥 正確位置在 meta.custom_data
-    const customDataRaw = req.body.meta?.custom_data;
-    console.log("📦 custom_data 原始:", customDataRaw);
+    const customData = req.body.meta?.custom_data;
+    console.log("📦 custom_data 原始:", customData);
 
     let userId = null;
 
-    if (customDataRaw) {
-      const customData = JSON.parse(customDataRaw);
+    // ✅ 情況 1：custom_data 是物件（你現在就是這個）
+    if (customData && typeof customData === "object") {
       userId = customData.user_id;
+    }
+
+    // ✅ 情況 2：custom_data 是字串（保留相容）
+    if (!userId && typeof customData === "string") {
+      try {
+        userId = JSON.parse(customData).user_id;
+      } catch (e) {
+        console.log("❌ custom_data JSON parse 失敗");
+      }
     }
 
     console.log("👤 解析出的 user_id:", userId);
@@ -377,12 +386,11 @@ app.post('/lemonsqueezy-webhook', express.json(), async (req, res) => {
       .eq('id', userId);
 
     console.log("✅ Supabase 已更新方案");
-
-    res.sendStatus(200);
+    return res.sendStatus(200);
 
   } catch (err) {
     console.error("❌ Webhook 錯誤:", err);
-    res.sendStatus(500);
+    return res.sendStatus(500);
   }
 });
 
