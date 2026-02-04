@@ -376,7 +376,7 @@ app.post('/lemonsqueezy-webhook', express.json(), async (req, res) => {
     console.log("📄 subscriptionId:", subscriptionId);
     console.log("📊 status:", status);
 
-    await supabaseAdmin
+    await supabase
       .from('profiles')
       .update({
         plan: status === 'active' ? 'pro' : 'free',
