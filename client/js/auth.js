@@ -165,34 +165,35 @@ document.getElementById("do-signup").addEventListener("click", async () => {
   });
   // 在你的 auth.js 中更新 handleCheckout 函式
   async function handleCheckout(event) {
-      event.preventDefault();
-      
-      // 💡 修正：使用 currentTarget 確保精準抓到 <a> 標籤本體
-      const btn = event.currentTarget; 
-      console.log("📍 點擊到的按鈕連結:", btn.href); // 加這行
-      if (!btn || !btn.href) return;
+    event.preventDefault();
 
-      // 從 Supabase 領取身分證 (ID)
-      const { data: { user } } = await supabaseClient.auth.getUser();
-      console.log("👤 當前登入用戶 ID:", user?.id); // 加這行 
+    const btn = event.currentTarget;
+    if (!btn || !btn.href) return;
 
-      if (!user) {
-          alert("請先登入後再進行訂閱！");
-          return;
-      }
+    const { data: { user } } = await supabaseClient.auth.getUser();
 
-      // 💡 修正：最原始但最有效的拼接方式
-      const userId = user.id;
-      const separator = btn.href.includes('?') ? '&' : '?';
-      const checkoutUrl = `${btn.href}${separator}passthrough[user_id]=${userId}`;
+    if (!user) {
+      alert("請先登入後再進行訂閱！");
+      return;
+    }
 
-      console.log("🚀 正確生成的網址（請確認最後有 ID）:", checkoutUrl);
-      window.location.href = checkoutUrl;
+    const userId = user.id;
+
+    const url = new URL(btn.href);
+
+    // ⭐ 關鍵：把 user_id 傳給 Lemon
+    url.searchParams.set('checkout[custom][user_id]', userId);
+
+    const checkoutUrl = url.toString();
+    console.log("🚀 正確生成的網址:", checkoutUrl);
+
+    window.location.href = checkoutUrl;
   }
-  // 綁定事件：確保監聽所有 lemonsqueezy-button
+
   document.querySelectorAll('.lemonsqueezy-button').forEach(btn => {
-      btn.addEventListener('click', handleCheckout);
+    btn.addEventListener('click', handleCheckout);
   });
+
   // ✅ 新增：初始化按鈕的函式
   function startBindingProcess() {
       let checkCount = 0;

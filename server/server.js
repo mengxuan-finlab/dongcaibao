@@ -339,37 +339,53 @@ app.get("/api/fmp/cash-flow-statement", async (req, res) => {
   }
 });
 
-app.post('/lemonsqueezy-webhook', async (req, res) => {
-    const event = req.body;
-    
-    // 💡 暴力列印：這行能讓你在 Render Logs 看到 meta 裡所有的東西
-    console.log("[檢查 Meta 內容]:", JSON.stringify(event.meta));
+app.post('/lemonsqueezy-webhook', express.json(), async (req, res) => {
+  try {
+    console.log("📩 收到事件:", req.body.meta?.event_name);
 
-    // 嘗試多種抓取路徑
-    const userId = event.meta?.custom_data?.user_id || 
-                   event.meta?.passthrough?.user_id || 
-                   event.meta?.custom_data?.[0]; // 有時會變成陣列第一項
+    // 🔥 正確位置在 meta.custom_data
+    const customDataRaw = req.body.meta?.custom_data;
+    console.log("📦 custom_data 原始:", customDataRaw);
 
-    console.log(`[解析結果] 事件: ${event.meta?.event_name}, ID: ${userId}`);
+    let userId = null;
 
-    if (userId && (eventName?.includes('subscription') || eventName?.includes('order'))) {
-        const variantName = event.data?.attributes?.variant_name || "";
-        // 💡 修正：用關鍵字判斷，只要名稱有 "pro" 就給 pro 權限，否則給 plus
-        const planToUpdate = variantName.toLowerCase().includes('pro') ? 'pro' : 'plus';
-        // 💡 提醒：這裡一定要用 service_role 的 supabaseAdmin，才能無視 RLS 修改資料
-        const { error } = await supabaseAdmin
-            .from('profiles')
-            .update({ plan: planToUpdate })
-            .eq('id', userId)
-        if (error) {
-            console.error('❌ Supabase 更新失敗:', error.message);
-        } else {
-            console.log(`✅ 更新成功！用戶 ${userId} 現在是 ${planToUpdate} 會員`);
-        }
+    if (customDataRaw) {
+      const customData = JSON.parse(customDataRaw);
+      userId = customData.user_id;
     }
 
-    res.status(200).send('OK');
+    console.log("👤 解析出的 user_id:", userId);
+
+    if (!userId) {
+      console.log("❌ 沒有 user_id，停止處理");
+      return res.sendStatus(200);
+    }
+
+    const subscriptionId = req.body.data?.id;
+    const status = req.body.data?.attributes?.status;
+
+    console.log("📄 subscriptionId:", subscriptionId);
+    console.log("📊 status:", status);
+
+    await supabaseAdmin
+      .from('profiles')
+      .update({
+        plan: status === 'active' ? 'pro' : 'free',
+        subscription_id: subscriptionId,
+        subscription_status: status
+      })
+      .eq('id', userId);
+
+    console.log("✅ Supabase 已更新方案");
+
+    res.sendStatus(200);
+
+  } catch (err) {
+    console.error("❌ Webhook 錯誤:", err);
+    res.sendStatus(500);
+  }
 });
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`後端伺服器啟動中： http://localhost:${PORT}`);
