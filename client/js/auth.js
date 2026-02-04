@@ -164,24 +164,29 @@ document.getElementById("do-signup").addEventListener("click", async () => {
   // ✅ 新增：處理結帳跳轉
   async function handleCheckout(event) {
       event.preventDefault();
+      
+      // 💡 修正 1：改用 event.target.closest('a') 確保一定能抓到 <a> 標籤
+      const btn = event.target.closest('a');
+      if (!btn) return;
+
       const { data: { user } } = await supabaseClient.auth.getUser();
 
       if (!user) {
           alert("請先登入！");
+          const authPanel = document.getElementById("auth-panel");
+          if (authPanel) authPanel.classList.add("show");
           return;
       }
 
-      const originalUrl = event.currentTarget.href;
+      const originalUrl = btn.href; // 💡 修正 2：從抓到的標籤拿網址
       const separator = originalUrl.includes('?') ? '&' : '?';
       
-      // 💡 嘗試使用最標準的陣列寫法
-      const checkoutUrl = `${originalUrl}${separator}passthrough[user_id]=${user.id}`;
+      // 💡 修正 3：使用 URLSearchParams 來處理參數，這比手動拼接更專業且不容易出錯
+      const checkoutUrl = new URL(originalUrl);
+      checkoutUrl.searchParams.set('passthrough[user_id]', user.id);
 
-      // 💡 測試重點：跳轉前彈出視窗讓你確認網址
-      console.log("🚀 生成網址:", checkoutUrl);
-      // alert("檢查這串網址最後有沒有 user_id：\n" + checkoutUrl); 
-      
-      window.location.href = checkoutUrl;
+      console.log("🚀 正確生成的結帳網址:", checkoutUrl.toString());
+      window.location.href = checkoutUrl.toString();
   }
   // 重新綁定按鈕
   document.querySelectorAll('.lemonsqueezy-button').forEach(btn => {
