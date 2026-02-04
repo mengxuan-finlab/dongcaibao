@@ -192,21 +192,31 @@ document.getElementById("do-signup").addEventListener("click", async () => {
       btn.addEventListener('click', handleCheckout);
   });
   // ✅ 新增：初始化按鈕的函式
-  async function initButtons() {
-      console.log("正在尋找訂閱按鈕...");
-      const buttons = document.querySelectorAll('.lemonsqueezy-button');
-      console.log(`找到 ${buttons.length} 個按鈕`);
+  function startBindingProcess() {
+      let checkCount = 0;
+      const maxChecks = 10; // 最多檢查 10 次 (共 5 秒)
 
-      buttons.forEach(btn => {
-          // 先移除舊的監聽器，避免重複綁定導致跳轉兩次
-          btn.removeEventListener('click', handleCheckout);
-          btn.addEventListener('click', handleCheckout);
-      });
+      const checkAndBind = setInterval(() => {
+          checkCount++;
+          const buttons = document.querySelectorAll('.lemonsqueezy-button');
+          
+          if (buttons.length > 0) {
+              console.log(`✅ [懂才抱] 成功找到 ${buttons.length} 個按鈕，開始綁定...`);
+              buttons.forEach(btn => {
+                  btn.removeEventListener('click', handleCheckout);
+                  btn.addEventListener('click', handleCheckout);
+              });
+              clearInterval(checkAndBind); // 抓到了就停止檢查
+          } else if (checkCount >= maxChecks) {
+              console.error("❌ [懂才抱] 超時 5 秒仍找不到任何訂閱按鈕，請檢查 HTML class 名稱");
+              clearInterval(checkAndBind);
+          }
+      }, 500);
   }
   // ✅ 7. 頁面載入時先更新一次狀態
   window.addEventListener("DOMContentLoaded", () => {
     refreshAuthUI();
-    initButtons();   // 💡 關鍵：必須執行這個函式，才能讓按鈕學會「帶 ID 跳轉」
+    startBindingProcess();
   });
 
   // 你原本的 scrollDown
