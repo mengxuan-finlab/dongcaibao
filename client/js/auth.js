@@ -167,10 +167,12 @@ document.getElementById("do-signup").addEventListener("click", async () => {
       
       // 💡 修正：使用 currentTarget 確保精準抓到 <a> 標籤本體
       const btn = event.currentTarget; 
+      console.log("📍 點擊到的按鈕連結:", btn.href); // 加這行
       if (!btn || !btn.href) return;
 
       // 從 Supabase 領取身分證 (ID)
       const { data: { user } } = await supabaseClient.auth.getUser();
+      console.log("👤 當前登入用戶 ID:", user?.id); // 加這行 
 
       if (!user) {
           alert("請先登入後再進行訂閱！");
