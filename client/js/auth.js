@@ -4,6 +4,7 @@
 
   // 💡 加上 window. 讓它變成全域變數，Console 才能讀到
   window.supabaseClient = supabase.createClient(supabaseUrl, supabaseAnonKey);
+  const supabaseClient = window.supabaseClient;
 
   // ✅ 1. 登入後幫他確保 profiles 有一筆資料
   async function ensureProfile() {
