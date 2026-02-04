@@ -194,29 +194,30 @@ document.getElementById("do-signup").addEventListener("click", async () => {
   // ✅ 新增：初始化按鈕的函式
   function startBindingProcess() {
       let checkCount = 0;
-      const maxChecks = 10; // 最多檢查 10 次 (共 5 秒)
+      const maxChecks = 20; // 最多檢查 10 秒
 
       const checkAndBind = setInterval(() => {
           checkCount++;
           const buttons = document.querySelectorAll('.lemonsqueezy-button');
           
           if (buttons.length > 0) {
-              console.log(`✅ [懂才抱] 成功找到 ${buttons.length} 個按鈕，開始綁定...`);
+              console.log(`✅ [懂才抱] 成功找到 ${buttons.length} 個按鈕，開始綁定處理程序...`);
               buttons.forEach(btn => {
                   btn.removeEventListener('click', handleCheckout);
                   btn.addEventListener('click', handleCheckout);
               });
-              clearInterval(checkAndBind); // 抓到了就停止檢查
+              clearInterval(checkAndBind); 
           } else if (checkCount >= maxChecks) {
-              console.error("❌ [懂才抱] 超時 5 秒仍找不到任何訂閱按鈕，請檢查 HTML class 名稱");
+              console.error("❌ [懂才抱] 找不到訂閱按鈕，請確認 HTML 中的 class 名稱是否正確");
               clearInterval(checkAndBind);
           }
       }, 500);
   }
-  // ✅ 7. 頁面載入時先更新一次狀態
-  window.addEventListener("DOMContentLoaded", () => {
-    refreshAuthUI();
-    startBindingProcess();
+
+  // 在頁面完全載入後啟動
+  window.addEventListener("load", () => {
+      refreshAuthUI();
+      startBindingProcess();
   });
 
   // 你原本的 scrollDown
