@@ -161,33 +161,34 @@ document.getElementById("do-signup").addEventListener("click", async () => {
     await supabaseClient.auth.signOut();
     await refreshAuthUI();
   });
-  // ✅ 新增：處理結帳跳轉
+  // 在你的 auth.js 中更新 handleCheckout 函式
   async function handleCheckout(event) {
       event.preventDefault();
 
-      // 💡 修正 1：確保不論點到哪，都能精準抓到 <a> 標籤
+      // 💡 關鍵修正：currentTarget 永遠會抓到「綁定事件的那個 a 標籤」
+      // 而不會被內層的文字或元件干擾
       const btn = event.currentTarget; 
       if (!btn || !btn.href) return;
 
-      // 💡 修正 2：從 Supabase 拿 ID
-      const { data: { user } } = await supabaseClient.auth.getUser();
+      // 從 Supabase 領取身分證 (ID)
+      const { data: { user }, error } = await supabaseClient.auth.getUser();
 
-      if (!user) {
-          alert("請先登入！");
+      if (error || !user) {
+          alert("請先登入後再進行訂閱！");
+          const authPanel = document.getElementById("auth-panel");
+          if (authPanel) authPanel.classList.add("show");
           return;
       }
 
-      // 💡 修正 3：手動拼接 passthrough，這是 Lemon Squeezy 最認帳的格式
-      const userId = user.id;
-      const checkoutUrl = `${btn.href}${btn.href.includes('?') ? '&' : '?'}passthrough[user_id]=${userId}`;
+      // 智能拼接參數：這段會把你的 Lemon Squeezy 網址後面加上用戶 ID
+      const url = new URL(btn.href);
+      url.searchParams.set('passthrough[user_id]', user.id);
 
-      console.log("🚀 ID 已上車:", userId);
-      console.log("🚀 即將跳轉至:", checkoutUrl);
-
-      window.location.href = checkoutUrl;
+      console.log("🚀 ID 成功上車！準備跳轉至金流頁面...");
+      window.location.href = url.toString();
   }
 
-  // 重新綁定：確保使用 currentTarget
+  // 綁定事件：確保監聽所有 lemonsqueezy-button
   document.querySelectorAll('.lemonsqueezy-button').forEach(btn => {
       btn.addEventListener('click', handleCheckout);
   });
