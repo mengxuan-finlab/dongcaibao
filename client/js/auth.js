@@ -164,31 +164,30 @@ document.getElementById("do-signup").addEventListener("click", async () => {
   // ✅ 新增：處理結帳跳轉
   async function handleCheckout(event) {
       event.preventDefault();
-      
-      // 💡 修正 1：改用 event.target.closest('a') 確保一定能抓到 <a> 標籤
-      const btn = event.target.closest('a');
-      if (!btn) return;
 
+      // 💡 修正 1：確保不論點到哪，都能精準抓到 <a> 標籤
+      const btn = event.currentTarget; 
+      if (!btn || !btn.href) return;
+
+      // 💡 修正 2：從 Supabase 拿 ID
       const { data: { user } } = await supabaseClient.auth.getUser();
 
       if (!user) {
           alert("請先登入！");
-          const authPanel = document.getElementById("auth-panel");
-          if (authPanel) authPanel.classList.add("show");
           return;
       }
 
-      const originalUrl = btn.href; // 💡 修正 2：從抓到的標籤拿網址
-      const separator = originalUrl.includes('?') ? '&' : '?';
-      
-      // 💡 修正 3：使用 URLSearchParams 來處理參數，這比手動拼接更專業且不容易出錯
-      const checkoutUrl = new URL(originalUrl);
-      checkoutUrl.searchParams.set('passthrough[user_id]', user.id);
+      // 💡 修正 3：手動拼接 passthrough，這是 Lemon Squeezy 最認帳的格式
+      const userId = user.id;
+      const checkoutUrl = `${btn.href}${btn.href.includes('?') ? '&' : '?'}passthrough[user_id]=${userId}`;
 
-      console.log("🚀 正確生成的結帳網址:", checkoutUrl.toString());
-      window.location.href = checkoutUrl.toString();
+      console.log("🚀 ID 已上車:", userId);
+      console.log("🚀 即將跳轉至:", checkoutUrl);
+
+      window.location.href = checkoutUrl;
   }
-  // 重新綁定按鈕
+
+  // 重新綁定：確保使用 currentTarget
   document.querySelectorAll('.lemonsqueezy-button').forEach(btn => {
       btn.addEventListener('click', handleCheckout);
   });
