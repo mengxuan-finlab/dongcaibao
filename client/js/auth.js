@@ -172,15 +172,17 @@ document.getElementById("do-signup").addEventListener("click", async () => {
       }
 
       const originalUrl = event.currentTarget.href;
-      // 💡 關鍵修正：Lemon Squeezy 對 passthrough 的參數名稱非常嚴格
-      // 確保使用 &passthrough[user_id] 這種寫法
       const separator = originalUrl.includes('?') ? '&' : '?';
-      const checkoutUrl = `${originalUrl}${separator}passthrough%5Buser_id%5D=${user.id}`;
+      
+      // 💡 嘗試使用最標準的陣列寫法
+      const checkoutUrl = `${originalUrl}${separator}passthrough[user_id]=${user.id}`;
 
-      console.log("🚀 發送 ID 給金流端:", user.id);
+      // 💡 測試重點：跳轉前彈出視窗讓你確認網址
+      console.log("🚀 生成網址:", checkoutUrl);
+      // alert("檢查這串網址最後有沒有 user_id：\n" + checkoutUrl); 
+      
       window.location.href = checkoutUrl;
   }
-
   // 重新綁定按鈕
   document.querySelectorAll('.lemonsqueezy-button').forEach(btn => {
       btn.addEventListener('click', handleCheckout);
