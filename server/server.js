@@ -341,31 +341,35 @@ app.get("/api/fmp/cash-flow-statement", async (req, res) => {
 
 app.post('/lemonsqueezy-webhook', async (req, res) => {
     const event = req.body;
-    const eventName = event.meta.event_name;
+    const eventName = event.meta?.event_name;
     
-    // 關鍵修正：這裡要對應你傳過去的 key 名稱 'user_id'
-    const customData = event.meta.custom_data; 
+    // 💡 修正：正確抓取我們剛剛傳過去的 user_id
+    const userId = event.meta?.custom_data?.user_id; 
+    
+    console.log(`[收到 Webhook] 事件: ${eventName}, 用戶ID: ${userId}`);
 
-    if (eventName === 'order_created' || eventName === 'subscription_created') {
-        const userId = customData?.user_id; // 確保 customData 存在
+    // 處理訂閱成功 (subscription_created) 或 更新 (subscription_updated)
+    if (userId && (eventName?.includes('subscription') || eventName?.includes('order'))) {
         
-        // 取得 Variant Name 並轉小寫 (例如: "Plus" -> "plus")
-        const variantName = event.data.attributes.variant_name;
+        const variantName = event.data?.attributes?.variant_name || "";
+        
+        // 💡 修正：用關鍵字判斷，只要名稱有 "pro" 就給 pro 權限，否則給 plus
+        const planToUpdate = variantName.toLowerCase().includes('pro') ? 'pro' : 'plus';
 
-        if (userId) {
-            // 更新 Supabase 資料表
-            const { error } = await supabase
-                .from('profiles')
-                .update({ plan: variantName.toLowerCase() })
-                .eq('id', userId);
+        // 💡 提醒：這裡一定要用 service_role 的 supabaseAdmin，才能無視 RLS 修改資料
+        const { error } = await supabaseAdmin
+            .from('profiles')
+            .update({ plan: planToUpdate })
+            .eq('id', userId);
 
-            if (error) {
-                console.error('Supabase 更新方案失敗:', error);
-            } else {
-                console.log(`用戶 ${userId} 成功升級至 ${variantName}`);
-            }
+        if (error) {
+            console.error('❌ Supabase 更新失敗:', error.message);
+        } else {
+            console.log(`✅ 更新成功！用戶 ${userId} 現在是 ${planToUpdate} 會員`);
         }
     }
+    
+    // 不論成功失敗都回傳 200 給 Lemon Squeezy，避免它一直重傳
     res.status(200).send('OK');
 });
 const PORT = process.env.PORT || 3000;
