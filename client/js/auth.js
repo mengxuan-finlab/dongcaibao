@@ -189,6 +189,18 @@ document.getElementById("do-signup").addEventListener("click", async () => {
   document.querySelectorAll('.lemonsqueezy-button').forEach(btn => {
       btn.addEventListener('click', handleCheckout);
   });
+  // ✅ 新增：初始化按鈕的函式
+  async function initButtons() {
+      console.log("正在尋找訂閱按鈕...");
+      const buttons = document.querySelectorAll('.lemonsqueezy-button');
+      console.log(`找到 ${buttons.length} 個按鈕`);
+
+      buttons.forEach(btn => {
+          // 先移除舊的監聽器，避免重複綁定導致跳轉兩次
+          btn.removeEventListener('click', handleCheckout);
+          btn.addEventListener('click', handleCheckout);
+      });
+  }
   // ✅ 7. 頁面載入時先更新一次狀態
   window.addEventListener("DOMContentLoaded", () => {
     refreshAuthUI();
