@@ -376,19 +376,16 @@ app.post('/lemonsqueezy-webhook', express.json(), async (req, res) => {
     console.log("📄 subscriptionId:", subscriptionId);
     console.log("📊 status:", status);
 
-    const { data, error } = await supabase
+    await supabase
       .from('profiles')
       .update({
         plan: status === 'active' ? 'pro' : 'free',
         subscription_id: subscriptionId,
         subscription_status: status
       })
-      .eq('id', userId)
-      .select('id,email,plan,subscription_id,subscription_status');
+      .eq('id', userId);
 
-    console.log("🧾 update data:", data);
-    console.log("🧾 update error:", error);
-
+    console.log("✅ Supabase 已更新方案");
     return res.sendStatus(200);
 
   } catch (err) {
