@@ -179,20 +179,24 @@ document.getElementById("do-signup").addEventListener("click", async () => {
 
     const userId = user.id;
 
+    // ⭐ 正確方式：用 URL 物件
     const url = new URL(btn.href);
 
-    // ⭐ 關鍵：把 user_id 傳給 Lemon
+    // ⭐ 關鍵：讓瀏覽器自動幫你 encode
     url.searchParams.set('checkout[custom][user_id]', userId);
 
     const checkoutUrl = url.toString();
-    console.log("🚀 正確生成的網址:", checkoutUrl);
+
+    console.log("🚀 Checkout URL:", checkoutUrl);
+    // 你應該會看到類似：
+    // checkout%5Bcustom%5D%5Buser_id%5D=xxxx-uuid
 
     window.location.href = checkoutUrl;
   }
 
-  document.querySelectorAll('.lemonsqueezy-button').forEach(btn => {
-    btn.addEventListener('click', handleCheckout);
-  });
+  document.querySelectorAll('.lemonsqueezy-button')
+    .forEach(btn => btn.addEventListener('click', handleCheckout));
+
 
   // ✅ 新增：初始化按鈕的函式
   function startBindingProcess() {
