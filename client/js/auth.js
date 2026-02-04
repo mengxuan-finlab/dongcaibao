@@ -165,29 +165,26 @@ document.getElementById("do-signup").addEventListener("click", async () => {
   async function handleCheckout(event) {
       event.preventDefault();
       
-      // 💡 修正 1：確保精準抓到 <a> 標籤
+      // 💡 修正：使用 currentTarget 確保精準抓到 <a> 標籤本體
       const btn = event.currentTarget; 
       if (!btn || !btn.href) return;
 
-      // 💡 修正 2：確保 Supabase 真的有拿到 ID
+      // 從 Supabase 領取身分證 (ID)
       const { data: { user } } = await supabaseClient.auth.getUser();
+
       if (!user) {
-          alert("請先登入後再訂閱！");
+          alert("請先登入後再進行訂閱！");
           return;
       }
 
-      // 💡 修正 3：暴力拼接，這是金流平台最認帳的格式
+      // 💡 修正：最原始但最有效的拼接方式
       const userId = user.id;
       const separator = btn.href.includes('?') ? '&' : '?';
       const checkoutUrl = `${btn.href}${separator}passthrough[user_id]=${userId}`;
 
-      console.log("🚀 乘客 ID 已上車:", userId);
-      console.log("🚀 最終網址:", checkoutUrl);
-
-      // 跳轉
+      console.log("🚀 正確生成的網址（請確認最後有 ID）:", checkoutUrl);
       window.location.href = checkoutUrl;
   }
-
   // 綁定事件：確保監聽所有 lemonsqueezy-button
   document.querySelectorAll('.lemonsqueezy-button').forEach(btn => {
       btn.addEventListener('click', handleCheckout);
