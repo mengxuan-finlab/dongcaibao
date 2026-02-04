@@ -339,6 +339,35 @@ app.get("/api/fmp/cash-flow-statement", async (req, res) => {
   }
 });
 
+app.post('/lemonsqueezy-webhook', async (req, res) => {
+    const event = req.body;
+    const eventName = event.meta.event_name;
+    
+    // 關鍵修正：這裡要對應你傳過去的 key 名稱 'user_id'
+    const customData = event.meta.custom_data; 
+
+    if (eventName === 'order_created' || eventName === 'subscription_created') {
+        const userId = customData?.user_id; // 確保 customData 存在
+        
+        // 取得 Variant Name 並轉小寫 (例如: "Plus" -> "plus")
+        const variantName = event.data.attributes.variant_name;
+
+        if (userId) {
+            // 更新 Supabase 資料表
+            const { error } = await supabase
+                .from('profiles')
+                .update({ plan: variantName.toLowerCase() })
+                .eq('id', userId);
+
+            if (error) {
+                console.error('Supabase 更新方案失敗:', error);
+            } else {
+                console.log(`用戶 ${userId} 成功升級至 ${variantName}`);
+            }
+        }
+    }
+    res.status(200).send('OK');
+});
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`後端伺服器啟動中： http://localhost:${PORT}`);

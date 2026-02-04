@@ -161,6 +161,30 @@ document.getElementById("do-signup").addEventListener("click", async () => {
     await supabaseClient.auth.signOut();
     await refreshAuthUI();
   });
+  // ✅ 新增：處理結帳跳轉
+  async function handleCheckout(event) {
+      const { data: { user } } = await supabaseClient.auth.getUser();
+      
+      if (!user) {
+          alert("請先登入後再進行訂閱！");
+          authPanel.classList.add("show");
+          event.preventDefault();
+          return;
+      }
+
+      // 在連結後方帶入 user_id，讓 Lemon Squeezy 知道是誰買的
+      const originalUrl = event.currentTarget.href;
+      const checkoutUrl = `${originalUrl}&passthrough[user_id]=${user.id}`;
+      
+      // 跳轉到帶有參數的結帳頁面
+      window.location.href = checkoutUrl;
+      event.preventDefault();
+  }
+
+  // 綁定給所有 lemonsqueezy 按鈕
+  document.querySelectorAll('.lemonsqueezy-button').forEach(btn => {
+      btn.addEventListener('click', handleCheckout);
+  });
 
   // ✅ 7. 頁面載入時先更新一次狀態
   window.addEventListener("DOMContentLoaded", () => {
