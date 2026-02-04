@@ -163,26 +163,21 @@ document.getElementById("do-signup").addEventListener("click", async () => {
   });
   // ✅ 新增：處理結帳跳轉
   async function handleCheckout(event) {
-      event.preventDefault(); 
-      
-      // 1. 確保拿到當前登入者
+      event.preventDefault();
       const { data: { user } } = await supabaseClient.auth.getUser();
-      
+
       if (!user) {
-          alert("請先登入後再進行訂閱！");
-          document.getElementById("auth-panel").classList.add("show");
+          alert("請先登入！");
           return;
       }
 
       const originalUrl = event.currentTarget.href;
-
-      // 2. 智能拼接：判斷是用 ? 還是 & (避免網址格式錯誤)
+      // 💡 關鍵修正：Lemon Squeezy 對 passthrough 的參數名稱非常嚴格
+      // 確保使用 &passthrough[user_id] 這種寫法
       const separator = originalUrl.includes('?') ? '&' : '?';
-      
-      // 3. 關鍵：passthrough[user_id] 必須這樣寫，Lemon Squeezy 才會把它塞進 meta.custom_data
-      const checkoutUrl = `${originalUrl}${separator}passthrough[user_id]=${user.id}`;
-      
-      console.log("🚀 即將前往結帳，UserID 已帶入：", user.id);
+      const checkoutUrl = `${originalUrl}${separator}passthrough%5Buser_id%5D=${user.id}`;
+
+      console.log("🚀 發送 ID 給金流端:", user.id);
       window.location.href = checkoutUrl;
   }
 

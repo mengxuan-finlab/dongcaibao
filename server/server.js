@@ -344,7 +344,7 @@ app.post('/lemonsqueezy-webhook', async (req, res) => {
     const eventName = event.meta?.event_name;
     
     // 💡 修正：正確抓取我們剛剛傳過去的 user_id
-    const userId = event.meta?.custom_data?.user_id; 
+    const userId = event.meta?.custom_data?.user_id || event.meta?.passthrough?.user_id;
     
     console.log(`[收到 Webhook] 事件: ${eventName}, 用戶ID: ${userId}`);
 
