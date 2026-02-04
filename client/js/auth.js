@@ -204,6 +204,7 @@ document.getElementById("do-signup").addEventListener("click", async () => {
   // ✅ 7. 頁面載入時先更新一次狀態
   window.addEventListener("DOMContentLoaded", () => {
     refreshAuthUI();
+    initButtons();   // 💡 關鍵：必須執行這個函式，才能讓按鈕學會「帶 ID 跳轉」
   });
 
   // 你原本的 scrollDown
