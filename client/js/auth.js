@@ -187,10 +187,6 @@ document.getElementById("do-signup").addEventListener("click", async () => {
 
     const checkoutUrl = url.toString();
 
-    console.log("🚀 Checkout URL:", checkoutUrl);
-    // 你應該會看到類似：
-    // checkout%5Bcustom%5D%5Buser_id%5D=xxxx-uuid
-
     window.location.href = checkoutUrl;
   }
 
@@ -208,7 +204,6 @@ document.getElementById("do-signup").addEventListener("click", async () => {
           const buttons = document.querySelectorAll('.lemonsqueezy-button');
           
           if (buttons.length > 0) {
-              console.log(`✅ [懂才抱] 成功找到 ${buttons.length} 個按鈕，開始綁定處理程序...`);
               buttons.forEach(btn => {
                   btn.removeEventListener('click', handleCheckout);
                   btn.addEventListener('click', handleCheckout);
