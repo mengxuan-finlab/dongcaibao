@@ -7,45 +7,30 @@
 
 body {
   font-family: 'Microsoft JhengHei', 'PingFang TC', sans-serif;
-  background: linear-gradient(135deg, #4a4ab6 0%, #7e7ee2 100%);
+  /* 🚩 電腦版背景：單一純色 */
+  background: #4a4ab6;
   min-height: 100vh;
   position: relative;
   overflow-x: hidden;
-  /* 不特別指定 overflow-y，交給瀏覽器自動算就好 */
-  /* 確保滾動順暢 */
   -webkit-overflow-scrolling: touch;
 }
 
-/* --- 移動網格線（背景動畫） --- */
+/* --- 背景動畫層（完全移除格子） --- */
 body::before {
   content: '';
-  position: fixed;     /* 🚩 改成 fixed，貼在視窗上 */
-  inset: 0;            /* 等於 top:0; right:0; bottom:0; left:0; */
+  position: fixed;
+  inset: 0;
   width: 100%;
   height: 100%;
-  background-image: 
-      linear-gradient(rgba(9, 237, 245, 0.03) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
-  background-size: 50px 50px;
-  animation: moveGrid 20s linear infinite;
+  /* 🚩 這裡不設定任何背景圖案與動畫 */
+  background: transparent;
   pointer-events: none;
-  z-index: -1;         /* 如果需要，讓它永遠在內容後面 */
-  /* 強制開啟硬體加速但保持穩定 */
+  z-index: -1;
   will-change: transform;
   transform: translateZ(0);
 }
 
-
-@keyframes moveGrid {
-  0% {
-    transform: translate(0, 0) rotate(-15deg);
-  }
-  100% {
-    transform: translate(50px, 50px) rotate(-15deg);
-  }
-}
-
-/* --- 粒子效果 --- */
+/* --- 粒子效果 (保留原本設定) --- */
 .particle {
   position: absolute;
   width: 4px;
@@ -55,38 +40,28 @@ body::before {
   animation: float 8s infinite;
 }
 
-/* 粒子位置與延遲 */
 .particle:nth-child(1) { left: 10%; top: 20%; animation-delay: 0s; }
 .particle:nth-child(2) { left: 80%; top: 40%; animation-delay: 2s; }
 .particle:nth-child(3) { left: 30%; top: 60%; animation-delay: 4s; }
 .particle:nth-child(4) { left: 90%; top: 80%; animation-delay: 6s; background: rgba(160, 120, 255, 0.6); }
 
 @keyframes float {
-  0%, 100% {
-    transform: translateY(0) translateX(0);
-    opacity: 0;
-  }
-  10% {
-    opacity: 1;
-  }
-  90% {
-    opacity: 1;
-  }
-  100% {
-    transform: translateY(-100px) translateX(30px);
-    opacity: 0;
-  }
+  0%, 100% { transform: translateY(0) translateX(0); opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translateY(-100px) translateX(30px); opacity: 0; }
 }
+
 html {
-  scroll-behavior: smooth; /* 平滑滾動 */
-  height: -webkit-fill-available; /* 讓 iOS 更好地計算高度 */
+  scroll-behavior: smooth;
+  height: -webkit-fill-available;
 }
 
 section {
-  min-height: 100vh;        /* 確保每頁都是滿版 */
+  min-height: 100vh;
 }
 
-/* --- 方案標籤樣式 --- */
+/* --- 方案標籤與 Pro 樣式 (保留原本設定) --- */
 .plan-tag {
   padding: 2px 8px;
   border-radius: 4px;
@@ -99,10 +74,9 @@ section {
 .plan-plus { background: #6366f1; color: white; }
 .plan-pro { background: #d97706; color: white; border: 1px solid #fcd34d; }
 
-/* --- Pro 版報告專屬樣式 --- */
 .pro-report-style {
-  border: 2px solid #D4AF37 !important; /* 經典金邊框 */
-  background: linear-gradient(to bottom, #fffdf0, #ffffff) !important; /* 淡淡的金色漸層 */
+  border: 2px solid #D4AF37 !important;
+  background: linear-gradient(to bottom, #fffdf0, #ffffff) !important;
   padding: 30px !important;
   border-radius: 16px !important;
   box-shadow: 0 10px 40px rgba(212, 175, 55, 0.2) !important;
@@ -110,7 +84,6 @@ section {
   color: #1a202c;
 }
 
-/* 在 Pro 報告右上角加一個奢華標籤 */
 .pro-report-style::before {
   content: "PRO INSTITUTIONAL REPORT";
   position: absolute;
@@ -126,7 +99,6 @@ section {
   box-shadow: 0 4px 10px rgba(0,0,0,0.1);
 }
 
-/* 美化報告內的表格 */
 .pro-report-style table {
   width: 100%;
   border-collapse: collapse;
@@ -144,28 +116,27 @@ section {
 }
 
 /* =============================================
-   針對手機版 (iOS/Android) 的最終視覺修正
+   針對手機版 (iOS/Android) 的視覺修正
    ============================================= */
 @media (max-width: 768px) {
-  /* 1. 徹底消滅格子感：手機版直接停用網格線條，只保留純淨漸層 */
-  body::before {
-    /* 🚩 改法：直接把網格圖案拿掉，僅保留背景漸層色 */
-    background-image: none !important; 
-    background: linear-gradient(135deg, #4a4ab6 0%, #7e7ee2 100%) !important;
-    animation: none !important; /* 關閉動畫，讓手機跑起來更順 */
+  body {
+    /* 🚩 手機版背景：同步為單一純色，不再有漸層感 */
+    background: #4a4ab6 !important;
+    padding: 15px 15px 40px !important;
   }
 
-  /* 2. 解決「離太遠」問題：緊縮所有上方間距 */
-  body {
-    padding: 15px 15px 40px !important; /* 縮小網頁四周邊距 */
+  body::before {
+    /* 徹底移除背景圖案與漸層 */
+    background: transparent !important;
+    background-image: none !important; 
+    animation: none !important;
   }
 
   h1 {
-    font-size: 20px !important; /* 縮小標題 */
+    font-size: 20px !important;
     margin-bottom: 10px !important;
   }
 
-  /* 縮小輸入框跟按鈕的佔位空間 */
   #symbolInput, #fetchBtn {
     margin-bottom: 8px !important;
   }
@@ -176,7 +147,6 @@ section {
     margin-bottom: 4px !important;
   }
 
-  /* 🚩 關鍵：取消 `#result` 的所有內距，讓內容緊貼在「查詢完成」下方 */
   #result {
     padding-top: 5px !important; 
     margin-top: 0 !important;
@@ -184,7 +154,6 @@ section {
     padding-right: 10px;
   }
 
-  /* 調整摘要標題，避免它離頂部太遠 */
   #result h1:first-child {
     margin-top: 5px !important;
     font-size: 1.4rem !important;
