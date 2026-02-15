@@ -65,7 +65,18 @@
     logoutBtn.style.display = "inline-flex";
     openPanelBtn.style.display = "none";
   }
+  function setupPasswordToggle() {
+  const toggleBtn = document.getElementById("toggle-password");
+  const passwordInput = document.getElementById("auth-password");
 
+  if (toggleBtn && passwordInput) {
+    toggleBtn.addEventListener("click", () => {
+      const isPassword = passwordInput.type === "password";
+      passwordInput.type = isPassword ? "text" : "password";
+      toggleBtn.textContent = isPassword ? "🙈" : "👁️";
+    });
+  }
+}
   // ✅ 3. 開關小面板
   const authPanel = document.getElementById("auth-panel");
   const openPanelBtn = document.getElementById("open-auth-panel");
@@ -220,6 +231,7 @@ document.getElementById("do-signup").addEventListener("click", async () => {
   window.addEventListener("load", () => {
       refreshAuthUI();
       startBindingProcess();
+      setupPasswordToggle();
   });
 
   // 你原本的 scrollDown

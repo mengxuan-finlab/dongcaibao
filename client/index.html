@@ -99,7 +99,12 @@
   </div>
   <div class="field">
     <label for="auth-password">密碼</label>
-    <input type="password" id="auth-password" placeholder="至少 6 碼" />
+    <div style="position: relative;">
+      <input type="password" id="auth-password" placeholder="至少 6 碼" style="padding-right: 40px;" />
+      <span id="toggle-password" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); cursor: pointer; user-select: none;">
+        👁️
+      </span>
+    </div>
   </div>
   <div class="panel-actions">
     <button class="btn-login" id="do-login">登入</button>
