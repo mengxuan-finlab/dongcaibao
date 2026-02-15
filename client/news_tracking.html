@@ -6,22 +6,51 @@
   <title>懂才抱｜新聞追蹤設定</title>
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
   <style>
-    body{font-family:system-ui,-apple-system,"Microsoft JhengHei",sans-serif;background:#f3f4f6;margin:0}
-    .wrap{max-width:10000px;margin:0 auto;padding:24px}
-    .card{background:#fff;border-radius:14px;padding:50px;box-shadow:0 6px 20px rgba(0,0,0,.06);margin-bottom:14px}
-    .row{display:flex;gap:10px;flex-wrap:wrap}
-    input,textarea,select,button{font:inherit}
-    input,textarea{width:100%;padding:10px 12px;border:1px solid #e5e7eb;border-radius:10px;background:#fff}
-    textarea{min-height:90px;resize:vertical}
-    button{padding:10px 14px;border:0;border-radius:10px;background:#111827;color:#fff;cursor:pointer}
-    button.secondary{background:#6b7280}
-    button.danger{background:#c43a3a}
-    .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-    .meta{color:#6b7280;font-size:13px}
-    .pill{display:inline-block;background:#eef2ff;color:#3730a3;padding:4px 10px;border-radius:999px;font-size:12px;margin-left:8px}
-    .item{border-top:1px solid #eef2f7;padding-top:12px;margin-top:12px}
-    .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
-    .muted{color:#9ca3af}
+    body { font-family: system-ui, -apple-system, "Microsoft JhengHei", sans-serif; background: #f3f4f6; margin: 0; }
+    .wrap { max-width: 800px; margin: 0 auto; padding: 16px; } 
+    
+
+    .card { 
+      background: #fff; 
+      border-radius: 14px; 
+      padding: 24px; 
+      box-shadow: 0 6px 20px rgba(0,0,0,.06); 
+      margin-bottom: 14px; 
+    }
+    
+    .row { display: flex; gap: 10px; flex-wrap: wrap; }
+    input, textarea, select, button { font: inherit; box-sizing: border-box; } /* 確保 padding 不會撐破寬度 */
+    input, textarea { width: 100%; padding: 10px 12px; border: 1px solid #e5e7eb; border-radius: 10px; background: #fff; }
+    textarea { min-height: 90px; resize: vertical; }
+    
+    button { padding: 10px 14px; border: 0; border-radius: 10px; background: #111827; color: #fff; cursor: pointer; }
+    button.secondary { background: #6b7280; }
+    button.danger { background: #c43a3a; }
+    
+    .grid { 
+      display: grid; 
+      grid-template-columns: 1fr 1fr; 
+      gap: 12px; 
+    }
+    
+    .meta { color: #6b7280; font-size: 13px; margin-bottom: 4px; }
+    .pill { display: inline-block; background: #eef2ff; color: #3730a3; padding: 4px 10px; border-radius: 999px; font-size: 12px; margin-left: 8px; }
+    .item { border-top: 1px solid #eef2f7; padding-top: 12px; margin-top: 12px; }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+    .muted { color: #9ca3af; }
+
+    #editModal .card { width: 90%; max-width: 600px; padding: 24px; }
+
+    /* --- 手機版適應 (RWD) --- */
+    @media (max-width: 600px) {
+      .wrap { padding: 12px; }
+      .card { padding: 16px; } 
+      .grid { grid-template-columns: 1fr; }
+      .actions button { flex: 1; text-align: center; } 
+      
+      h2 { font-size: 1.25rem; }
+      h3 { font-size: 1.1rem; }
+    }
   </style>
 </head>
 <body>
