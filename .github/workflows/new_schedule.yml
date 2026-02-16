@@ -2,9 +2,8 @@ name: Stock News Bot
 
 on:
   schedule:
-    # 設定每 15 分鐘執行一次 (GitHub 免費版最快頻率)
+    # 每 15 分鐘執行一次
     - cron: '*/15 * * * *'
-  # 允許手動按按鈕觸發 (方便測試用)
   workflow_dispatch:
 
 jobs:
@@ -20,18 +19,23 @@ jobs:
         with:
           python-version: '3.13'
 
-      - name: 安裝套件
+      # 新增：安裝系統依賴 (newspaper 爬蟲在編譯時需要這些工具)
+      - name: 安裝系統依賴
         run: |
-          pip install requests google-generativeai supabase python-dotenv
+          sudo apt-get update
+          sudo apt-get install -y libxml2-dev libxslt-dev
+
+      - name: 安裝 Python 套件
+        run: |
+          # 修改點：加入 newspaper4k (支援 Python 3.13) 與 lxml_html_clean
+          pip install requests google-generativeai supabase python-dotenv newspaper4k lxml_html_clean
 
       - name: 執行新聞追蹤程式
         env:
-          # 把 GitHub 上的秘密變數注入到程式環境中
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           GEMINI_API_MAIN: ${{ secrets.GEMINI_API_MAIN }}
           FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
           ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
           EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
-        # 注意路徑：如果您的 tracknews.py 在 server 資料夾下，請用 server/tracknews.py
         run: python server/tracknews.py
