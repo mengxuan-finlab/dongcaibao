@@ -184,7 +184,7 @@
 
     const { count, error } = await supabaseClient
       .from("usage_logs")
-      .select("*", { count: 'exact', head: true }) // 只抓數量，比較快
+      .select("*", { count: 'exact', head: true })
       .eq("user_id", userId)
       .eq("action", "company_intro")
       .gte("created_at", startOfWeek.toISOString());
@@ -194,36 +194,28 @@
 
   async function updateUsageInfo(user, plan) {
     const usageInfoEl = document.getElementById("usageInfo");
-    if (!usageInfoEl) return;
+    if (!usageInfoEl || !user) return;
 
-    if (!user) {
-      usageInfoEl.textContent = "請先登入以使用此功能。";
-      return;
-    }
-
-    // --- ★ 關鍵修正：定義本週起始時間 (週日凌晨) ---
+    // ★ 必須重複定義這一段，因為這是一個新的函數房間
     const startOfWeek = new Date();
     startOfWeek.setHours(0, 0, 0, 0);
     startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
-    // ------------------------------------------
 
     const limit = PLAN_LIMIT[plan] ?? PLAN_LIMIT["free"];
     const limitText = limit === Infinity ? "無限" : limit;
     
-    // 1. 讀取目前報告生成使用量
     const used = await getWeeklyUsage(user.id);
 
-    // 2. 讀取目前 AI 對話使用量 (chat_query)
+    // 查詢對話次數
     const { count: chatUsed } = await supabaseClient
       .from("usage_logs")
       .select("*", { count: 'exact', head: true })
       .eq("user_id", user.id)
       .eq("action", "chat_query")
-      .gte("created_at", startOfWeek.toISOString());
+      .gte("created_at", startOfWeek.toISOString()); // 如果上面沒定義，程式會死在這裡
 
     const chatLimit = (plan === 'pro') ? "無限" : (plan === 'plus' ? 20 : 5);
     
-    // 3. 渲染顯示資訊
     usageInfoEl.innerHTML = `
       目前方案：<span class="plan-tag plan-${plan}">${plan}</span> 
       ｜ 本週報告：${used} / ${limitText} 次
