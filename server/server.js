@@ -292,12 +292,62 @@ app.post('/api/analyze-stock', async (req, res) => {
 
     res.json({ 
       text: responseText, 
-      plan: userPlan 
+      plan: userPlan,
+      searchContext: searchContext
     });
 
   } catch (err) {
     console.error("後端錯誤:", err);
     res.status(500).json({ error: err.message || '伺服器忙碌中' });
+  }
+});
+// ===== 新增：AI 深度追問 Endpoint =====
+app.post('/api/chat-with-report', async (req, res) => {
+  const { symbol, searchContext, userQuery } = req.body;
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader) return res.status(401).json({ error: '未登入' });
+
+  try {
+    const token = authHeader.split(' ')[1];
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    if (authError || !user) throw new Error('身分驗證失敗');
+
+    // 1. 取得使用者方案 (可用來限制對話次數，這裡先示範基礎功能)
+    const { data: profile } = await supabase.from('profiles').select('plan').eq('id', user.id).single();
+    const modelName = "gemini-2.5-flash"; // 對話用 Flash 速度較快且省錢
+
+    // 2. 構建對話專用 Prompt (RAG 模式)
+    const chatPrompt = `
+      你是一位專業的資深產業研究員。
+      以下是關於 ${symbol} 的【原始事實資料】：
+      ---
+      ${searchContext}
+      ---
+      
+      請根據上方事實資料，回答投資人的追問：
+      「${userQuery}」
+
+      【回答要求】：
+      1. 僅根據提供的資料回答，不可編造事實。
+      2. 若資料中未提及，請回答「目前的分析資料中未提及此細節」。
+      3. 語氣專業簡練。
+      4. 嚴禁提供投資建議（買入/賣出目標價）。
+    `;
+
+    // 3. 呼叫 Gemini
+    const chatModel = genAI.getGenerativeModel({ model: modelName });
+    const aiResult = await chatModel.generateContent(chatPrompt);
+    const responseText = aiResult.response.text();
+
+    // 4. (選做) 紀錄 usage_log
+    await supabase.from('usage_logs').insert({ user_id: user.id, action: 'chat_query' });
+
+    res.json({ text: responseText });
+
+  } catch (err) {
+    console.error("對話錯誤:", err);
+    res.status(500).json({ error: err.message || '對話發生錯誤' });
   }
 });
 // === 額外：Stock Data Supabase（讀 core_metrics 用）===
