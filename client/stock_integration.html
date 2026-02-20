@@ -201,16 +201,19 @@
       return;
     }
 
+    // --- ★ 關鍵修正：定義本週起始時間 (週日凌晨) ---
+    const startOfWeek = new Date();
+    startOfWeek.setHours(0, 0, 0, 0);
+    startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+    // ------------------------------------------
+
     const limit = PLAN_LIMIT[plan] ?? PLAN_LIMIT["free"];
     const limitText = limit === Infinity ? "無限" : limit;
     
-    // 讀取目前使用量
+    // 1. 讀取目前報告生成使用量
     const used = await getWeeklyUsage(user.id);
-    // ★ 使用 HTML 標籤讓方案顯示更漂亮
-    usageInfoEl.innerHTML = `
-      目前方案：<span class="plan-tag plan-${plan}">${plan}</span> 
-      ｜ 本週已使用 ${used} / ${limitText} 次
-    `;
+
+    // 2. 讀取目前 AI 對話使用量 (chat_query)
     const { count: chatUsed } = await supabaseClient
       .from("usage_logs")
       .select("*", { count: 'exact', head: true })
@@ -220,7 +223,12 @@
 
     const chatLimit = (plan === 'pro') ? "無限" : (plan === 'plus' ? 20 : 5);
     
-    usageInfoEl.innerHTML += `<br>💬 本週對話已使用 ${chatUsed || 0} / ${chatLimit} 次`;
+    // 3. 渲染顯示資訊
+    usageInfoEl.innerHTML = `
+      目前方案：<span class="plan-tag plan-${plan}">${plan}</span> 
+      ｜ 本週報告：${used} / ${limitText} 次
+      <br>💬 本週對話：${chatUsed || 0} / ${chatLimit} 次
+    `;
   }
 
   // 頁面載入時更新一次資訊
