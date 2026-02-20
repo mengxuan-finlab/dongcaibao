@@ -320,21 +320,17 @@ app.post('/api/chat-with-report', async (req, res) => {
     // 2. 構建對話專用 Prompt (RAG 模式)
     const chatPrompt = `
       你是一位專業的資深產業研究員。
-      以下是關於 ${symbol} 的【原始事實資料】：
-      ---
-      ${searchContext}
-      ---
       
-      請根據上方事實資料，回答投資人的追問：
-      「${userQuery}」
+      【背景資料】：
+      ${searchContext}
 
-      【回答要求】：
-      1. 僅根據提供的資料回答，不可編造事實。
-      2. 若資料中未提及，請回答「目前的分析資料中未提及此細節」。
-      3. 語氣專業簡練。
-      4. 嚴禁提供投資建議（買入/賣出目標價）。
+      【指令】：
+      1. 請回答投資人的追問：「${userQuery}」
+      2. **優先級 1**：如果提供的【背景資料】中有答案，請精確引用。
+      3. **優先級 2**：如果背景資料中沒有，請運用你作為資深分析師的內建知識進行回答，但請在該段落開頭註明「根據產業通用資訊補充：」。
+      4. **目標**：給投資人最有價值的回答，不要只說「資料未提及」。
+      5. 語氣保持專業、數據導向，嚴禁投資建議。
     `;
-
     // 3. 呼叫 Gemini
     const chatModel = genAI.getGenerativeModel({ model: modelName });
     const aiResult = await chatModel.generateContent(chatPrompt);
