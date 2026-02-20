@@ -211,6 +211,16 @@
       目前方案：<span class="plan-tag plan-${plan}">${plan}</span> 
       ｜ 本週已使用 ${used} / ${limitText} 次
     `;
+    const { count: chatUsed } = await supabaseClient
+      .from("usage_logs")
+      .select("*", { count: 'exact', head: true })
+      .eq("user_id", user.id)
+      .eq("action", "chat_query")
+      .gte("created_at", startOfWeek.toISOString());
+
+    const chatLimit = (plan === 'pro') ? "無限" : (plan === 'plus' ? 20 : 5);
+    
+    usageInfoEl.innerHTML += `<br>💬 本週對話已使用 ${chatUsed || 0} / ${chatLimit} 次`;
   }
 
   // 頁面載入時更新一次資訊

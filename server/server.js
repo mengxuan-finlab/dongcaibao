@@ -313,9 +313,38 @@ app.post('/api/chat-with-report', async (req, res) => {
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     if (authError || !user) throw new Error('身分驗證失敗');
 
-    // 1. 取得使用者方案 (可用來限制對話次數，這裡先示範基礎功能)
+    // 1. 取得使用者方案
     const { data: profile } = await supabase.from('profiles').select('plan').eq('id', user.id).single();
-    const modelName = "gemini-2.5-flash"; // 對話用 Flash 速度較快且省錢
+    const userPlan = (profile?.plan || 'free').toLowerCase();
+    const modelName = "gemini-2.5-flash";
+
+    // ==========================================
+    // ★ 新增：問答限流攔截器 (Pro 方案無限)
+    // ==========================================
+    if (userPlan !== 'pro') {
+      const startOfWeek = new Date();
+      startOfWeek.setHours(0, 0, 0, 0);
+      startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+
+      // 查詢該用戶本週已提問次數
+      const { count: chatCount, error: countError } = await supabase
+        .from("usage_logs")
+        .select("*", { count: 'exact', head: true })
+        .eq("user_id", user.id)
+        .eq("action", "chat_query")
+        .gte("created_at", startOfWeek.toISOString());
+
+      if (countError) throw new Error("無法讀取對話紀錄");
+
+      // 定義對話限制：Free 5 次, Plus 20 次
+      const chatLimit = userPlan === 'plus' ? 20 : 5; 
+      if (chatCount >= chatLimit) {
+        return res.status(403).json({ 
+          error: `已達本週對話上限。您的 ${userPlan} 方案配額為每週 ${chatLimit} 次，請升級 Pro 方案以解鎖無限對話。` 
+        });
+      }
+    }
+    // ==========================================
 
     // 2. 構建對話專用 Prompt (RAG 模式)
     const chatPrompt = `
@@ -331,12 +360,13 @@ app.post('/api/chat-with-report', async (req, res) => {
       4. **目標**：給投資人最有價值的回答，不要只說「資料未提及」。
       5. 語氣保持專業、數據導向，嚴禁投資建議。
     `;
+
     // 3. 呼叫 Gemini
     const chatModel = genAI.getGenerativeModel({ model: modelName });
     const aiResult = await chatModel.generateContent(chatPrompt);
     const responseText = aiResult.response.text();
 
-    // 4. (選做) 紀錄 usage_log
+    // 4. 紀錄行為 (只有成功回答才計次)
     await supabase.from('usage_logs').insert({ user_id: user.id, action: 'chat_query' });
 
     res.json({ text: responseText });
