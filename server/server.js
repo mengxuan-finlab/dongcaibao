@@ -316,8 +316,7 @@ app.post('/api/chat-with-report', async (req, res) => {
     const { data: profile } = await supabase.from('profiles').select('plan').eq('id', user.id).single();
     const userPlan = (profile?.plan || 'free').toLowerCase();
     
-    // 注意：Gemini 目前穩定型號為 gemini-1.5-flash 或 gemini-2.0-flash
-    const modelName = "gemini-1.5-flash"; 
+    const modelName = "gemini-2.5-flash"; 
 
     // --- (保留原本的問答限流攔截器邏輯) ---
     if (userPlan !== 'pro') {
