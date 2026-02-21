@@ -323,19 +323,23 @@
 
     if (!userQuery) return;
 
-    // 1. 在介面上顯示使用者的問題
+    // 1. 顯示使用者提問
     chatHistory.innerHTML += `<div style="margin-bottom:10px; color:#fff;"><strong>👤 您：</strong>${userQuery}</div>`;
     chatInput.value = "";
 
-    // 2. 顯示思考中狀態
-    const loadingId = "loading-" + Date.now();
-    chatHistory.innerHTML += `<div id="${loadingId}" style="margin-bottom:10px; color:#a78bfa;">AI 分析師正在思考中...</div>`;
+    // 2. 建立 AI 回答的容器 (先放一個空的區域)
+    const aiMsgId = "ai-" + Date.now();
+    chatHistory.innerHTML += `
+      <div style="margin-bottom:20px; padding-left:10px; border-left:3px solid #8b5cf6; color:#ede7f3;">
+        <strong>🤖 AI：</strong><br><span id="${aiMsgId}">正在思考中...</span>
+      </div>
+    `;
+    const aiDisplayEl = document.getElementById(aiMsgId);
     chatHistory.scrollTop = chatHistory.scrollHeight;
 
     try {
       const { data: { session } } = await supabaseClient.auth.getSession();
       
-      // 3. 呼叫後端對話 API
       const response = await fetch("https://dongcaibao.onrender.com/api/chat-with-report", {
         method: "POST",
         headers: {
@@ -349,21 +353,36 @@
         })
       });
 
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "對話失敗");
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "對話失敗");
+      }
 
-      // 4. 移除 loading 並顯示 AI 回答
-      document.getElementById(loadingId).remove();
-      chatHistory.innerHTML += `
-        <div style="margin-bottom:20px; padding-left:10px; border-left:3px solid #8b5cf6; color:#ede7f3;">
-          <strong>🤖 AI：</strong><br>${marked.parse(data.text)}
-        </div>
-      `;
-      chatHistory.scrollTop = chatHistory.scrollHeight;
+      // ★ 關鍵：串流讀取邏輯
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let fullContent = "";
+      aiDisplayEl.innerHTML = ""; // 清除「思考中」文字
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        fullContent += chunk;
+        
+        // 即時渲染 Markdown 並更新畫面
+        aiDisplayEl.innerHTML = marked.parse(fullContent);
+        chatHistory.scrollTop = chatHistory.scrollHeight;
+      }
+
+      // 結束後更新一次次數
+      const { user, plan } = await getCurrentUserPlan();
+      await updateUsageInfo(user, plan);
 
     } catch (err) {
       console.error(err);
-      document.getElementById(loadingId).innerHTML = `<span style="color:red;">❌ 錯誤：${err.message}</span>`;
+      aiDisplayEl.innerHTML = `<span style="color:red;">❌ 錯誤：${err.message}</span>`;
     }
   });
 </script>

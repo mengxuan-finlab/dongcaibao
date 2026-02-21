@@ -313,20 +313,18 @@ app.post('/api/chat-with-report', async (req, res) => {
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     if (authError || !user) throw new Error('身分驗證失敗');
 
-    // 1. 取得使用者方案
     const { data: profile } = await supabase.from('profiles').select('plan').eq('id', user.id).single();
     const userPlan = (profile?.plan || 'free').toLowerCase();
-    const modelName = "gemini-2.5-flash";
+    
+    // 注意：Gemini 目前穩定型號為 gemini-1.5-flash 或 gemini-2.0-flash
+    const modelName = "gemini-1.5-flash"; 
 
-    // ==========================================
-    // ★ 新增：問答限流攔截器 (Pro 方案無限)
-    // ==========================================
+    // --- (保留原本的問答限流攔截器邏輯) ---
     if (userPlan !== 'pro') {
       const startOfWeek = new Date();
       startOfWeek.setHours(0, 0, 0, 0);
       startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
 
-      // 查詢該用戶本週已提問次數
       const { count: chatCount, error: countError } = await supabase
         .from("usage_logs")
         .select("*", { count: 'exact', head: true })
@@ -336,7 +334,6 @@ app.post('/api/chat-with-report', async (req, res) => {
 
       if (countError) throw new Error("無法讀取對話紀錄");
 
-      // 定義對話限制：Free 5 次, Plus 20 次
       const chatLimit = userPlan === 'plus' ? 20 : 5; 
       if (chatCount >= chatLimit) {
         return res.status(403).json({ 
@@ -344,36 +341,47 @@ app.post('/api/chat-with-report', async (req, res) => {
         });
       }
     }
-    // ==========================================
 
-    // 2. 構建對話專用 Prompt (RAG 模式)
-    const chatPrompt = `
-      你是一位專業的資深產業研究員。
-      
+    const chatPrompt = ` 你是一位專業的資深產業研究員。
       【背景資料】：
       ${searchContext}
-
       【指令】：
       1. 請回答投資人的追問：「${userQuery}」
       2. **優先級 1**：如果提供的【背景資料】中有答案，請精確引用。
       3. **優先級 2**：如果背景資料中沒有，請運用你作為資深分析師的內建知識進行回答，但請在該段落開頭註明「根據產業通用資訊補充：」。
       4. **目標**：給投資人最有價值的回答，不要只說「資料未提及」。
       5. 語氣保持專業、數據導向，嚴禁投資建議。
-    `;
+      `;
+    // ==========================================
+    // ★ 修改開始：設定 HTTP Header 支援串流
+    // ==========================================
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Transfer-Encoding', 'chunked');
 
-    // 3. 呼叫 Gemini
+    // 使用 generateContentStream 啟動串流
     const chatModel = genAI.getGenerativeModel({ model: modelName });
-    const aiResult = await chatModel.generateContent(chatPrompt);
-    const responseText = aiResult.response.text();
+    const result = await chatModel.generateContentStream(chatPrompt);
 
-    // 4. 紀錄行為 (只有成功回答才計次)
+    // 逐塊讀取 AI 生成的文字並發送給前端
+    for await (const chunk of result.stream) {
+      const chunkText = chunk.text();
+      res.write(chunkText); 
+    }
+
+    // 成功完成後紀錄行為
     await supabase.from('usage_logs').insert({ user_id: user.id, action: 'chat_query' });
-
-    res.json({ text: responseText });
+    
+    // 正式結束 HTTP 連線
+    res.end();
 
   } catch (err) {
     console.error("對話錯誤:", err);
-    res.status(500).json({ error: err.message || '對話發生錯誤' });
+    // 如果 Header 尚未發送，回傳 JSON 錯誤；若已開始串流，則直接結束
+    if (!res.headersSent) {
+      res.status(500).json({ error: err.message || '對話發生錯誤' });
+    } else {
+      res.end();
+    }
   }
 });
 // === 額外：Stock Data Supabase（讀 core_metrics 用）===
