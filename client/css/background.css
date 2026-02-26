@@ -23,9 +23,10 @@ body {
 body::before {
   content: '';
   position: fixed;     /* 🚩 改成 fixed，貼在視窗上 */
-  inset: 0;            /* 等於 top:0; right:0; bottom:0; left:0; */
-  width: 100%;
-  height: 100%;
+  inset: -50%;
+  width: 200%;
+  height: 200%;
+  transform-origin: center;
   background-image: 
       linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
       linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
