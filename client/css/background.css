@@ -4,10 +4,15 @@
   padding: 0;
   box-sizing: border-box;
 }
-
+html {
+  height: 100%;
+  background: linear-gradient(135deg, #2d2d44 0%, #3d3d5c 100%);
+  scroll-behavior: smooth; /* 平滑滾動 */
+  scroll-snap-type: y mandatory; 
+}
 body {
   font-family: 'Microsoft JhengHei', 'PingFang TC', sans-serif;
-  background: linear-gradient(135deg, #2d2d44 0%, #3d3d5c 100%);
+  background: transparent;
   min-height: 100vh;
   position: relative;
   overflow-x: hidden;
@@ -27,9 +32,13 @@ body::before {
   background-size: 50px 50px;
   animation: moveGrid 20s linear infinite;
   pointer-events: none;
-  z-index: -1;         /* 如果需要，讓它永遠在內容後面 */
+  z-index: 0;         /* 如果需要，讓它永遠在內容後面 */
+  will-change: transform;     /* ✅ 不會被動畫覆蓋，iOS 更穩 */
 }
-
+body > * {
+  position: relative;
+  z-index: 1;
+}
 
 @keyframes moveGrid {
   0% {
@@ -71,10 +80,6 @@ body::before {
     transform: translateY(-100px) translateX(30px);
     opacity: 0;
   }
-}
-html {
-  scroll-behavior: smooth; /* 平滑滾動 */
-  scroll-snap-type: y mandatory; 
 }
 
 section {
