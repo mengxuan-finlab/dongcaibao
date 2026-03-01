@@ -4,19 +4,15 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <!-- Primary SEO -->
   <title>懂才抱｜股票資訊整合平台：選股器、財報快照、新聞追蹤</title>
   <meta name="description" content="懂才抱提供核心指標選股器、公司與產業資訊整合、三大財報自動更新與客製化新聞追蹤，讓投資人從選股到追蹤一站完成。" />
   <meta name="keywords" content="懂才抱,股票,選股器,財報,財報追蹤,新聞追蹤,公司資訊整合,美股" />
   <meta name="author" content="小炫" />
 
-  <!-- Canonical（把網址換成你的正式網域；沒有網域先放 Vercel） -->
   <link rel="canonical" href="https://doncaibao.com/" />
 
-  <!-- Robots -->
   <meta name="robots" content="index,follow,max-image-preview:large" />
 
-  <!-- Open Graph（分享預覽） -->
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="懂才抱" />
   <meta property="og:title" content="懂才抱｜股票資訊整合平台" />
@@ -24,13 +20,11 @@
   <meta property="og:url" content="https://doncaibao.com/" />
   <meta property="og:image" content="https://doncaibao.com/og-cover.png" />
 
-  <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="懂才抱｜股票資訊整合平台" />
   <meta name="twitter:description" content="核心指標選股器、財報快照自動更新、客製化新聞追蹤。" />
   <meta name="twitter:image" content="https://doncaibao.com/og-cover.png" />
 
-  <!-- Structured Data：WebSite + Organization -->
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -51,28 +45,18 @@
   }
   </script>
 
-  <!-- 背景樣式 -->
   <link rel="stylesheet" href="css/background.css" />
-  <!-- 首頁樣式 -->
   <link rel="stylesheet" href="css/home.css" />
-  <!-- 第二頁樣式 -->
   <link rel="stylesheet" href="css/select.css" />
-  <!-- 第三頁樣式 -->
   <link rel="stylesheet" href="css/integration.css" />
-  <!-- 第四頁樣式 -->
   <link rel="stylesheet" href="css/service.css" />
-  <!-- 第五頁樣式 -->
   <link rel="stylesheet" href="css/news.css" />
-  <!-- 第六頁樣式 -->
   <link rel="stylesheet" href="css/fee.css" />
 
-  <!-- Supabase JS v2 -->
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-  <!-- lemon squeeze -->
   <script src="https://app.lemonsqueezy.com/js/lemon.js" defer></script>
 </head>
 <body>
-  <!-- 🌌 粒子效果 -->
   <div class="particle"></div>
   <div class="particle"></div>
   <div class="particle"></div>
@@ -82,15 +66,12 @@
 <header class="top-logo">
   <div class="logo-text">懂才抱</div>
   <div class="auth-area" id="auth-area">
-      <!-- 未登入狀態下顯示 -->
       <button class="auth-btn" id="open-auth-panel">登入 / 註冊</button>
 
-      <!-- 登入後狀態下顯示（JS 動態塞內容） -->
       <div class="auth-user" id="auth-user" style="display:none;"></div>
       <button class="auth-btn" id="logout-btn" style="display:none;">登出</button>
     </div>
 </header>
-  <!-- ✨ 登入 / 註冊小面板 -->
 <div class="auth-panel" id="auth-panel">
   <h3>登入 / 註冊</h3>
   <div class="field">
@@ -114,7 +95,6 @@
   <div class="error" id="auth-error" style="display:none;"></div>
 </div>
 
-  <!-- 首頁內容 -->
   <section id="home">
       <div class="container">
           
@@ -215,7 +195,6 @@
   </section>
 
   
-  <!--第二頁服務內容-->
   <section id="service">
       <div class="container">
           <div class="subtitle">專業的股票分析服務</div>
@@ -245,7 +224,6 @@
       </button>
   </section>
 
-  <!--第三頁-->
   <section id="news">
     <div class="container">
       <div class="subtitle">追蹤你所感興趣的新聞</div>
@@ -281,7 +259,6 @@
   </section>
 
 
-  <!--第五頁-->
   <section id="fee">
     <div class="container">
       <h2>定價與服務</h2>
@@ -364,9 +341,7 @@
       </div>
     </div>
   </section>
-  <!--登入系統-->
   <script src="js/auth.js"></script>
-   <!--javascript 按鈕-->
   <script src="js/index.js"></script>
 </body>
 </html>
