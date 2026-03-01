@@ -43,7 +43,7 @@
       border: 1px solid #374151;
       background: #111827;
       color: #f9fafb;
-      box-sizing: border-box; /* 確保 padding 不會撐爆寬度 */
+      box-sizing: border-box;
     }
     .sidebar button {
       margin-top: 8px;
@@ -93,7 +93,7 @@
       padding: 2px 8px;
       font-size: 12px;
       background: #b91c1c;
-      width: auto; /* 移除按鈕這部分的全寬設定 */
+      width: auto;
     }
 
     .content {
@@ -122,7 +122,6 @@
       padding-bottom: 12px;
     }
     
-    /* ★ 2. 新增 Tab 按鈕樣式 */
     .tab-container {
       display: flex;
       gap: 10px;
@@ -149,13 +148,12 @@
       border-color: #4f46e5;
     }
 
-    /* 內容顯示區塊 */
     .view-section {
-      display: none; /* 預設隱藏 */
+      display: none;
       animation: fadeIn 0.3s ease-in-out;
     }
     .view-section.active {
-      display: block; /* 加上 active 類別才顯示 */
+      display: block;
     }
 
     @keyframes fadeIn {
@@ -163,7 +161,6 @@
       to { opacity: 1; transform: translateY(0); }
     }
 
-    /* Iframe 樣式 */
     iframe {
       width: 100%;
       height: 800px;
@@ -172,7 +169,6 @@
       background: #f9fafb;
     }
 
-    /* AI Summary 樣式 (Markdown 渲染後) */
     .summary-content {
       line-height: 1.8;
       color: #374151;
@@ -198,7 +194,6 @@
       margin-bottom: 8px;
     }
 
-    /* 狀態標籤 */
     .status-badge {
       display: inline-flex;
       align-items: center;
@@ -213,71 +208,54 @@
       background: #fff7ed;
       color: #c2410c;
     }
-    /* --- 📱 手機版 RWD 優化 --- */
+
 @media (max-width: 768px) {
-  /* 1. 將左右佈局改為上下堆疊 */
   .layout {
     grid-template-columns: 1fr; 
     display: block;
   }
-
-  /* 2. 側邊欄改為頂部選單感 */
   .sidebar {
     padding: 16px;
     border-bottom: 4px solid #4f46e5;
   }
-
-  /* 3. 股票清單改為「橫向滾動」或「按鈕組」，節省垂直空間 */
   .stock-list {
     display: flex;
     overflow-x: auto;
     gap: 8px;
     padding-bottom: 8px;
-    -webkit-overflow-scrolling: touch; /* 讓 iOS 滑動更順 */
+    -webkit-overflow-scrolling: touch;
   }
-
   .stock-item {
-    flex: 0 0 auto; /* 防止被擠壓 */
+    flex: 0 0 auto;
     margin-bottom: 0;
     min-width: 120px;
     flex-direction: column;
     align-items: flex-start;
     padding: 10px;
   }
-
   .stock-item button {
     margin-top: 8px;
     width: 100%;
   }
-
-  /* 4. 主內容區縮小內距 */
   .content {
     padding: 12px;
   }
-
   .dash-card {
     padding: 16px;
     min-height: auto;
   }
-
-  /* 5. 讓 Tab 按鈕更適合手指點擊 */
   .tab-container {
-    flex-direction: column; /* 手機上按鈕上下排或撐滿 */
+    flex-direction: column;
   }
-
   .tab-btn {
     width: 100%;
     text-align: center;
     padding: 12px;
     font-size: 16px;
   }
-
-  /* 6. Iframe 高度調整 */
   iframe {
-    height: 500px; /* 手機上不要太長 */
+    height: 500px;
   }
-
-  /* 7. 文字字體調整 */
   .summary-content {
     font-size: 15px;
   }
@@ -307,7 +285,6 @@
 </div>
 
 <script>
-  // ------- 1. 初始化 Supabase -------
   const supabaseUrl = "https://zlkexplsleznuebighte.supabase.co";
   const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpsa2V4cGxzbGV6bnVlYmlnaHRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0MzAwNjUsImV4cCI6MjA4MTAwNjA2NX0.HPVn3jcN88M4U3-RCVW-YO-b65rDOKv6pxEaVWwbm68";
   const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
@@ -317,16 +294,13 @@
   let currentUser = null;
   let currentPlan = "free";
   let currentLimit = 1;
-  // tracked: { id, symbol, status, report_url, summary }
   let tracked = [];
   let selectedStockId = null;
 
-  // ------- 2. 取得登入狀態 + 會員方案 -------
   async function init() {
     const { data: { session } } = await supabaseClient.auth.getSession();
     if (!session) {
       alert("請先登入後再使用財報追蹤功能");
-      // window.location.href = "login.html"; 
       return;
     }
     currentUser = session.user;
@@ -351,9 +325,7 @@
     await loadTrackedStocks();
   }
 
-  // ------- 3. 載入目前追蹤清單 -------
   async function loadTrackedStocks() {
-    // ★ 關鍵：記得多抓取 summary 欄位
     const { data, error } = await supabaseClient
       .from("tracked_stocks")
       .select("id, symbol, status, report_url, summary")
@@ -367,7 +339,6 @@
 
     tracked = data || [];
 
-    // 預設選第一筆
     if (tracked.length > 0) {
       if (!selectedStockId || !tracked.some(s => s.id === selectedStockId)) {
         selectedStockId = tracked[0].id;
@@ -411,20 +382,14 @@
     renderDashboards();
   }
 
-  // ------- ★ 4. 切換 Tab 的功能 -------
-  // 為了讓 HTML onclick 呼叫得到，掛在 window 上
   window.switchView = function(viewName) {
-    // 1. 處理按鈕樣式
     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
     document.getElementById(`btn-${viewName}`).classList.add('active');
 
-    // 2. 處理內容顯示
     document.querySelectorAll('.view-section').forEach(sec => sec.classList.remove('active'));
     document.getElementById(`view-${viewName}`).classList.add('active');
   }
 
-  // ------- 5. 右邊內容渲染邏輯 (主要修改處) -------
-  // 🎯 記得這裡要加上 async
 async function renderDashboards() {
     const container = document.getElementById("dashboards");
 
@@ -436,7 +401,6 @@ async function renderDashboards() {
     const s = tracked.find(item => item.id === selectedStockId);
     if (!s) { container.innerHTML = ""; return; }
 
-    // --- 狀態判斷 ---
     if (s.status === "pending") {
       container.innerHTML = `
         <div class="dash-card" style="text-align:center; padding: 60px;">
@@ -447,22 +411,16 @@ async function renderDashboards() {
       return;
     }
 
-    // --- 狀態為 ready 時的邏輯 ---
-    
-    // 🎯 核心修改：取得主站目前的 Session Token
     const { data: { session } } = await supabaseClient.auth.getSession();
     const accessToken = session?.access_token || "";
     const refreshToken = session?.refresh_token || "";
 
-    // 🎯 核心修改：將 Token 附加到 Iframe 網址後方
-    // 因為你的 report_url 已經有 ?symbol=TSLA，所以後面要用 & 連接
     const authenticatedUrl = s.report_url 
       ? `${s.report_url}&access_token=${accessToken}&refresh_token=${refreshToken}`
       : null;
 
     const summaryHtml = s.summary ? marked.parse(s.summary) : "<p>暫無文字摘要。</p>";
     
-    // 使用 authenticatedUrl 作為 iframe 的 src
     const iframeHtml = authenticatedUrl 
       ? `<iframe src="${authenticatedUrl}"></iframe>` 
       : `<div style="text-align:center; padding:40px; background:#f9fafb; border-radius:8px;">尚未連結圖表數據</div>`;
@@ -501,7 +459,6 @@ async function renderDashboards() {
     }
   }
 
-  // ------- 6. 新增與移除功能 -------
   async function addStock() {
     const input = document.getElementById("symbolInput");
     const symbolRaw = input.value.trim().toUpperCase();
@@ -512,7 +469,6 @@ async function renderDashboards() {
       return;
     }
 
-    // 關鍵修正：onConflict 必須包含兩個欄位
     const { error } = await supabaseClient
       .from("tracked_stocks")
       .upsert({
@@ -521,7 +477,7 @@ async function renderDashboards() {
         status: "pending", 
         summary: null
       }, { 
-        onConflict: 'user_id, symbol' // 這裡要改，對應你剛才在 SQL 建立的索引
+        onConflict: 'user_id, symbol'
       });
 
     if (error) {
