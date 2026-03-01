@@ -1,14 +1,12 @@
-/*首頁css樣式*/
-/* 讓整個首頁區塊佔滿螢幕高 */
 #home {
-  min-height: 100vh;               /* vh = viewport height, 100vh 代表 100% 視窗高度 */
-  display: flex;               /* 讓內容可以置中對齊 */
-  flex-direction: column;      
-  justify-content: center;     /* 垂直置中 */
-  align-items: center;         /* 水平置中 */
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
   position: relative;
-  overflow: hidden;            /* 避免背景動畫超出邊界 */
-  padding-top: 120px;  /* 視覺上看起來舒服即可，可微調 */
+  overflow: hidden;
+  padding-top: 120px;
 }
 
 #home .container {
@@ -20,7 +18,6 @@
   z-index: 1;
 }
 
-/*一個幫你省下時間的整合平台*/
 #home .subtitle {
   font-size: 70px;
   color: rgba(243, 103, 241, 0.7);
@@ -28,18 +25,14 @@
   margin-top: -40px;
   margin-bottom: 16px;
   text-transform: uppercase;
-  /* 🎨 核心：文字漸層設定 */
   background: linear-gradient(to right, #d8b9ff 0%, #ff77b7 100%);
-  -webkit-background-clip: text;      /* 將背景裁切到文字形狀 */
-  -webkit-text-fill-color: transparent; /* 讓文字本身透明，顯示背景漸層 */
-  background-clip: text;               /* 新瀏覽器標準支援 */
-  color: transparent;                  /* 保險用 */
-
-  /* 💫 額外細節：柔光陰影提升亮度層次 */
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  color: transparent;
   text-shadow: 0 2px 12px rgba(255, 120, 200, 0.25);
 }
 
-/* 內文段落 */
 #home .content{
   font-size: 17px;
   line-height: 1.45;
@@ -49,35 +42,29 @@
 #home .content p{ margin-bottom: 0px; }
 #home .highlight{ color:#f3f1f1; font-weight: 600; font-size: 20px;}
 
-
-
-
-/* 底部圓形 CTA 按鈕（向下箭頭） */
 #home .cta-button{
-  width: 40px; height: 40px; /*按鈕大小*/
-  border: 0; border-radius: 9999px;  /*移除預設邊框*/
-  display: inline-flex; align-items: center; justify-content: center; /*置中箭頭*/
-  background: radial-gradient(120% 120% at 30% 20%, #ff77b7 0%, #a78bfa 60%, #7c6ef6 100%);  /*放射漸層*/
-  box-shadow: 0 12px 36px rgba(135,110,255,.45);  /*模糊陰影*/
-  cursor: pointer; /*手指圖示*/
-  transition: transform .25s ease, box-shadow .25s ease, filter .25s ease;  /*滑鼠移入有平滑過度*/
+  width: 40px; height: 40px;
+  border: 0; border-radius: 9999px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: radial-gradient(120% 120% at 30% 20%, #ff77b7 0%, #a78bfa 60%, #7c6ef6 100%);
+  box-shadow: 0 12px 36px rgba(135,110,255,.45);
+  cursor: pointer;
+  transition: transform .25s ease, box-shadow .25s ease, filter .25s ease;
   margin-top: 0px;
 }
 #home .cta-button:hover{
-  transform: translateY(-3px) scale(1.06); /*滑鼠移去浮動變大*/
-  box-shadow: 0 18px 48px rgba(135,110,255,.6);  /*陰影變身*/
-  filter: brightness(1.05);  /*變亮*/
+  transform: translateY(-3px) scale(1.06);
+  box-shadow: 0 18px 48px rgba(135,110,255,.6);
+  filter: brightness(1.05);
 }
-#home .cta-button:active{ transform: scale(0.98); }   /*點下去縮小*/
-#home .cta-button svg{ width: 34px; height: 34px; fill: #fff; }  /*按鈕大小*/
+#home .cta-button:active{ transform: scale(0.98); }
+#home .cta-button svg{ width: 34px; height: 34px; fill: #fff; }
 
-
-/*三大財報追蹤頁面按鈕*/
 #home .btn {
   width: 230px; 
   height: 45px; 
   border: 1px solid #bcd6f1;
-  background: transparent;             
+  background: transparent;
   border-radius: 9999px;
   color: #bcd6f1;
   font-size: 18px;
@@ -101,91 +88,80 @@
   transform: scale(0.97);
 }
 
-
-/* 左上角 Header 區域 */
 .top-logo {
-  position: absolute;   /* 固定在畫面左上 */
+  position: absolute;
   top: 30px;
   left: 40px;
-  z-index: 1000;        /* 確保在最上層 */
+  z-index: 1000;
 }
 
-/* 左上角 Logo 文字 */
 .top-logo .logo-text {
   font-size: 25px;
   font-weight: 800;
   letter-spacing: 4px;
-
   background: linear-gradient(to bottom, #e6e0ff 0%, #b6a8e8 50%, #8b7ccc 100%);
-  background-clip: text;            /* 標準語法 */
-  -webkit-background-clip: text;    /* WebKit 語法 */
+  background-clip: text;
+  -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
+header.top-logo {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  padding: 16px 40px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 100;
+  background: linear-gradient(
+    to bottom,
+    rgba(10, 16, 40, 0.9),
+    transparent
+  );
+}
 
-/*登入按鈕*/
+.logo-text {
+  font-size: 20px;
+  font-weight: 700;
+  color: #ffffff;
+}
 
-  /* 讓上方 logo + 登入區塊變成一條水平列，固定在畫面最上方 */
-  header.top-logo {
-    position: fixed;      /* 固定在視窗頂部 */
-    top: 0;
-    left: 0;
-    width: 100%;
-    padding: 16px 40px;   /* 左右邊界可依喜好調整 */
-    display: flex;
-    justify-content: space-between; /* 左右兩邊拉開：左 logo、右登入 */
-    align-items: center;            /* 垂直置中 */
-    z-index: 100;                   /* 蓋在最上層，避免被其他區塊遮住 */
-    background: linear-gradient(
-      to bottom,
-      rgba(10, 16, 40, 0.9),
-      transparent
-    ); /* 上方做一點漸層，不會突兀 */
-  }
+.auth-area {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
 
-  .logo-text {
-    font-size: 20px;
-    font-weight: 700;
-    color: #ffffff;
-  }
+.auth-btn {
+  padding: 6px 14px;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: transparent;
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 13px;
+  backdrop-filter: blur(4px);
+}
 
-  /* 右上登入區塊：水平排版 */
-  .auth-area {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 13px;
-  }
+.auth-btn.primary {
+  background: #4f46e5;
+  border-color: #4f46e5;
+}
 
-  .auth-btn {
-    padding: 6px 14px;
-    border-radius: 9999px;
-    border: 1px solid rgba(255, 255, 255, 0.4);
-    background: transparent;
-    color: #ffffff;
-    cursor: pointer;
-    font-size: 13px;
-    backdrop-filter: blur(4px);
-  }
+.auth-user {
+  color: #e5e7eb;
+  font-size: 13px;
+}
 
-  .auth-btn.primary {
-    background: #4f46e5;
-    border-color: #4f46e5;
-  }
-
-  .auth-user {
-    color: #e5e7eb;
-    font-size: 13px;
-  }
-
-  /* 登入小面板的位置：對齊右上角 header */
-  /* 右上登入卡片整體樣式 */
 .auth-panel {
   position: fixed;
   top: 80px;
   right: 40px;
   width: 320px;
-  background: rgba(15, 23, 42, 0.96); /* 深藍半透明，搭配背景 */
+  background: rgba(15, 23, 42, 0.96);
   border-radius: 18px;
   padding: 18px 18px 14px;
   box-shadow: 0 20px 45px rgba(0, 0, 0, 0.65);
@@ -207,7 +183,6 @@
   color: #e5e7eb;
 }
 
-/* 表單欄位區 */
 .auth-panel .field {
   margin-bottom: 10px;
 }
@@ -240,7 +215,6 @@
   box-shadow: 0 0 0 1px rgba(168, 85, 247, 0.5);
 }
 
-/* 登入 / 註冊按鈕列 */
 .auth-panel .panel-actions {
   display: flex;
   gap: 8px;
@@ -257,21 +231,18 @@
   font-weight: 500;
 }
 
-/* 左邊：登入（深色主按鈕） */
 .auth-panel .btn-login {
   background: linear-gradient(135deg, #6366f1, #a855f7);
   color: #f9fafb;
   box-shadow: 0 10px 25px rgba(99, 102, 241, 0.35);
 }
 
-/* 右邊：註冊（外框次要按鈕） */
 .auth-panel .btn-signup {
   background: transparent;
   color: #e5e7eb;
   border: 1px solid rgba(148, 163, 184, 0.8);
 }
 
-/* 提示 / 錯誤訊息 */
 .auth-panel .hint {
   margin-top: 8px;
   font-size: 11px;
@@ -285,7 +256,6 @@
   color: #fecaca;
 }
 
-/* 右上角的「登入 / 註冊」按鈕也順便調整一下質感 */
 .auth-area {
   display: flex;
   align-items: center;
@@ -315,25 +285,15 @@
   font-size: 13px;
 }
 
-
-/* 預設隱藏手機版專用組件，確保電腦看不到 */
 .mobile-hero-layout, .mountain-bg {
     display: none;
 }
 
-/* 這裡保留你原本設定好的電腦版標題、按鈕等 CSS ... (如 .subtitle, .btn) */
-
-/* ==========================================
-   2. 手機版專屬 (螢幕 768px 以下才生效)
-   ========================================== */
 @media screen and (max-width: 768px) {
-    
-    /* 🛑 徹底關閉電腦版原本的容器 */
     .pc-layout, .cta-button {
         display: none !important;
     }
 
-    /* 🟢 啟動手機版仿財報狗佈局 */
     .mobile-hero-layout {
         display: flex !important;
         flex-direction: column;
@@ -343,7 +303,6 @@
     }
 
     #home {
-        /* 背景換成財報狗藍綠漸層 */
         background: linear-gradient(180deg, #0093E9 0%, #27ae60 100%) !important;
         justify-content: flex-start !important;
         padding-top: 100px !important;
@@ -352,7 +311,6 @@
     .hero-brand h2 { font-size: 28px; line-height: 1.3; margin-top: 10px; }
     .brand-logo { font-size: 50px; }
 
-    /* 搜尋框 */
     .mobile-search-bar {
         background: white;
         width: 90%;
@@ -365,7 +323,6 @@
     .mobile-search-bar input { border: none; flex: 1; height: 44px; outline: none; font-size: 16px; color: #333; }
     .mobile-search-bar button { background: transparent; border: none; font-size: 20px; }
 
-    /* 熱門標籤 */
     .tag {
         background: rgba(255, 255, 255, 0.2);
         color: white;
@@ -376,7 +333,6 @@
         display: inline-block;
     }
 
-    /* 山脈裝飾 */
     .mountain-bg {
         display: block !important;
         position: absolute;

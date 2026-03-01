@@ -270,7 +270,6 @@ body{
 }
 .insight li{ margin: 6px 0; }
 
-/* Charts */
 .chartGrid{
     display:grid;
     grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -293,7 +292,6 @@ body{
     height: 220px;
 }
 
-/* Health Check（自成一格，放在趨勢下面） */
 .healthCard{
     padding: 16px;
     border-radius: 18px;
@@ -341,7 +339,6 @@ body{
     opacity: .95;
 }
 
-/* Health 專用 pill（避免污染全域 .pill） */
 .hpill{
     font-size: 12px;
     padding: 4px 10px;
@@ -371,17 +368,15 @@ body{
     opacity: .92;
 }
 
-/* 指標解釋 Tooltip 主體 */
 .item-help {
     position: relative;
     cursor: help;
-    border-bottom: 1px dotted var(--muted); /* 加上點狀底線提示可互動 */
+    border-bottom: 1px dotted var(--muted);
     display: inline-block;
 }
 
-/* Tooltip 彈出視窗 */
 .item-help::before {
-    content: attr(data-tip); /* 取得標籤上的描述文字 */
+    content: attr(data-tip);
     position: absolute;
     bottom: 125%;
     left: 50%;
@@ -404,7 +399,6 @@ body{
     text-align: left;
 }
 
-/* Tooltip 小箭頭 */
 .item-help::after {
     content: "";
     position: absolute;
@@ -419,7 +413,6 @@ body{
     transition: all 0.2s ease;
 }
 
-/* 滑鼠懸停顯示 */
 .item-help:hover::before,
 .item-help:hover::after {
     opacity: 1;

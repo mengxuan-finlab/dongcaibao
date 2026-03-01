@@ -1,16 +1,15 @@
-/* 版面容器 */
 #fee {
-  height: 100vh;                /* 讓整個區塊佔滿視窗高度 */
-  display: flex;                /* 啟用 flex 排版（方便垂直與水平置中） */
-  justify-content: center;      /* 垂直方向置中所有內容 */
-  align-items: center;          /* 水平方向置中所有內容 */
-  flex-direction: column;       /* 內容由上往下排列（主標題 → 三欄） */
-  text-align: center;           /* 文字置中 */
-  color: rgba(255,255,255,0.9); /* 字體顏色（微透明白） */
-  padding: 80px 40px;           /* 上下左右留白（避免內容太擠） */
-  box-sizing: border-box;       /* 包含 padding 在內的寬高計算 */
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+  text-align: center;
+  color: rgba(255,255,255,0.9);
+  padding: 80px 40px;
+  box-sizing: border-box;
 }
-/* 區塊標題(定價與服務) */
+
 #fee h2{
   text-align: center;
   font-size: 45px;
@@ -21,83 +20,85 @@
   margin-bottom: 50px;
 }
 
-
-/* ========== 卡片格線 ========== */
 .fee-grid{
   display: grid;
-  grid-template-columns: 1fr 1fr; /* 雙欄 */
+  grid-template-columns: 1fr 1fr;
   gap: 28px;
 }
 
-/* ========== 卡片 ========== */
 .fee-item{
-  border: 1px solid rgba(224, 206, 206, 0.3); /* 實線框 */
+  border: 1px solid rgba(224, 206, 206, 0.3);
   border-radius: 18px;
   padding: 50px 75px 50px;
 }
 
-/* 卡片內標題與說明(股票資訊整合、新聞追蹤) */
 .fee-title{
   font-size: 25px;
   color: var(--text);
   margin: -30px 0 6px;
 }
-/*單次交付 持續追蹤*/
+
 .muted{
   color: var(--muted);
   font-size: 18px;
   margin: 10px 0 18px;
 }
 
-/* 價格盒（虛線邊或淡底都可二選一） */
 .price-card{
   border: 1px solid rgba(255,255,255,0.9);
   border-radius: 12px;
   padding: 14px 16px;
   margin-bottom: 18px;
 }
+
 .price-row{
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
 }
+
 .price-row .label{
   font-weight: 600;
   color: var(--text);
 }
+
 .price-row .value{
   display: inline-flex;
   align-items: baseline;
   gap: 6px;
 }
+
 .money{
   font-size: 28px;
   font-weight: 800;
   color: var(--text);
   letter-spacing: .5px;
 }
+
 .unit{
   color: var(--muted);
   font-size: 14px;
 }
 
-/* 特色列表 */
 .feature-list{
   list-style: none;
   padding: 0;
   margin: 0 0 16px;
 }
+
 .feature-list li + li{
-  margin-top: 12px;              /* 條目間距 */
+  margin-top: 12px;
   padding-top: 12px;
   border-top: 1px solid var(--line);
 }
+
 .feature-list h4{
   font-size: 20px;
   margin: 0 0 4px;
   color: var(--text);
 }
+
 .feature-list p{
   color: var(--muted);
   font-size: 16px;
@@ -105,72 +106,57 @@
   margin: 0;
 }
 
-/* ===================== CTA 區 ===================== */
-/* 負責排列下方的「按鈕列」，例如「購買一次分析 $500」或「訂閱新聞追蹤」 */
 .cta-row {
-  margin-top: 12px;    /* 與上方內容的距離（上下間距） */
-  display: flex;       /* 使用 flex 讓按鈕橫向排列 */
-  gap: 12px;           /* 按鈕之間的間距（空隙） */
-  justify-content: center;  /* 讓按鈕水平置中 */
+  margin-top: 12px;
+  display: flex;
+  gap: 12px;
+  justify-content: center;
 }
 
-/* ===================== 按鈕基本樣式 ===================== */
 .btn {
-  display: inline-flex;               /* 讓按鈕內文字可垂直與水平置中 */
-  align-items: center;                /* 垂直置中（flex 交叉軸） */
-  justify-content: center;            /* 水平置中 */
-  white-space: nowrap;                /* 防止文字自動換行 */
-  border-radius: 10px;                /* 圓角按鈕（越大越圓） */
-  padding: 12px 18px;                 /* 內距：上下12px、左右18px */
-  font-weight: 700;                   /* 粗體字讓文字更醒目 */
-  letter-spacing: .2px;               /* 字距微調 */
-  text-decoration: none;              /* 移除超連結底線 */
-  transition: 
-    transform .15s ease,              /* 點擊或滑鼠移入的移動效果 */
-    box-shadow .2s ease,              /* 陰影平滑變化 */
-    filter .2s ease;                  /* 亮度變化的平滑過渡 */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  border-radius: 10px;
+  padding: 12px 18px;
+  font-weight: 700;
+  letter-spacing: .2px;
+  text-decoration: none;
+  transition: transform .15s ease, box-shadow .2s ease, filter .2s ease;
 }
 
-/* ===================== 主要按鈕（深色款） ===================== */
 .btn-primary {
   background: linear-gradient(180deg, var(--accent), var(--accent-2)); 
-  /* 從上到下的漸層顏色，使用網站副色 */
-  color: #fff;                        /* 白色文字 */
-  box-shadow: 0 8px 22px rgba(155, 236, 247, 0.301); /* 柔和陰影，增加浮起感 */
+  color: #fff;
+  box-shadow: 0 8px 22px rgba(155, 236, 247, 0.301);
 }
 
-/* 滑鼠移到主要按鈕時的效果 */
 .btn-primary:hover {
-  filter: brightness(1.05);           /* 整體變亮5%（hover 時有光感） */
-  transform: translateY(-1px);        /* 向上微浮 1px，看起來有互動性 */
+  filter: brightness(1.05);
+  transform: translateY(-1px);
 }
 
-/* ===================== 次要按鈕（漸層亮色款） ===================== */
 .btn-accent {
   background: linear-gradient(180deg, var(--accent), var(--accent-2)); 
-  /* 從上到下的漸層顏色，使用網站副色 */
-  color: #fff;                        /* 白色文字 */
-  box-shadow: 0 10px 26px rgba(124,110,246,.35); /* 紫色柔光陰影 */
+  color: #fff;
+  box-shadow: 0 10px 26px rgba(124,110,246,.35);
 }
 
-/* 滑鼠移到漸層按鈕時的效果 */
 .btn-accent:hover {
-  filter: brightness(1.06);           /* 提亮 6%，顏色更飽和 */
-  transform: translateY(-1px);        /* 同樣浮起效果 */
+  filter: brightness(1.06);
+  transform: translateY(-1px);
 }
 
-
-/* ========== 響應式 ========== */
 @media (max-width: 960px){
-  .fee-grid{ grid-template-columns: 1fr; }  /* 單欄 */
+  .fee-grid{ grid-template-columns: 1fr; }
   #fee{ padding: 48px 16px 72px; }
 }
+
 @media (max-width: 420px){
   .money{ font-size: 26px; }
-  .btn{ width: 100%; }                     /* 手機讓按鈕滿寬 */
+  .btn{ width: 100%; }
 }
-
-
 
 .feature-list li { text-align: left; }
 
@@ -201,61 +187,48 @@
   background: rgba(130,110,255,.20);
   border-color: rgba(130,110,255,.35);
 }
-/* --- 📱 手機版專屬樣式 (max-width: 768px) --- */
-@media (max-width: 768px) {
 
+@media (max-width: 768px) {
   #fee {
-    /* ❌ 刪除或覆蓋原本的 height: 100vh */
     height: auto !important; 
-    
-    /* ✅ 改用 min-height，讓內容多時可以正常往下長，滾動才會順 */
     min-height: 100vh; 
-    
-    /* 增加頂部留白防止被 Header 遮擋，並給底部一點收尾空間 */
     padding: 100px 20px 80px; 
-    
-    /* 確保 flex 不會強制壓縮卡片高度 */
     display: block; 
   }
 
-  /* 2. 標題調整 */
   #fee h2 {
     font-size: 32px;
     margin-bottom: 40px;
   }
 
-  /* 3. 卡片容器：改用 Flex 垂直排列，最不會有跳格感 */
   .fee-grid {
     display: flex;
-    flex-direction: column;      /* 垂直排列 */
-    gap: 30px;                   /* 增加卡片間距 */
+    flex-direction: column;
+    gap: 30px;
     width: 100%;
-    max-width: 480px;            /* 防止卡片在寬手機上太寬 */
-    margin: 0 auto;              /* 居中容器 */
+    max-width: 480px;
+    margin: 0 auto;
   }
 
-  /* 4. 卡片內容優化 */
   .fee-item {
-    padding: 40px 24px;          /* 調整內距 */
+    padding: 40px 24px;
     width: 100%;
-    height: auto !important;     /* 確保卡片高度隨內容長高 */
+    height: auto !important;
     box-sizing: border-box;
   }
 
-  /* 5. 方案標題與價格 */
   .fee-title {
     font-size: 24px;
-    margin-top: 0;               /* 取消電腦版的負間距 */
+    margin-top: 0;
     margin-bottom: 10px;
   }
   
   .money {
-    font-size: 28px;             /* 價格在手機上要夠大 */
+    font-size: 28px;
   }
 
-  /* 6. 特色列表優化 */
   .feat-head {
-    flex-wrap: wrap;             /* 防止標題與 Badge 撞在一起 */
+    flex-wrap: wrap;
     gap: 8px;
   }
 
@@ -263,7 +236,6 @@
     font-size: 17px;
   }
 
-  /* 7. 按鈕優化 */
   .cta-row {
     width: 100%;
     margin-top: 25px;
@@ -271,7 +243,7 @@
 
   .btn {
     width: 100%;
-    height: 56px;                /* 稍微加高，更好按 */
+    height: 56px;
     font-size: 17px;
     font-weight: 700;
   }

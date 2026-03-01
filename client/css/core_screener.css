@@ -6,7 +6,7 @@
 
 body {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  background:  rgba(3, 15, 22, 0.95);
+  background: rgba(3, 15, 22, 0.95);
   color: #f3f4f5;
   min-height: 100vh;
   padding: 24px 16px 40px;
@@ -129,7 +129,6 @@ tr:hover {
   color: #f97373; 
 }
 
-/* === 一鍵策略按鈕列 === */
 .preset-bar {
   margin: 8px 0 4px;
   display: flex;
@@ -154,27 +153,16 @@ tr:hover {
   transform: translateY(-1px);
 }
 
-/* 搜尋區塊樣式 */
 .header-row {
   display: flex;
-  
-  /* ★ 關鍵修改 1：原本是 space-between，改成 flex-start (靠左對齊) */
   justify-content: flex-start; 
-  
-  /* ★ 關鍵修改 2：讓搜尋框跟標題底部對齊，或是改成 center 垂直置中 */
   align-items: flex-end; 
-  
   margin-bottom: 24px;
   flex-wrap: wrap;
-  
-  /* ★ 關鍵修改 3：設定標題跟搜尋框之間的距離 (原本 16px，可以稍微加大一點) */
   gap: 30px; 
-  
-  /* 如果之前有加 margin-top 負值，可以保留或調整 */
   margin-top: -10px; 
 }
 
-/* 調整搜尋區塊樣式，讓它小巧精緻一點 */
 .search-section {
   display: flex;
   gap: 8px;
@@ -199,28 +187,26 @@ tr:hover {
   color: white;
   font-size: 14px;
   cursor: pointer;
-  white-space: nowrap; /* 防止文字換行 */
+  white-space: nowrap;
 }
 
 .search-section button:hover {
   background-color: #1d4ed8;
 }
-/* --- Filters Container (外層容器) --- */
+
 .filters-container {
   display: flex;
   flex-direction: column;
-  gap: 12px; /* 區塊間距縮小 */
-  padding: 15px; /* 內距縮小 */
+  gap: 12px;
+  padding: 15px;
   background-color: #1a202c; 
   border-radius: 8px;
   margin-bottom: 20px;
-  /* 限制最大寬度，避免在超寬螢幕被拉得太長 */
   max-width: 1400px; 
   margin-left: auto;
   margin-right: auto;
 }
 
-/* --- Filter Section (每一大類) --- */
 .filter-section {
   border-bottom: 1px solid #2d3748;
   padding-bottom: 10px;
@@ -232,10 +218,9 @@ tr:hover {
   margin-bottom: 0;
 }
 
-/* 小標題樣式 (更緊湊) */
 .section-title {
   color: #63b3ed;
-  font-size: 0.95rem; /* 字體縮小 */
+  font-size: 0.95rem;
   margin-bottom: 8px;
   font-weight: 600;
   display: flex;
@@ -243,41 +228,36 @@ tr:hover {
   gap: 6px;
 }
 
-/* --- Filters Container --- */
 .filters-container {
   display: flex;
   flex-direction: column;
   gap: 10px;
   padding: 10px;
-  /* 背景透明化一點，或是保持深色塊 */
   background-color: transparent; 
   margin-bottom: 20px;
 }
 
-/* --- Filter Section (摺疊區塊) --- */
 .filter-section {
-  background-color: #1a202c; /* 深色背景 */
+  background-color: #1a202c;
   border-radius: 8px;
-  overflow: hidden; /* 確保圓角不被內容切斷 */
+  overflow: hidden;
   border: 1px solid #2d3748;
 }
 
-/* --- Header (點擊觸發區) --- */
 .section-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 12px 15px;
-  cursor: pointer; /* 讓滑鼠變成手指 */
-  background-color: #2d3748; /* 比內容區稍亮一點的顏色 */
+  cursor: pointer;
+  background-color: #2d3748;
   transition: background-color 0.2s;
 }
 
 .section-header:hover {
-  background-color: #4a5568; /* 滑鼠懸停變亮 */
+  background-color: #4a5568;
 }
 
-/* 標題文字 */
 .section-title {
   margin: 0;
   color: #63b3ed;
@@ -288,47 +268,39 @@ tr:hover {
   gap: 8px;
 }
 
-/* 箭頭圖示 */
 .toggle-icon {
   color: #a0aec0;
   font-size: 0.8rem;
   transition: transform 0.3s;
 }
 
-/* 當區塊展開時，箭頭旋轉 */
 .filter-section.active .toggle-icon {
   transform: rotate(180deg);
 }
 
-/* --- Content (內容區) --- */
 .section-content {
-  display: none; /* 預設隱藏！這是關鍵 */
+  display: none;
   padding: 15px;
   background-color: #1a202c;
   border-top: 1px solid #2d3748;
 }
 
-/* 當區塊有 active class 時，顯示內容 */
 .filter-section.active .section-content {
   display: block;
   animation: slideDown 0.3s ease-out;
 }
 
-/* 下拉動畫 (選用) */
 @keyframes slideDown {
   from { opacity: 0; transform: translateY(-5px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* --- Filter Grid (內容排版) --- */
 .filter-grid {
   display: grid;
-  /* 手機 2欄，電腦自動填滿 (最小 120px) */
   grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
   gap: 12px;
 }
 
-/* --- Filter Group --- */
 .filter-group {
   display: flex;
   flex-direction: column;
@@ -354,7 +326,6 @@ tr:hover {
   border-color: #63b3ed;
 }
 
-/* --- Preset Section (快速策略區) --- */
 .preset-section {
   background-color: #1a202c;
   padding: 10px 15px;
@@ -367,7 +338,7 @@ tr:hover {
 }
 
 .preset-label {
-  color: #ecc94b; /* 黃色文字提示 */
+  color: #ecc94b;
   font-weight: bold;
   font-size: 0.9rem;
 }
@@ -394,13 +365,12 @@ tr:hover {
   transform: translateY(-2px);
 }
 
-/* 讓被選中的策略按鈕變紅色 */
 .preset-btn.active {
   background-color: #ff4d4d; 
   color: white;
   border-color: #ff4d4d;
 }
-/* 被策略選中的選單組，顯示亮色外框 */
+
 .filter-group.filter-active {
     border: 1px solid #ff4d4d !important;
     background: rgba(255, 77, 77, 0.05);
@@ -414,29 +384,23 @@ tr:hover {
     font-weight: bold;
 }
 
-/* 控制摺疊選單展開的邏輯 (確保 active class 有效) */
 .filter-section.active .section-content {
-    display: block !important; /* 或是使用你的 max-height 動畫 */
+    display: block !important;
 }
 
 .filter-section.active .toggle-icon {
     transform: rotate(180deg);
 }
 
-/* =============================================
-   懂才抱．選股器手機版終極優化 (整合版)
-   ============================================= */
 @media (max-width: 768px) {
-  /* 關閉手機版的毛玻璃效果，減輕 GPU 負擔 */
   .filter-section, .hero-actions .btn {
     backdrop-filter: none !important;
     background: rgba(30, 41, 59, 0.95) !important;
   }
   
-  /* 1. 標題與搜尋區塊：改為垂直排列並撐滿螢幕 */
   .header-row {
     flex-direction: column !important;
-    align-items: stretch !important; /* 讓內容水平撐滿 */
+    align-items: stretch !important;
     gap: 15px !important;
     margin-top: 0 !important;
   }
@@ -448,32 +412,30 @@ tr:hover {
   }
 
   .search-section input {
-    flex: 1 !important; /* 輸入框佔滿剩餘寬度 */
+    flex: 1 !important;
     width: auto !important;
-    height: 44px !important; /* 符合手指點擊高度 */
+    height: 44px !important;
   }
 
-  /* 2. 快速策略：改為「橫向捲動列」，不再佔據垂直空間 */
   .preset-bar {
     display: flex !important;
-    flex-wrap: nowrap !important; /* 強制不換行 */
-    overflow-x: auto !important; /* 開啟橫向滑動 */
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
     padding: 5px 0 15px !important;
     gap: 10px !important;
-    -webkit-overflow-scrolling: touch; /* iOS 滑動優化 */
+    -webkit-overflow-scrolling: touch;
   }
 
   .preset-btn {
-    flex-shrink: 0 !important; /* 防止按鈕被壓扁 */
+    flex-shrink: 0 !important;
     padding: 8px 16px !important;
     font-size: 14px !important;
   }
   
   .preset-bar::-webkit-scrollbar {
-    display: none; /* 隱藏捲軸讓畫面更乾淨 */
+    display: none;
   }
 
-  /* 3. 篩選網格：改為一排兩個，方便點選 */
   .filter-grid {
     grid-template-columns: 1fr 1fr !important;
     gap: 12px !important;
@@ -484,9 +446,8 @@ tr:hover {
     font-size: 14px !important;
   }
 
-  /* 4. 數據表格：橫向滑動 + 釘住股票代號 */
   .container {
-    overflow-x: hidden; /* 防止整個網頁左右晃動 */
+    overflow-x: hidden;
   }
   
   table {
@@ -496,13 +457,12 @@ tr:hover {
     -webkit-overflow-scrolling: touch;
   }
 
-  /* 核心黑科技：釘住第一欄（股票代號） */
   th:first-child, td:first-child {
     position: sticky !important;
     left: 0 !important;
     z-index: 10 !important;
-    background-color: #1a202c !important; /* 確保滑動時背景不透明 */
-    box-shadow: 2px 0 5px rgba(0,0,0,0.5); /* 增加層次感 */
+    background-color: #1a202c !important;
+    box-shadow: 2px 0 5px rgba(0,0,0,0.5);
   }
 
   th, td {
