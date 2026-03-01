@@ -9,27 +9,18 @@
   <meta name="keyword" content="股票,財報狗,資訊整合平台">
   <meta name="author" content="小炫">
 
-  <!-- 背景樣式 -->
   <link rel="stylesheet" href="css/background_integration.css">
-
-  <!--內文css-->
   <link rel="stylesheet" href="css/content.css">
-  <!-- 轉換 Markdown → HTML -->
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-
-  <!-- ★ 新增：Supabase JS SDK v2 -->
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 
-  <!-- ★ 新增：簡單 modal 樣式 -->
   <style>
-    /* ★ 新增：使用次數資訊區塊 */
     #usageInfo {
       margin-top: 8px;
       font-size: 14px;
       color: #ede7f3;
     }
 
-    /* ★ 新增：Modal 外層容器 */
     .dc-modal {
       position: fixed;
       inset: 0;
@@ -94,15 +85,12 @@
   <input id="symbolInput" type="text" placeholder="例如：HIMS 或 NVDA" />
   <button id="fetchBtn">產生公司介紹</button>
 
-  <!-- ★ 新增：顯示本週使用次數 / 方案 -->
   <p id="usageInfo"></p>
-
   <p id="debug"></p>
-
 
   <div id="result"></div>
   <div id="chatContainer" style="display:none; margin-top: 30px; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; background: rgba(255,255,255,0.05);">
-  <h3 style="color: #8b5cf6;">💡 深度追問 AI 分析師</h3>
+  <h3 style="color: #8b5cf6;">深度追問 AI 分析師</h3>
   <div id="chatHistory" style="max-height: 300px; overflow-y: auto; margin-bottom: 15px; font-size: 14px;"></div>
   
   <div style="display: flex; gap: 10px;">
@@ -111,7 +99,6 @@
   </div>
 </div>
 
-  <!-- ★ 新增：Modal 結構 -->
   <div id="planModal" class="dc-modal">
     <div class="dc-modal-backdrop" id="planModalBackdrop"></div>
     <div class="dc-modal-content">
@@ -124,26 +111,20 @@
   </div>
 
   <script>
-  // ============================
-  // ★ 設定區
-  // ============================
   const BACKEND_URL = "https://dongcaibao.onrender.com/api/analyze-stock";
 
   const supabaseUrl = "https://zlkexplsleznuebighte.supabase.co";
   const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpsa2V4cGxzbGV6bnVlYmlnaHRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0MzAwNjUsImV4cCI6MjA4MTAwNjA2NX0.HPVn3jcN88M4U3-RCVW-YO-b65rDOKv6pxEaVWwbm68";
   const supabaseClient = supabase.createClient(supabaseUrl, supabaseAnonKey);
-  let currentSearchContext = ""; // 存儲搜尋背景
-  let currentSymbol = "";        // 存儲當前代碼
-  // 顯示用的方案限制 (僅供顯示，實際限制在後端執行)
+  let currentSearchContext = "";
+  let currentSymbol = "";
+  
   const PLAN_LIMIT = {
     free: 2,
     plus: 10,
     pro: Infinity
   };
 
-  // ============================
-  // ★ Modal UI 操作
-  // ============================
   const planModal = document.getElementById("planModal");
   const planModalBackdrop = document.getElementById("planModalBackdrop");
   const planModalClose = document.getElementById("planModalClose");
@@ -161,9 +142,6 @@
   planModalClose.addEventListener("click", hidePlanModal);
   planModalBackdrop.addEventListener("click", hidePlanModal);
 
-  // ============================
-  // ★ 讀取使用者資訊與方案 (僅供顯示用)
-  // ============================
   async function getCurrentUserPlan() {
     const { data: { user } } = await supabaseClient.auth.getUser();
     if (!user) return { user: null, plan: null };
@@ -196,7 +174,6 @@
     const usageInfoEl = document.getElementById("usageInfo");
     if (!usageInfoEl || !user) return;
 
-    // ★ 必須重複定義這一段，因為這是一個新的函數房間
     const startOfWeek = new Date();
     startOfWeek.setHours(0, 0, 0, 0);
     startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
@@ -206,13 +183,12 @@
     
     const used = await getWeeklyUsage(user.id);
 
-    // 查詢對話次數
     const { count: chatUsed } = await supabaseClient
       .from("usage_logs")
       .select("*", { count: 'exact', head: true })
       .eq("user_id", user.id)
       .eq("action", "chat_query")
-      .gte("created_at", startOfWeek.toISOString()); // 如果上面沒定義，程式會死在這裡
+      .gte("created_at", startOfWeek.toISOString());
 
     const chatLimit = (plan === 'pro') ? "無限" : (plan === 'plus' ? 20 : 5);
     
@@ -223,99 +199,80 @@
     `;
   }
 
-  // 頁面載入時更新一次資訊
   window.addEventListener("DOMContentLoaded", async () => {
     const { user, plan } = await getCurrentUserPlan();
     await updateUsageInfo(user, plan);
   });
 
-  // ============================
-  // ★ 主要功能：呼叫後端 API
-  // ============================
   document.getElementById("fetchBtn").addEventListener("click", async () => {
     const debugEl = document.getElementById("debug");
     const resultEl = document.getElementById("result");
     const symbolInput = document.getElementById("symbolInput");
     
-    // 1. 檢查輸入
     const symbol = symbolInput.value.trim().toUpperCase();
     if (!symbol) {
       alert("請輸入股票代碼！");
       return;
     }
 
-    // 2. 檢查登入 (取得 Session Token)
     const { data: { session } } = await supabaseClient.auth.getSession();
     if (!session) {
       alert("請先登入才能使用產生公司介紹功能。");
       return;
     }
 
-    // 3. UI 狀態更新
     debugEl.textContent = "查詢中…正在分析數據...";
     resultEl.innerHTML = "<p>正在生成公司報告，請稍候...(約 15-30 秒)</p>";
 
     try {
-      // 4. 發送請求給後端
       const response = await fetch(BACKEND_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${session.access_token}` // ★ 關鍵：把 Token 傳給後端
+          "Authorization": `Bearer ${session.access_token}`
         },
         body: JSON.stringify({ symbol: symbol })
       });
 
       const data = await response.json();
 
-      // 5. 錯誤處理
       if (!response.ok) {
-        // 如果後端回傳 403，代表額度滿了
         if (response.status === 403) {
           showPlanModal(data.error || "已達本週使用上限，請升級方案。");
           debugEl.textContent = "已達使用上限 ⛔";
           resultEl.innerHTML = "";
           return;
         }
-        // 其他錯誤 (401, 500 等)
         throw new Error(data.error || "伺服器發生錯誤");
       }
       
-
-      // --- ★ 修改開始：判斷方案並套用樣式 ---
-      const resultEl = document.getElementById("result");
+      const resultElement = document.getElementById("result");
 
       if (data.plan === 'pro') {
-          resultEl.classList.add("pro-report-style"); // 套用金色樣式
+          resultElement.classList.add("pro-report-style");
       } else {
-          resultEl.classList.remove("pro-report-style"); // 移除樣式 (避免上次查詢殘留)
+          resultElement.classList.remove("pro-report-style");
       }
 
-      // 渲染結果
       const htmlContent = marked.parse(data.text);
-      resultEl.innerHTML = htmlContent;
-      // ★ 新增：存下搜尋背景與代碼，並顯示對話框
+      resultElement.innerHTML = htmlContent;
       currentSearchContext = data.searchContext; 
       currentSymbol = symbol;
       document.getElementById("chatContainer").style.display = "block";
-      document.getElementById("chatHistory").innerHTML = ""; // 清空上次對話
-      // --- ★ 修改結束 ---
+      document.getElementById("chatHistory").innerHTML = "";
 
       debugEl.textContent = "查詢完成 ✔";
 
-      // 7. 更新介面上的使用次數 (重新抓一次資料庫)
       const { user, plan } = await getCurrentUserPlan();
       await updateUsageInfo(user, plan);
 
     } catch (err) {
       console.error(err);
-      debugEl.textContent = "❌ 錯誤：" + err.message;
+      debugEl.textContent = "錯誤：" + err.message;
       resultEl.innerHTML = `<p style='color:red'>發生錯誤，請確認後端是否已啟動。</p>`;
     }
   });
-  // ============================
-  // ★ 新增：AI 對話提問功能
-  // ============================
+
   document.getElementById("sendChatBtn").addEventListener("click", async () => {
     const chatInput = document.getElementById("chatInput");
     const chatHistory = document.getElementById("chatHistory");
@@ -323,11 +280,9 @@
 
     if (!userQuery) return;
 
-    // 1. 顯示使用者提問
     chatHistory.innerHTML += `<div style="margin-bottom:10px; color:#fff;"><strong>👤 您：</strong>${userQuery}</div>`;
     chatInput.value = "";
 
-    // 2. 建立 AI 回答的容器 (先放一個空的區域)
     const aiMsgId = "ai-" + Date.now();
     chatHistory.innerHTML += `
       <div style="margin-bottom:20px; padding-left:10px; border-left:3px solid #8b5cf6; color:#ede7f3;">
@@ -358,11 +313,10 @@
         throw new Error(errorData.error || "對話失敗");
       }
 
-      // ★ 關鍵：串流讀取邏輯
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let fullContent = "";
-      aiDisplayEl.innerHTML = ""; // 清除「思考中」文字
+      aiDisplayEl.innerHTML = "";
 
       while (true) {
         const { done, value } = await reader.read();
@@ -371,18 +325,16 @@
         const chunk = decoder.decode(value, { stream: true });
         fullContent += chunk;
         
-        // 即時渲染 Markdown 並更新畫面
         aiDisplayEl.innerHTML = marked.parse(fullContent);
         chatHistory.scrollTop = chatHistory.scrollHeight;
       }
 
-      // 結束後更新一次次數
       const { user, plan } = await getCurrentUserPlan();
       await updateUsageInfo(user, plan);
 
     } catch (err) {
       console.error(err);
-      aiDisplayEl.innerHTML = `<span style="color:red;">❌ 錯誤：${err.message}</span>`;
+      aiDisplayEl.innerHTML = `<span style="color:red;">錯誤：${err.message}</span>`;
     }
   });
 </script>

@@ -4,7 +4,6 @@
   <meta charset="UTF-8" />
   <title>懂才抱．核心指標選股器</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <!-- Supabase JS v2 -->
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
   <link rel="stylesheet" href="css/core_screener.css" />
 </head>
@@ -177,18 +176,14 @@
   </div>
 
   <script>
-  // === Supabase 設定 ===
   const SUPABASE_URL = "https://ojeirmqxborwxhuwuems.supabase.co";
   const SUPABASE_ANON_KEY = "sb_publishable_wur9F2qRW0NFyZpijPub2A__IsGlpgZ";
-
-  // 【修正點 1】變數改名為 supabaseClient
   const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   let allRows = [];
   let sortState = { key: "market_cap", dir: "desc" };
-  // --- 新增這兩行 ---
-  let displayedCount = 50;       // 手機版預設顯示 50 筆
-  let currentFilteredRows = [];  // 儲存目前篩選完後的完整資料
+  let displayedCount = 50;
+  let currentFilteredRows = [];
 
   function formatCap(x) {
     if (x == null) return "-";
@@ -202,60 +197,43 @@
     return (x * 100).toFixed(2) + "%";
   }
 
-  // 🔹 增強版小工具：設定 select 值，並點亮/展開對應區塊
 function setSelect(id, value) {
   const el = document.getElementById(id);
   if (!el) return;
-
-  // 1. 設定數值
   el.value = value;
-
-  // 2. 處理視覺高亮 (讓使用者知道哪些被改了)
   const group = el.closest('.filter-group');
   if (group) {
     if (value !== "0" && value !== "all") {
-      group.classList.add("filter-active"); // 自定義的高亮 class
+      group.classList.add("filter-active");
     } else {
       group.classList.remove("filter-active");
     }
   }
-
-  // 3. 自動展開所屬的摺疊區塊 (如果區塊是收起來的)
   const section = el.closest('.filter-section');
   if (section && value !== "0" && value !== "all") {
       section.classList.add("active");
   }
 }
 
-// --- 新增 1：儲存目前的完整狀態 ---
 function saveAllStates() {
   const state = {
     filters: {},
     activePreset: sessionStorage.getItem("activePreset") || "" 
   };
-
-  // 抓取所有選單的值
   document.querySelectorAll('.filter-section select').forEach(select => {
     state.filters[select.id] = select.value;
   });
-
   sessionStorage.setItem("screener_state", JSON.stringify(state));
 }
 
-// --- 新增 2：還原完整狀態 ---
 function restoreAllStates() {
   const savedData = sessionStorage.getItem("screener_state");
   if (!savedData) return false;
-
   const state = JSON.parse(savedData);
-
-  // 1. 還原所有下拉選單的值
   Object.keys(state.filters).forEach(id => {
     const val = state.filters[id];
-    setSelect(id, val); // 這會觸發你原本寫好的高亮與展開邏輯
+    setSelect(id, val);
   });
-
-  // 2. 還原風格按鈕的高亮狀態
   if (state.activePreset) {
     document.querySelectorAll(".preset-btn").forEach(btn => {
       btn.classList.remove("active");
@@ -264,22 +242,14 @@ function restoreAllStates() {
   }
   return true;
 }
-  // 🔹 一鍵策略：依名稱調整所有篩選器
-function applyPreset(name) {
-  // === 新增：將選擇的策略儲存到 sessionStorage ===
-  sessionStorage.setItem("activePreset", name);
 
-  // 1. 處理按鈕高亮
+function applyPreset(name) {
+  sessionStorage.setItem("activePreset", name);
   document.querySelectorAll(".preset-btn").forEach(btn => {
     btn.classList.remove("active");
     if (btn.dataset.preset === name) btn.classList.add("active");
   });
-
-  // 2. 全域重置 (清空之前的高亮與數值)
   document.querySelectorAll('.filter-group').forEach(g => g.classList.remove("filter-active"));
-  // 先不要關閉所有 section，保留使用者原本開啟的，或者視需求加：
-  // document.querySelectorAll('.filter-section').forEach(s => s.classList.remove("active"));
-
   const allSelects = [
     "capFilter","roeFilter","roicFilter","fcfFilter","eyFilter","crFilter",
     "ndFilter","cccFilter","peFilter","pegFilter","psFilter","pbFilter",
@@ -287,109 +257,73 @@ function applyPreset(name) {
     "omFilter","evFilter","rgFilter","egFilter","fgFilter","dgFilter",
     "sectorFilter","betaFilter"
   ];
-  
   allSelects.forEach(id => {
       const el = document.getElementById(id);
       if(el) el.value = el.querySelector('option[value="0"]') ? "0" : "all";
   });
 
-  // 3. 執行特定策略數值
   if (name === "buffett") {
-      // 巴菲特風格：放寬估值，堅持品質
-      setSelect("roeFilter",  "15");    // ROE ≥ 15% (堅持)
-      setSelect("roicFilter", "0.10");  // ROIC ≥ 10%
-      // 修正：放寬現金流要求，避免篩不到好公司
-      setSelect("fcfFilter",  "0.02");  // FCF 殖利率 ≥ 2% (原本 4% 太嚴)
-      setSelect("eyFilter",   "0.04");  // 盈餘殖利率 ≥ 4% (PE < 25) (原本 6% 太嚴)
-      setSelect("gmFilter",   "0.4");   // 毛利率 ≥ 40%
-      setSelect("omFilter",   "0.1");   // 營業利益率 ≥ 10%
-      setSelect("dpFilter",   "0.6");   // 配息率 ≤ 60%
-      setSelect("deFilter",   "0.5");   // D/E ≤ 0.5
-      // Beta 不一定要鎖死，巴菲特有時也買波動大的蘋果，但設 1.0 偏保守也行
-      setSelect("betaFilter", "1.2");   // 建議稍微放寬到 1.2
+      setSelect("roeFilter", "15");
+      setSelect("roicFilter", "0.10");
+      setSelect("fcfFilter", "0.02");
+      setSelect("eyFilter", "0.04");
+      setSelect("gmFilter", "0.4");
+      setSelect("omFilter", "0.1");
+      setSelect("dpFilter", "0.6");
+      setSelect("deFilter", "0.5");
+      setSelect("betaFilter", "1.2");
     }
-
     if (name === "dividend") {
-      // 如果想抓更多穩健的大型股，建議殖利率改 0.03 (3%)
-      setSelect("dyFilter",   "0.03");  
-      setSelect("dpFilter",   "0.8");   
-      setSelect("deFilter",   "1");     
-      setSelect("betaFilter", "1.0");   
-      setSelect("rgFilter",   "0.05");  
+      setSelect("dyFilter", "0.03");
+      setSelect("dpFilter", "0.8");
+      setSelect("deFilter", "1");
+      setSelect("betaFilter", "1.0");
+      setSelect("rgFilter", "0.05");
     }
     if (name === "growth") {
-      // 高成長策略
-      setSelect("rgFilter",   "0.15");  // 營收年增率 ≥ 15%
-      setSelect("egFilter",   "0.2");   // EPS 年增率 ≥ 20%
-      setSelect("gmFilter",   "0.5");   // 毛利率 ≥ 50%
-      setSelect("omFilter",   "0.1");   // 營業利益率 ≥ 10%
-      setSelect("psFilter",   "10");    // P/S ≤ 10
+      setSelect("rgFilter", "0.15");
+      setSelect("egFilter", "0.2");
+      setSelect("gmFilter", "0.5");
+      setSelect("omFilter", "0.1");
+      setSelect("psFilter", "10");
     }
-
-
-
     if (name === "value") {
-      // 價值股策略：避免過度嚴格
-      setSelect("peFilter",   "15");    // PE ≤ 15
-      setSelect("pbFilter",   "2");     // PB ≤ 2
-      setSelect("pfcfFilter", "15");    // P/FCF ≤ 15
-      // 修正：既然限制了 PE <= 15，這裡就不用再鎖 EY >= 8%，避免衝突
-      setSelect("eyFilter",   "0");     
-      setSelect("fcfFilter",  "0.04");  // FCF 殖利率 ≥ 4%
+      setSelect("peFilter", "15");
+      setSelect("pbFilter", "2");
+      setSelect("pfcfFilter", "15");
+      setSelect("eyFilter", "0");
+      setSelect("fcfFilter", "0.04");
   }
-
-    
-
     if (name === "lynch") {
-      // 1. 估值：PEG 必須低於 1.0 是林區的招牌
-      setSelect("pegFilter", "1"); 
-      // 2. 成長：穩健成長，不需要爆發性，但要及格
-      setSelect("rgFilter",  "0.1");  // 營收成長 >= 10%
-      setSelect("egFilter",  "0.1");  // EPS 成長 >= 10%
-      // 3. 品質：高 ROE 與 良好的獲利能力
-      setSelect("roeFilter", "15");   // ROE >= 15%
-      setSelect("omFilter",  "0.1");  // 營業利益率 >= 10% (確保不是靠業外)
-      // 4. 財務體質：林區討厭負債
-      setSelect("deFilter",  "0.5");  // 負債權益比更嚴格 (<= 0.5)
-      setSelect("crFilter",  "1.5");  // 流動比率 >= 1.5 (短期償債能力)
-      // 5. 現金流：他強調現金是真實的
-      setSelect("fcfFilter", "0.04"); // FCF 殖利率 >= 4%
+      setSelect("pegFilter", "1");
+      setSelect("rgFilter", "0.1");
+      setSelect("egFilter", "0.1");
+      setSelect("roeFilter", "15");
+      setSelect("omFilter", "0.1");
+      setSelect("deFilter", "0.5");
+      setSelect("crFilter", "1.5");
+      setSelect("fcfFilter", "0.04");
     }
-
-
-
     if (name === "magic") {
-      // 魔法公式：高 ROIC + 便宜 (EV/EBITDA)
-      setSelect("roicFilter", "0.15"); // 加強：ROIC 拉高
-      setSelect("evFilter",   "15");
-      setSelect("roeFilter",  "15");
-      // 建議：不鎖 PE，專注於 EV/EBITDA
+      setSelect("roicFilter", "0.15");
+      setSelect("evFilter", "15");
+      setSelect("roeFilter", "15");
     }
-
-
-
     if (name === "compounder") {
-      // 複利成長：高品質 + 現金流成長 (不一定便宜)
-      setSelect("roicFilter", "0.15"); // 加強：效率要高
-      setSelect("fcfFilter",  "0.02"); // 放寬：好公司殖利率通常不高
-      setSelect("fgFilter",   "0.10");
-      setSelect("rgFilter",   "0.10");
-      setSelect("gmFilter",   "0.3");  // 放寬：涵蓋更多產業
+      setSelect("roicFilter", "0.15");
+      setSelect("fcfFilter", "0.02");
+      setSelect("fgFilter", "0.10");
+      setSelect("rgFilter", "0.10");
+      setSelect("gmFilter", "0.3");
     }
-
-
-
     if (name === "lowvol") {
-      // 低波動：Beta 低 + 配息穩
-      setSelect("betaFilter", "0.8");  // 加強：Beta 要夠低
-      setSelect("deFilter",   "1");
-      setSelect("roeFilter",  "10");
-      setSelect("dyFilter",   "0.02"); // 新增：防禦型通常有股息
+      setSelect("betaFilter", "0.8");
+      setSelect("deFilter", "1");
+      setSelect("roeFilter", "10");
+      setSelect("dyFilter", "0.02");
     }
-
-  // 4. 立即渲染
   applyFiltersAndRender();
-  saveAllStates(); // <-- 新增這一行
+  saveAllStates();
 }
 
 function resetFilters() {
@@ -400,7 +334,6 @@ function resetFilters() {
         "omFilter","evFilter","rgFilter","egFilter","fgFilter","dgFilter",
         "sectorFilter","betaFilter"
     ];
-
     filterIds.forEach(id => {
         const el = document.getElementById(id);
         if (el) {
@@ -409,17 +342,12 @@ function resetFilters() {
             if (group) group.classList.remove("filter-active");
         }
     });
-
     document.querySelectorAll(".preset-btn").forEach(btn => btn.classList.remove("active"));
     sessionStorage.removeItem("activePreset");
     sessionStorage.removeItem("screener_state");
-
     applyFiltersAndRender();
     saveAllStates();
-    
-    // (選用) 讓所有摺疊區塊也一起收起來：
     document.querySelectorAll('.filter-section').forEach(s => s.classList.remove("active"));
-    
     alert("已清空所有篩選條件！");
 }
 
@@ -427,126 +355,76 @@ function resetFilters() {
   const pageSize = 1000;
   let from = 0;
   let all = [];
-
   while (true) {
-    // 這裡也要跟著改成 supabaseClient
       const { data, error } = await supabaseClient
       .from("core_metrics")
       .select(`
-        symbol,
-        market_cap,
-        roa,
-        roe,
-        roic,
-        fcf_yield,
-        earnings_yield,
-        current_ratio,
-        net_debt_to_ebitda,
-        ccc,
-        pe,
-        peg,
-        ps,
-        pb,
-        p_fcf,
-        debt_to_equity,
-        debt_to_asset,
-        dividendpayoutratio,
-        dividendyield,
-        dividendpershare,
-        grossmargin,
-        operatingmargin,
-        evtoebitda,
-        revenue_growth,
-        eps_growth,
-        fcf_growth,
-        dividend_growth,
-        beta,
-        sector
+        symbol, market_cap, roa, roe, roic, fcf_yield, earnings_yield, current_ratio, net_debt_to_ebitda, ccc, pe, peg, ps, pb, p_fcf, debt_to_equity, debt_to_asset, dividendpayoutratio, dividendyield, dividendpershare, grossmargin, operatingmargin, evtoebitda, revenue_growth, eps_growth, fcf_growth, dividend_growth, beta, sector
       `)
       .range(from, from + pageSize - 1);
-
     if (error) {
       console.error(error);
       document.getElementById("summaryText").textContent = "載入失敗，請稍後再試。";
       return;
     }
-
     if (!data || data.length === 0) break;
-
     all = all.concat(data);
-
-    // 下一頁
     if (data.length < pageSize) break;
     from += pageSize;
   }
-
   allRows = all;
   document.getElementById("summaryText").textContent = `已載入：${allRows.length} 檔`;
+  restoreAllStates();
   applyFiltersAndRender();
 }
-
 
   function applyFiltersAndRender() {
     const capMode = document.getElementById("capFilter").value;
     const roeMin = Number(document.getElementById("roeFilter").value) / 100;
     const fcfMin = Number(document.getElementById("fcfFilter").value);
     const roicMin = Number(document.getElementById("roicFilter").value);
-    const eyMin = Number(document.getElementById("eyFilter").value);   
-    const crMin = Number(document.getElementById("crFilter").value);  
-    const ndMode = document.getElementById("ndFilter").value;   
+    const eyMin = Number(document.getElementById("eyFilter").value); 
+    const crMin = Number(document.getElementById("crFilter").value); 
+    const ndMode = document.getElementById("ndFilter").value; 
     const cccMode = document.getElementById("cccFilter").value;
-    const peMode   = document.getElementById("peFilter").value;
-    const pegMode  = document.getElementById("pegFilter").value;
-    const psMode   = document.getElementById("psFilter").value;
-    const pbMode   = document.getElementById("pbFilter").value;
+    const peMode = document.getElementById("peFilter").value;
+    const pegMode = document.getElementById("pegFilter").value;
+    const psMode = document.getElementById("psFilter").value;
+    const pbMode = document.getElementById("pbFilter").value;
     const pfcfMode = document.getElementById("pfcfFilter").value;
-    const deMode   = document.getElementById("deFilter").value;
-    const daMode   = document.getElementById("daFilter").value;
-    const dyMin  = Number(document.getElementById("dyFilter").value);
+    const deMode = document.getElementById("deFilter").value;
+    const daMode = document.getElementById("daFilter").value;
+    const dyMin = Number(document.getElementById("dyFilter").value);
     const dpMode = document.getElementById("dpFilter").value;
-
     const gmMin = Number(document.getElementById("gmFilter").value);
     const omMin = Number(document.getElementById("omFilter").value);
     const evMode = document.getElementById("evFilter").value;
-
     const rgMin = Number(document.getElementById("rgFilter").value);
     const egMin = Number(document.getElementById("egFilter").value);
     const fgMin = Number(document.getElementById("fgFilter").value);
     const dgMin = Number(document.getElementById("dgFilter").value);
     const sectorMode = document.getElementById("sectorFilter").value;
-    const betaMode   = document.getElementById("betaFilter").value;
+    const betaMode = document.getElementById("betaFilter").value;
 
     let rows = allRows.filter(r => {
-      // 市值
       if (capMode !== "all") {
         const cap = r.market_cap || 0;
         if (capMode === "mega" && !(cap >= 3e11)) return false;
         if (capMode === "large" && !(cap >= 1e11)) return false;
-        if (capMode === "mid"   && !(cap >= 1e10 && cap < 1e11)) return false;
-        if (capMode === "small" && !(cap <  1e10)) return false;
+        if (capMode === "mid" && !(cap >= 1e10 && cap < 1e11)) return false;
+        if (capMode === "small" && !(cap < 1e10)) return false;
       }
-
-      // 獲利 & 現金流
       if (roeMin > 0 && (r.roe == null || r.roe < roeMin)) return false;
       if (fcfMin > 0 && (r.fcf_yield == null || r.fcf_yield < fcfMin)) return false;
       if (roicMin > 0 && (r.roic == null || r.roic < roicMin)) return false;
       if (eyMin > 0 && (r.earnings_yield == null || r.earnings_yield < eyMin)) return false;
-
-
-      // 流動比率
       if (crMin > 0 && (r.current_ratio == null || r.current_ratio < crMin)) return false;
-
-      // Net debt / EBITDA
       if (ndMode !== "all") {
         const ndMax = Number(ndMode);
         if (r.net_debt_to_ebitda == null || r.net_debt_to_ebitda > ndMax) return false;
       }
-
-      // CCC
       if (cccMode === "neg" && !(r.ccc < 0)) return false;
       if (cccMode === "pos" && !(r.ccc >= 0)) return false;
-
-      // 估值倍率
       if (peMode !== "all") {
         const maxPE = Number(peMode);
         if (r.pe == null || r.pe > maxPE) return false;
@@ -567,8 +445,6 @@ function resetFilters() {
         const maxPFCF = Number(pfcfMode);
         if (r.p_fcf == null || r.p_fcf > maxPFCF) return false;
       }
-
-      // 槓桿
       if (deMode !== "all") {
         const maxDE = Number(deMode);
         if (r.debt_to_equity == null || r.debt_to_equity > maxDE) return false;
@@ -577,74 +453,48 @@ function resetFilters() {
         const maxDA = Number(daMode);
         if (r.debt_to_asset == null || r.debt_to_asset > maxDA) return false;
       }
-
-      // 股利條件
       if (dyMin > 0 && (r.dividendyield == null || r.dividendyield < dyMin)) return false;
       if (dpMode !== "all") {
         const maxDP = Number(dpMode);
         if (r.dividendpayoutratio == null || r.dividendpayoutratio > maxDP) return false;
       }
-
-      // 獲利結構
       if (gmMin > 0 && (r.grossmargin == null || r.grossmargin < gmMin)) return false;
       if (omMin > 0 && (r.operatingmargin == null || r.operatingmargin < omMin)) return false;
-
       if (evMode !== "all") {
         const maxEV = Number(evMode);
         if (r.evtoebitda == null || r.evtoebitda > maxEV) return false;
       }
-
-      // 成長率
       if (rgMin > 0 && (r.revenue_growth == null || r.revenue_growth < rgMin)) return false;
       if (egMin > 0 && (r.eps_growth == null || r.eps_growth < egMin)) return false;
       if (fgMin > 0 && (r.fcf_growth == null || r.fcf_growth < fgMin)) return false;
       if (dgMin > 0 && (r.dividend_growth == null || r.dividend_growth < dgMin)) return false;
-
-      // 產業
       if (sectorMode !== "all") {
         if (!r.sector || r.sector !== sectorMode) return false;
       }
-
-      // Beta
       if (betaMode !== "all") {
         const maxBeta = Number(betaMode);
         if (r.beta == null || r.beta > maxBeta) return false;
       }
-
       return true;
     });
 
-    // 排序（數字 / 字串都支援）
     rows.sort((a, b) => {
       const k = sortState.key;
       const va = a[k];
       const vb = b[k];
-
       if (va == null) return 1;
       if (vb == null) return -1;
-
-      // 字串：用字母排序
       if (typeof va === "string" || typeof vb === "string") {
         return sortState.dir === "asc"
           ? String(va).localeCompare(String(vb))
           : String(vb).localeCompare(String(va));
       }
-      // 數字
       return sortState.dir === "asc" ? va - vb : vb - va;
     });
-    // === 【以下是核心修改內容】 ===
-
-    // A. 將篩選排序完的「完整結果」存起來
     currentFilteredRows = rows; 
-
-    // B. 判斷裝置，重置初始顯示筆數
     const isMobile = window.innerWidth <= 768;
     displayedCount = isMobile ? 50 : currentFilteredRows.length;
-
-    // C. 呼叫渲染函式 (現在不需要傳參數，讓 renderTable 直接讀取 currentFilteredRows)
     renderTable();
-
-  
   }
 
   function renderTable() {
@@ -652,17 +502,9 @@ function resetFilters() {
       const summary = document.getElementById("summaryText");
       const loadMoreContainer = document.getElementById("loadMoreContainer");
       const currentCountText = document.getElementById("currentCountText");
-
-      // 1. 清空舊的內容
       tbody.innerHTML = "";
-      
-      // 2. 更新總筆數提示
       summary.textContent = `符合條件的股票：${currentFilteredRows.length} 檔`;
-
-      // 3. 【關鍵修改】使用 slice 只取出目前要顯示的筆數 (例如 0 到 50)
       const slice = currentFilteredRows.slice(0, displayedCount);
-
-      // 4. 只循環 slice 出來的資料
       slice.forEach(r => {
         const cccClass = r.ccc != null && r.ccc < 0 ? "pill-pos" : "";
         const tr = document.createElement("tr");
@@ -703,8 +545,6 @@ function resetFilters() {
         `;
         tbody.appendChild(tr);
       });
-
-      // 5. 【關鍵修改】判斷是否還有更多資料可以載入
       if (currentFilteredRows.length > displayedCount) {
           loadMoreContainer.style.display = "block";
           currentCountText.textContent = slice.length;
@@ -713,8 +553,6 @@ function resetFilters() {
       }
   }
 
-  // 篩選器 change 事件
-  // 這裡定義所有選單的 ID
   const filterIds = [
     "capFilter","roeFilter","roicFilter","fcfFilter","eyFilter","crFilter",
     "ndFilter","cccFilter","peFilter","pegFilter","psFilter","pbFilter",
@@ -722,29 +560,24 @@ function resetFilters() {
     "omFilter","evFilter","rgFilter","egFilter","fgFilter","dgFilter",
     "sectorFilter","betaFilter"
   ];
-  
-  // 批次綁定：手動更改選單時「過濾」＋「存檔微調結果」
   filterIds.forEach(id => {
     const el = document.getElementById(id);
     if (el) {
       el.addEventListener("change", () => {
         applyFiltersAndRender();
-        saveAllStates(); // <-- 這是記住「手動微調」的關鍵！
+        saveAllStates();
       });
     }
   });
 
-  // 一鍵策略按鈕事件
   document.querySelectorAll(".preset-btn").forEach(btn => {
     btn.addEventListener("click", () => {
-      const name = btn.dataset.preset;  // buffett / dividend / growth / value
-      // 🚩 關鍵修正：如果這個按鈕沒有 data-preset 屬性（像是顯示更多按鈕），就不要執行策略
+      const name = btn.dataset.preset;
       if (!name) return;
       applyPreset(name);
     });
   });
 
-  // 排序事件
   document.querySelectorAll("th[data-sort]").forEach(th => {
     th.addEventListener("click", () => {
       const key = th.dataset.sort;
@@ -759,64 +592,40 @@ function resetFilters() {
     });
   });
 
-  // ★★★ 新增：搜尋跳轉功能 ★★★
   function goToSnapshot() {
     const input = document.getElementById("stockInput");
-    const symbol = input.value.trim().toUpperCase(); // 去除空白並轉大寫
-
+    const symbol = input.value.trim().toUpperCase();
     if (!symbol) {
       alert("請輸入股票代號！");
       return;
     }
-
-    // 跳轉到 analysis.html 並帶上 symbol 參數
     window.location.href = `analysis.html?symbol=${symbol}`;
   }
 
-  // 綁定按鈕點擊事件
   document.getElementById("btnGoSnapshot").addEventListener("click", goToSnapshot);
   document.getElementById("btnClearAll").addEventListener("click", resetFilters);
-
-  // 綁定 Enter 鍵事件 (讓使用者按 Enter 也能搜尋)
   document.getElementById("stockInput").addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
       goToSnapshot();
     }
   });
 
-  // === 新增：控制摺疊選單的函式 ===
   function toggleSection(header) {
-  // 找到 header 的父層 (filter-section)
     const section = header.parentElement;
-  
-  // 切換 active class
-  // 如果原本有關閉，現在打開；原本打開，現在關閉
-  section.classList.toggle("active");
-  
-  // (選用) 如果希望一次只開一個，可以先把其他的關掉：
-  /*
-  document.querySelectorAll('.filter-section').forEach(s => {
-    if (s !== section) s.classList.remove('active');
-  });
-  */
+    section.classList.toggle("active");
 }
 
-// === 新增：頁面載入時恢復上次點選的風格 ===
-// 修改頁面返回時的邏輯
 window.addEventListener('pageshow', (event) => {
-    // 優先嘗試還原完整存檔
     const hasRestored = restoreAllStates();
     if (hasRestored) {
         applyFiltersAndRender();
     }
 });
 
-// 修改資料載入函式的結尾
 async function loadData() {
   const pageSize = 1000;
   let from = 0;
-  let all = []; // 關鍵：定義 all 變數
-
+  let all = [];
   while (true) {
     const { data, error } = await supabaseClient
       .from("core_metrics")
@@ -828,33 +637,26 @@ async function loadData() {
         revenue_growth, eps_growth, fcf_growth, dividend_growth, beta, sector
       `)
       .range(from, from + pageSize - 1);
-
     if (error) {
       console.error(error);
       document.getElementById("summaryText").textContent = "載入失敗，請稍後再試。";
       return;
     }
-
     if (!data || data.length === 0) break;
     all = all.concat(data);
-
     if (data.length < pageSize) break;
     from += pageSize;
   }
-
   allRows = all;
   document.getElementById("summaryText").textContent = `已載入：${allRows.length} 檔`;
-  
-  // 核心：載入資料後，先還原上次儲存的選單狀態，再進行篩選與渲染
   restoreAllStates(); 
   applyFiltersAndRender();
 }
 
-// 在 script 區塊最後面加入
   document.getElementById("btnLoadMore").addEventListener("click", (e) => {
-      e.preventDefault(); // 雙重保險：防止任何預設提交行為
+      e.preventDefault();
       displayedCount += 50; 
-      renderTable(); // 🚩 關鍵：只重新畫圖，不重新跑 applyFiltersAndRender
+      renderTable();
   });
 
   loadData();

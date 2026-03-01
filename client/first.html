@@ -8,23 +8,15 @@
   <meta name="keyword" content ="股票,財報狗，資訊整合平台">
   <meta name="author" content="小炫">
   <title>懂才抱</title>
-  <!--背景樣式 -->
   <link rel="stylesheet" href="css/background.css">
-  <!--首頁樣式 -->
   <link rel="stylesheet" href="css/home.css">
-  <!--第二頁樣式 -->
   <link rel="stylesheet" href="css/service.css">
-  <!--第三頁樣式-->
   <link rel="stylesheet" href="css/news.css">
-  <!--第四頁樣式-->
   <link rel="stylesheet" href="css/differ.css">
-  <!--第五頁樣式-->
   <link rel="stylesheet" href="css/fee.css">
-  <!-- Supabase JS v2（一定要放） -->
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 </head>
 <body>
-  <!-- 🌌 粒子效果 -->
   <div class="particle"></div>
   <div class="particle"></div>
   <div class="particle"></div>
@@ -33,18 +25,14 @@
   <header class="top-logo">
     <div class="logo-text">懂才抱</div>
 
-    <!-- 🔐 右上角登入 / 註冊區塊 -->
     <div class="auth-area" id="auth-area">
-      <!-- 未登入狀態下顯示 -->
       <button class="auth-btn" id="open-auth-panel">登入 / 註冊</button>
 
-      <!-- 登入後狀態下顯示（JS 動態塞內容） -->
       <div class="auth-user" id="auth-user" style="display:none;"></div>
       <button class="auth-btn" id="logout-btn" style="display:none;">登出</button>
     </div>
   </header>
 
-  <!-- ✨ 登入 / 註冊小面板 -->
   <div class="auth-panel" id="auth-panel">
     <h3>登入 / 註冊</h3>
     <div class="field">
@@ -63,7 +51,6 @@
     <div class="error" id="auth-error" style="display:none;"></div>
   </div>
 
-  <!-- 首頁內容 -->
   <section id="home">
     <div class="container">
       <div class="subtitle">從選股到賣出的股票資訊整合平台</div>
@@ -72,7 +59,6 @@
           懂才抱從選股、公司資訊整合，到財報追蹤與新聞監控一次包辦，打造屬於你的全方位股票研究流程
         </p>
 
-        <!-- 兩個主要行動按鈕 -->
         <div class="hero-actions">
           <a href="#select" class="btn primary">選出屬於你的優質公司</a>
           <a href="#integration" class="btn secondary">查看公司及產業報告</a>
@@ -81,7 +67,6 @@
         </div>
       </div>
 
-      <!-- 向下箭頭 -->
       <button class="cta-button" onclick="scrollDown()">
         <svg viewBox="0 0 24 24">
           <path d="M7 10l5 5 5-5z" />
