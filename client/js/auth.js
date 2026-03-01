@@ -1,12 +1,9 @@
-// Supabase 設定
-  const supabaseUrl = "https://zlkexplsleznuebighte.supabase.co";
+const supabaseUrl = "https://zlkexplsleznuebighte.supabase.co";
   const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpsa2V4cGxzbGV6bnVlYmlnaHRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0MzAwNjUsImV4cCI6MjA4MTAwNjA2NX0.HPVn3jcN88M4U3-RCVW-YO-b65rDOKv6pxEaVWwbm68";
 
-  // 💡 加上 window. 讓它變成全域變數，Console 才能讀到
   window.supabaseClient = supabase.createClient(supabaseUrl, supabaseAnonKey);
   const supabaseClient = window.supabaseClient;
 
-  // ✅ 1. 登入後幫他確保 profiles 有一筆資料
   async function ensureProfile() {
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
     if (userError || !user) {
@@ -29,7 +26,7 @@
       const { error: insertError } = await supabaseClient.from("profiles").insert({
         id: user.id,
         email: user.email,
-        plan: "free", // 預設方案
+        plan: "free",
       });
       if (insertError) {
         console.error("建立 profile 失敗：", insertError);
@@ -37,7 +34,6 @@
     }
   }
 
-  // ✅ 2. 更新右上角 UI（顯示登入人 email + 方案）
   async function refreshAuthUI() {
     const authUserEl = document.getElementById("auth-user");
     const logoutBtn = document.getElementById("logout-btn");
@@ -65,19 +61,20 @@
     logoutBtn.style.display = "inline-flex";
     openPanelBtn.style.display = "none";
   }
-  function setupPasswordToggle() {
-  const toggleBtn = document.getElementById("toggle-password");
-  const passwordInput = document.getElementById("auth-password");
 
-  if (toggleBtn && passwordInput) {
-    toggleBtn.addEventListener("click", () => {
-      const isPassword = passwordInput.type === "password";
-      passwordInput.type = isPassword ? "text" : "password";
-      toggleBtn.textContent = isPassword ? "🙈" : "👁️";
-    });
+  function setupPasswordToggle() {
+    const toggleBtn = document.getElementById("toggle-password");
+    const passwordInput = document.getElementById("auth-password");
+
+    if (toggleBtn && passwordInput) {
+      toggleBtn.addEventListener("click", () => {
+        const isPassword = passwordInput.type === "password";
+        passwordInput.type = isPassword ? "text" : "password";
+        toggleBtn.textContent = isPassword ? "🙈" : "👁️";
+      });
+    }
   }
-}
-  // ✅ 3. 開關小面板
+
   const authPanel = document.getElementById("auth-panel");
   const openPanelBtn = document.getElementById("open-auth-panel");
   const authErrorEl = document.getElementById("auth-error");
@@ -88,7 +85,6 @@
     authErrorEl.textContent = "";
   });
 
-  // ✅ 4. 按「登入」
   document.getElementById("do-login").addEventListener("click", async () => {
     const email = document.getElementById("auth-email").value.trim();
     const password = document.getElementById("auth-password").value;
@@ -113,14 +109,12 @@
       return;
     }
 
-    // 登入成功 → 有 session → RLS 才讓你寫 profiles
     await ensureProfile();
     authPanel.classList.remove("show");
     await refreshAuthUI();
   });
 
-  // ✅ 5. 按「註冊」
-document.getElementById("do-signup").addEventListener("click", async () => {
+  document.getElementById("do-signup").addEventListener("click", async () => {
     const email = document.getElementById("auth-email").value.trim();
     const password = document.getElementById("auth-password").value;
     const authErrorEl = document.getElementById("auth-error");
@@ -128,7 +122,6 @@ document.getElementById("do-signup").addEventListener("click", async () => {
     authErrorEl.style.display = "none";
     authErrorEl.textContent = "";
 
-    // 1. 基本檢查
     if (!email || !password) {
       authErrorEl.textContent = "請輸入 Email 和密碼";
       authErrorEl.style.display = "block";
@@ -140,7 +133,6 @@ document.getElementById("do-signup").addEventListener("click", async () => {
       return;
     }
 
-    // 2. 執行註冊
     const { data, error } = await supabaseClient.auth.signUp({
       email,
       password,
@@ -149,7 +141,6 @@ document.getElementById("do-signup").addEventListener("click", async () => {
       }
     });
 
-    // 3. 錯誤處理 (這裡捕捉格式錯誤、密碼太弱等)
     if (error) {
       console.error("註冊錯誤:", error);
       authErrorEl.textContent = "註冊失敗：" + error.message;
@@ -157,24 +148,18 @@ document.getElementById("do-signup").addEventListener("click", async () => {
       return;
     }
 
-    // 4. 成功處理 (通用訊息)
-    // 這裡的邏輯是：無論是新帳號(真的註冊成功) 還是舊帳號(Supabase 假裝成功)，
-    // 前端都顯示這段話，讓使用者自己去確認。
-    
     alert(`請求已送出！\n\n已將通知發送至 ${email}。\n若您尚未註冊，請前往信箱點擊連結啟用帳號。\n若此 Email 曾經註冊過，請直接登入即可。`);
     
-    // 關閉面板並清空欄位
     document.getElementById("auth-panel").classList.remove("show");
     document.getElementById("auth-email").value = "";
     document.getElementById("auth-password").value = "";
-});
+  });
 
-  // ✅ 6. 登出
   document.getElementById("logout-btn").addEventListener("click", async () => {
     await supabaseClient.auth.signOut();
     await refreshAuthUI();
   });
-  // 在你的 auth.js 中更新 handleCheckout 函式
+
   async function handleCheckout(event) {
     event.preventDefault();
 
@@ -189,26 +174,20 @@ document.getElementById("do-signup").addEventListener("click", async () => {
     }
 
     const userId = user.id;
-
-    // ⭐ 正確方式：用 URL 物件
     const url = new URL(btn.href);
 
-    // ⭐ 關鍵：讓瀏覽器自動幫你 encode
     url.searchParams.set('checkout[custom][user_id]', userId);
 
     const checkoutUrl = url.toString();
-
     window.location.href = checkoutUrl;
   }
 
   document.querySelectorAll('.lemonsqueezy-button')
     .forEach(btn => btn.addEventListener('click', handleCheckout));
 
-
-  // ✅ 新增：初始化按鈕的函式
   function startBindingProcess() {
       let checkCount = 0;
-      const maxChecks = 20; // 最多檢查 10 秒
+      const maxChecks = 20;
 
       const checkAndBind = setInterval(() => {
           checkCount++;
@@ -227,14 +206,12 @@ document.getElementById("do-signup").addEventListener("click", async () => {
       }, 500);
   }
 
-  // 在頁面完全載入後啟動
   window.addEventListener("load", () => {
       refreshAuthUI();
       startBindingProcess();
       setupPasswordToggle();
   });
 
-  // 你原本的 scrollDown
   function scrollDown() {
     const nextSection = document.querySelector("#service") || document.querySelector("#home");
     if (nextSection) {

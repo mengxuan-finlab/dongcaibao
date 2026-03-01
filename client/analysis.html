@@ -33,25 +33,18 @@
   </div>
 
 <script>
-
-// === Auth/Portfolio Supabase（用來讀登入與方案）===
 const SB_AUTH_URL = "https://zlkexplsleznuebighte.supabase.co";
 const SB_AUTH_ANON = "sb_publishable_KvJtQN9R6YC5PpsKLFtu0Q_43LqiQN-";
 const sbAuth = window.supabase.createClient(SB_AUTH_URL, SB_AUTH_ANON);
 
-// === Stock Data Supabase（用來讀股票資料）===
 const SB_DATA_URL = "https://ojeirmqxborwxhuwuems.supabase.co";
 const SB_DATA_ANON = "sb_publishable_wur9F2qRW0NFyZpijPub2A__IsGlpgZ";
 const sbData = window.supabase.createClient(SB_DATA_URL, SB_DATA_ANON);
 
-
 const params = new URLSearchParams(window.location.search);
 const symbol = (params.get("symbol") || "").toUpperCase();
 
-// ============================
-// Plan / Permission
-// ============================
-let __plan = "free";   // free | plus | pro
+let __plan = "free"; 
 let __isPro = false;
 let __user = null;
 
@@ -69,12 +62,9 @@ async function getCurrentUserPlan() {
     .eq("id", user.id)
     .maybeSingle();
 
-  // 如果 RLS 或資料缺失，至少不要炸掉
   const plan = (!error && profile?.plan) ? profile.plan : "free";
   return { user, plan };
 }
-
-
 
 function setPlanUI(plan){
   const el = document.getElementById("planBadge");
@@ -88,7 +78,6 @@ function setPlanUI(plan){
   el.textContent = text;
 }
 
-// 這個函式是「未來新增 Pro 指標」時的入口：只允許 Pro 呼叫
 function requireProOrShowCard() {
   if (__isPro) return true;
 
@@ -130,7 +119,6 @@ async function loadProMetrics(sym){
   const token = await getAccessToken();
   if (!token) throw new Error("未登入");
 
-  // 你的 Node server 位址（本機開發）
   const apiBase = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
   ? "http://localhost:3000"
   : "https://dongcaibao.onrender.com"; 
@@ -145,13 +133,10 @@ async function loadProMetrics(sym){
   return json;
 }
 
-// 修正後的變數對應（假設後端回傳的是扁平的欄位名稱）
-// 前端分析頁面 (analysis.html)
 function renderProCard(p) {
   const host = document.getElementById("trends");
   if (!host || !p.snapshot || !p.history) return;
 
-  // 修正 2：銷毀舊圖表實例（這部分你原本寫得很好，保留它）
   ['proMarginChart', 'proRoicChart', 'proValuationChart'].forEach(id => {
     const chartStatus = Chart.getChart(id);
     if (chartStatus) chartStatus.destroy();
@@ -160,19 +145,16 @@ function renderProCard(p) {
   const s = p.snapshot;
   const h = p.history; 
 
-  // --- 1. 強化版評價邏輯 ---
   const peList = h.map(item => item.pe).filter(v => v > 0);
   const avgPe = peList.length > 0 ? peList.reduce((a, b) => a + b, 0) / peList.length : 0;
   
   const fcfList = h.map(item => item.p_fcf).filter(v => v > 0);
   const avgFcf = fcfList.length > 0 ? fcfList.reduce((a, b) => a + b, 0) / fcfList.length : 0;
 
-  // 判定變數
   const isPeCheap = s.pe > 0 && s.pe < avgPe;
   const isPeWarning = s.pe > (avgPe * 1.2) || s.pe > 60;
   const isFcfWarning = s.p_fcf > (avgFcf * 1.2) || s.p_fcf > 80;
 
-  // 評價文字
   const fcfEval = s.p_fcf > avgFcf ? "（高於歷史均值）" : "（具備安全邊際）";
   const roicEval = s.roic > 0.4 ? "（資本效率極高）" : s.roic > 0.15 ? "（獲利品質優）" : "（效率待觀察）";
   const fcfMargin = s.fcfMargin || 0;
@@ -180,30 +162,25 @@ function renderProCard(p) {
                         fcfMargin > 0.15 ? "（現金轉化優良）" : 
                         fcfMargin > 0 ? "（現金流穩定）" : "（需注意現金缺口）";
 
-  // --- 2. 插入 HTML 結構 ---
   host.insertAdjacentHTML("beforeend", `
       <div class="card" style="margin-top:16px; border:2px solid #ffd700; background: rgba(255, 215, 0, 0.05);">
         <div class="cardHeader">
-          <h3 class="cardTitle" style="color:#ffd700;"> Pro 進階分析：護城河與估值安全邊際</h3>
+          <h3 class="cardTitle" style="color:#ffd700;"> Pro 進階分析：護城營與估值安全邊際</h3>
           <span class="pill" style="background:#ffd700; color:#000;">Pro Only</span>
         </div>
-
         <div style="margin: 12px 0; display: flex; gap: 8px; flex-wrap: wrap;">
-          
           ${s.roic > 0.15 ? 
             `<span class="hpill good item-help" data-tip="複利機器：ROIC > 15%，具備核心護城河。">複利機器 ✅</span>` : 
             (s.roic < 0.05 && s.roic !== null ? 
               `<span class="hpill bad item-help" data-tip="效率堪憂：ROIC < 5%，資金回報過低。">效率堪憂 ⚠️</span>` : 
               `<span class="hpill mid item-help" data-tip="獲利平穩：ROIC 處於 5%~15% 之間，運作正常。">獲利平穩</span>`)
           }
-            
           ${s.net_debt_to_ebitda < 1 ? 
             `<span class="hpill good item-help" data-tip="財務堡壘：淨負債比 < 1，財務極度健壯。">財務堡壘 ✅</span>` : 
             (s.net_debt_to_ebitda > 3 ? 
               `<span class="hpill bad item-help" data-tip="負債沉重：淨負債比 > 3，注意利息壓力。">負債警訊 ⚠️</span>` : 
               `<span class="hpill mid item-help" data-tip="財務尚可：債務水位處於安全範圍。">財務尚可</span>`)
           }
-            
           ${isPeCheap ? 
             `<span class="hpill good item-help" data-tip="估值便宜：目前 PE 低於 5 年均值。">估值便宜 ✅</span>` : 
             (isPeWarning || isFcfWarning ? 
@@ -211,13 +188,11 @@ function renderProCard(p) {
               `<span class="hpill mid item-help" data-tip="估值合理：股價處於歷史合理波段。">估值合理</span>`)
           }
         </div>
-
         <div class="chartGrid">
           <div class="chartBox"><div class="chartTitle">獲利效率趨勢 (毛利 vs 營益 %)</div><div class="chartCanvasWrap"><canvas id="proMarginChart"></canvas></div></div>
           <div class="chartBox"><div class="chartTitle">ROIC 資本回報趨勢 (%)</div><div class="chartCanvasWrap"><canvas id="proRoicChart"></canvas></div></div>
           <div class="chartBox"><div class="chartTitle">估值水位趨勢 (PE vs P/FCF)</div><div class="chartCanvasWrap"><canvas id="proValuationChart"></canvas></div></div>
         </div>
-        
         <div class="pro-snapshot-footer" style="margin-top: 20px; padding: 16px; background: rgba(255, 215, 0, 0.1); border-radius: 8px; border-left: 4px solid #ffd700;">
           <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
             <div style="font-size: 16px; font-weight: 600; color: #ffd700;"> 最新快照數據 (Latest Snapshot)</div>
@@ -230,10 +205,9 @@ function renderProCard(p) {
         </div>
       </div>
   `);
-  // --- 3. 呼叫 Chart.js 渲染圖表 ---
+
   const labels = h.map(item => item.year);
   
-  // 圖表 A：獲利率趨勢
   new Chart(document.getElementById('proMarginChart'), {
     type: 'line',
     data: {
@@ -246,7 +220,6 @@ function renderProCard(p) {
     options: { responsive: true, maintainAspectRatio: false }
   });
 
-  // 圖表 B：ROIC 趨勢
   new Chart(document.getElementById('proRoicChart'), {
     type: 'line',
     data: {
@@ -263,7 +236,6 @@ function renderProCard(p) {
     options: { responsive: true, maintainAspectRatio: false }
   });
 
-  // 圖表 C：估值趨勢 (PE vs P/FCF)
   new Chart(document.getElementById('proValuationChart'), {
     type: 'line',
     data: {
@@ -282,13 +254,11 @@ function renderProCard(p) {
     }
   });
 }
-// ===== FMP (Income / Cash Flow) =====
 
 let _revChart = null;
 let _epsChart = null;
 let _fcfChart = null;
 
-// --- 在這裡加入指標定義 ---
 const METRIC_DEFINITIONS = {
   "營收成長(YoY) ≥ 10%": "反映公司業務擴張速度，兩位數成長通常被視為成長股的門檻。",
   "EPS 成長(YoY) ≥ 10%": "純益成長率，確保公司不只是營收增加，獲利能力也同步提升。",
@@ -307,6 +277,7 @@ const METRIC_DEFINITIONS = {
   "負債權益比 ≤ 2": "衡量公司財務槓桿高低，比例過高代表借錢過多。",
   "ROE > 0": "股東權益報酬率。最基本的獲利要求，代表公司沒在虧錢。"
 };
+
 function getApiBase(){
   return (location.hostname === "localhost" || location.hostname === "127.0.0.1")
     ? "http://localhost:3000"
@@ -348,7 +319,6 @@ async function fetchCashFlowFY(sym) {
     .sort((a,b) => a.year - b.year);
 }
 
-
 function destroyCharts(){
   if (_revChart) { _revChart.destroy(); _revChart = null; }
   if (_epsChart) { _epsChart.destroy(); _epsChart = null; }
@@ -383,7 +353,7 @@ function renderLineChart(canvas, labels, series, title, ySuffix="", decimals=1){
         x: { ticks: { maxRotation: 0 } },
         y: {
           ticks: {
-            callback: (v) => Number(v).toFixed(decimals) // 左邊刻度小數位
+            callback: (v) => Number(v).toFixed(decimals)
           }
         }
       }
@@ -401,26 +371,21 @@ async function loadQuickTrends(sym){
         <h3 class="cardTitle">財務趨勢（Quick Trends）</h3>
         <span class="pill">FMP · Income & Cash Flow</span>
       </div>
-
       <div id="trendState" class="note">載入中…</div>
-
       <div class="chartGrid">
         <div class="chartBox">
           <div class="chartTitle">營收（億 USD）</div>
           <div class="chartCanvasWrap"><canvas id="revChart"></canvas></div>
         </div>
-
         <div class="chartBox">
           <div class="chartTitle">EPS（USD）</div>
           <div class="chartCanvasWrap"><canvas id="epsChart"></canvas></div>
         </div>
-
         <div class="chartBox">
           <div class="chartTitle">自由現金流 FCF（億 USD）</div>
           <div class="chartCanvasWrap"><canvas id="fcfChart"></canvas></div>
         </div>
       </div>
-
       <div class="note">資料來源：Financial Modeling Prep（年度 FY）。</div>
     </div>
   `;
@@ -463,7 +428,6 @@ async function loadQuickTrends(sym){
   }
 }
 
-// --------- formatting ----------
 function fmtPct(x, digits=1){
   if (x == null || Number.isNaN(x)) return "—";
   return (x*100).toFixed(digits) + "%";
@@ -482,11 +446,9 @@ function fmtCap(x){
 }
 function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
 
-// --------- scoring ----------
 function calculateScore(d) {
   let quality = 0, growth = 0, valuation = 0;
 
-  // 品質（40）
   if (d.roe >= 0.2) quality += 15;
   else if (d.roe >= 0.1) quality += 10;
   else quality += 5;
@@ -498,7 +460,6 @@ function calculateScore(d) {
   if (d.fcf_yield >= 0.04) quality += 10;
   else if (d.fcf_yield >= 0.02) quality += 5;
 
-  // 成長（30）
   if (d.revenue_growth >= 0.15) growth += 15;
   else if (d.revenue_growth >= 0.05) growth += 10;
   else growth += 5;
@@ -507,7 +468,6 @@ function calculateScore(d) {
   else if (d.eps_growth >= 0.05) growth += 10;
   else growth += 5;
 
-  // 估值（30）
   if (d.pe != null && d.pe <= 20) valuation += 15;
   else if (d.pe != null && d.pe <= 30) valuation += 10;
   else valuation += 5;
@@ -531,7 +491,6 @@ function calculateScore(d) {
 
 function buildInsight(d, s) {
   const lines = [];
-
   const rev = d.revenue_growth;
   const eps = d.eps_growth;
   if (rev == null || eps == null) {
@@ -567,91 +526,64 @@ function buildInsight(d, s) {
   } else {
     lines.push("估值：估值落在中性區間，建議搭配成長性一起衡量是否合理。");
   }
-
   return lines.slice(0, 3);
 }
 
 function yn(ok){ return ok ? "✅" : "❌"; }
 
 function buildHealthChecks(d) {
-  // 1. 安全轉換函式：處理 null/undefined/空字串
   const safeNum = (v) => {
     if (v === null || v === undefined || v === "") return null;
     const n = Number(v);
     return Number.isFinite(n) ? n : null;
   };
 
-  // --- 讀取欄位 (變數名稱對應你的資料庫欄位) ---
-  const rev_g    = safeNum(d.revenue_growth);     // 營收成長率
-  const eps_g    = safeNum(d.eps_growth);         // EPS 成長率
-  const fcf_g    = safeNum(d.fcf_growth);         // FCF 成長率
-  const div_g    = safeNum(d.dividend_growth);    // 股息成長率
-  
-  const roic     = safeNum(d.roic);               // 資本回報率
-  const roe      = safeNum(d.roe);                // 股東權益報酬率
-  const beta     = safeNum(d.beta);               // 波動率
-  const peg      = safeNum(d.peg);                // PEG
-  
-  const dy       = safeNum(d.dividendyield);      // 現金殖利率
-  const payout   = safeNum(d.dividendpayoutratio);// 配息率
-  
-  const pe       = safeNum(d.pe);                 // 本益比
-  const pb       = safeNum(d.pb);                 // 股價淨值比
-  const ev_ebitda= safeNum(d.evtoebitda);         // 企業價值倍數 (EV/EBITDA)
-  const p_fcf    = safeNum(d.p_fcf);              // 股價自由現金流比 (P/FCF)
-  
-  const curr_r   = safeNum(d.current_ratio);      // 流動比 (短期償債)
-  const net_d_e  = safeNum(d.net_debt_to_ebitda); // 淨負債/EBITDA (長期償債)
-  const de_ratio = safeNum(d.debt_to_equity);     // 負債權益比
+  const rev_g = safeNum(d.revenue_growth);
+  const eps_g = safeNum(d.eps_growth);
+  const fcf_g = safeNum(d.fcf_growth);
+  const div_g = safeNum(d.dividend_growth);
+  const roic = safeNum(d.roic);
+  const roe = safeNum(d.roe);
+  const beta = safeNum(d.beta);
+  const peg = safeNum(d.peg);
+  const dy = safeNum(d.dividendyield);
+  const payout = safeNum(d.dividendpayoutratio);
+  const pe = safeNum(d.pe);
+  const pb = safeNum(d.pb);
+  const ev_ebitda = safeNum(d.evtoebitda);
+  const p_fcf = safeNum(d.p_fcf);
+  const curr_r = safeNum(d.current_ratio);
+  const net_d_e = safeNum(d.net_debt_to_ebitda);
+  const de_ratio = safeNum(d.debt_to_equity);
 
-  // --- 2. 定義四大類型的檢查邏輯 ---
-
-  // A. 成長型 (Growth) - 看重成長動能與效率
   const growthChecks = [
-    { label: "營收成長(YoY) ≥ 10%",   ok: rev_g !== null && rev_g >= 0.10 },
-    { label: "EPS 成長(YoY) ≥ 10%",   ok: eps_g !== null && eps_g >= 0.10 },
-    { label: "FCF 成長(YoY) > 0%",    ok: fcf_g !== null && fcf_g > 0 }, // 真金白銀也要成長
-    { label: "PEG ≤ 2.0",        ok: peg !== null && peg > 0 && peg <= 2.0 }, // 成長股可以接受稍高估值，但不能離譜
+    { label: "營收成長(YoY) ≥ 10%", ok: rev_g !== null && rev_g >= 0.10 },
+    { label: "EPS 成長(YoY) ≥ 10%", ok: eps_g !== null && eps_g >= 0.10 },
+    { label: "FCF 成長(YoY) > 0%", ok: fcf_g !== null && fcf_g > 0 },
+    { label: "PEG ≤ 2.0", ok: peg !== null && peg > 0 && peg <= 2.0 },
   ];
 
-  // B. 定存/存股型 (Dividend/Income) - 看重殖利率與配息安全性
   const incomeChecks = [
-    // 1. 殖利率門檻 (例如 4%)
-    { label: "現金殖利率 ≥ 4%",  ok: dy !== null && dy >= 0.04 },
-    // 2. 配息率 < 90% (賺 100 發 90 內算安全，超過 100 代表老本或借錢發)
-    // 註：REITs 類股通常會高於 90%，一般公司則不宜過高
-    { label: "配息率 ≤ 90%",     ok: payout !== null && payout > 0 && payout <= 0.90 },
-    // 3. 股息有成長 (抗通膨)
-    { label: "股息成長 > 0",     ok: div_g !== null && div_g > 0 },
-    // 4. 波動低 (晚上睡得著)
-    { label: "低波動 (β < 1)",   ok: beta !== null && beta < 1.0 },
+    { label: "現金殖利率 ≥ 4%", ok: dy !== null && dy >= 0.04 },
+    { label: "配息率 ≤ 90%", ok: payout !== null && payout > 0 && payout <= 0.90 },
+    { label: "股息成長 > 0", ok: div_g !== null && div_g > 0 },
+    { label: "低波動 (β < 1)", ok: beta !== null && beta < 1.0 },
   ];
 
-  // C. 價值型 (Value) - 看重便宜估值
   const valueChecks = [
-    // 1. 本益比便宜
-    { label: "PE ≤ 15",          ok: pe !== null && pe > 0 && pe <= 15 },
-    // 2. EV/EBITDA (比 PE 更專業的估值，通常 < 12 算便宜)
-    { label: "EV/EBITDA ≤ 12",   ok: ev_ebitda !== null && ev_ebitda > 0 && ev_ebitda <= 12 },
-    // 3. P/FCF (股價/自由現金流，越低越好，< 20 代表 5% FCF Yield)
-    { label: "P/FCF ≤ 20",       ok: p_fcf !== null && p_fcf > 0 && p_fcf <= 20 },
-    // 4. 股價淨值比 (傳統價值指標)
-    { label: "PB ≤ 1.5",         ok: pb !== null && pb > 0 && pb <= 1.5 },
+    { label: "PE ≤ 15", ok: pe !== null && pe > 0 && pe <= 15 },
+    { label: "EV/EBITDA ≤ 12", ok: ev_ebitda !== null && ev_ebitda > 0 && ev_ebitda <= 12 },
+    { label: "P/FCF ≤ 20", ok: p_fcf !== null && p_fcf > 0 && p_fcf <= 20 },
+    { label: "PB ≤ 1.5", ok: pb !== null && pb > 0 && pb <= 1.5 },
   ];
 
-  // D. 排除地雷股 (Safety) - 看重償債能力與基本獲利
   const riskChecks = [
-    // 1. 流動比 > 1 (短期能還錢)
-    { label: "流動比 ≥ 1",       ok: curr_r !== null && curr_r >= 1.0 },
-    // 2. 淨負債比 < 4 (還債壓力測試，越低越好)
-    { label: "淨負債/EBITDA ≤ 4",ok: net_d_e !== null && net_d_e <= 4.0 }, 
-    // 3. 負債比 (不宜過度槓桿)
-    { label: "負債權益比 ≤ 2",   ok: de_ratio !== null && de_ratio <= 2.0 },
-    // 4. 基本獲利能力 (沒虧錢)
-    { label: "ROE > 0",          ok: roe !== null && roe > 0 },
+    { label: "流動比 ≥ 1", ok: curr_r !== null && curr_r >= 1.0 },
+    { label: "淨負債/EBITDA ≤ 4", ok: net_d_e !== null && net_d_e <= 4.0 }, 
+    { label: "負債權益比 ≤ 2", ok: de_ratio !== null && de_ratio <= 2.0 },
+    { label: "ROE > 0", ok: roe !== null && roe > 0 },
   ];
 
-  // --- 3. 打包回傳 ---
   function pack(title, checks){
     const pass = checks.filter(c => c.ok).length;
     const total = checks.length;
@@ -675,13 +607,11 @@ function renderHealthSection(d){
 
   const blocks = buildHealthChecks(d);
 
-  // 修改 renderHealthSection 函式內部的 blocks.map 部分
   host.innerHTML = `
       <div class="healthCard">
         <div class="healthHeader">
           <h3>投資風格適配度分析</h3>
         </div>
-
         <div class="healthGrid">
           ${blocks.map(b => `
             <div class="healthBox">
@@ -691,7 +621,6 @@ function renderHealthSection(d){
               </div>
               <ul class="healthList">
                 ${b.checks.map(c => {
-                  // 取得對應的解釋，如果沒有定義則不顯示 Tooltip
                   const tip = METRIC_DEFINITIONS[c.label] || "";
                   return `
                     <li>
@@ -705,7 +634,7 @@ function renderHealthSection(d){
             </div>
           `).join("")}
         </div>
-        `;
+  `;
 }
 
 async function loadSnapshot() {
@@ -716,7 +645,6 @@ async function loadSnapshot() {
     return;
   }
   
-    // ===== 先讀方案（權限基礎）=====
   const planInfo = await getCurrentUserPlan();
   __user = planInfo.user;
   __plan = planInfo.plan || "free";
@@ -726,8 +654,7 @@ async function loadSnapshot() {
   document.getElementById("tvLink").href = `https://www.tradingview.com/symbols/NASDAQ-${symbol}/`;
   document.getElementById("yfLink").href = `https://finance.yahoo.com/quote/${symbol}`;
 
-  // 這裡也要跟著改名
-    const { data, error } = await sbData
+  const { data, error } = await sbData
     .from("core_metrics")
     .select("*")
     .eq("symbol", symbol)
@@ -760,7 +687,6 @@ async function loadSnapshot() {
           <h3 class="cardTitle">快照評分</h3>
           <span class="pill">Snapshot Score</span>
         </div>
-
         <div class="scoreWrap" style="--ringColor:${s.ringColor};">
           <div class="ring" style="--p:${scoreP}; --ringColor:${s.ringColor};">
             <div class="ringInner">
@@ -769,7 +695,6 @@ async function loadSnapshot() {
               <div class="grade">${s.grade}</div>
             </div>
           </div>
-
           <div class="bars">
             <div class="barRow">
               <div class="barTop"><span>品質</span><span>${s.quality}/40</span></div>
@@ -783,11 +708,9 @@ async function loadSnapshot() {
               <div class="barTop"><span>估值</span><span>${s.valuation}/30</span></div>
               <div class="bar"><div style="--w:${vP}%; --ringColor:${s.ringColor};"></div></div>
             </div>
-
             <div class="note">
               評分用於快速比較公司獲利品質、成長性與估值水準；僅供參考，不構成投資建議。
             </div>
-
             <div class="insight">
               <div class="insightTitle">
                 <h4>AI 快速解讀</h4>
@@ -802,69 +725,58 @@ async function loadSnapshot() {
           </div>
         </div>
       </div>
-
       <div class="card">
         <div class="cardHeader">
           <h3 class="cardTitle">公司快照</h3>
           <span class="pill">core_metrics</span>
         </div>
-
         <div class="kpiGrid">
           <div class="kpi">
             <div class="kLabel">市值</div>
             <div class="kVal">${fmtCap(data.market_cap)}</div>
             <div class="kHint">Market Cap</div>
           </div>
-
           <div class="kpi">
             <div class="kLabel">PE</div>
             <div class="kVal">${data.pe == null ? "—" : fmtNum(data.pe, 1)}</div>
             <div class="kHint">Price / Earnings</div>
           </div>
-
           <div class="kpi">
             <div class="kLabel">PEG</div>
             <div class="kVal">${data.peg == null ? "—" : fmtNum(data.peg, 2)}</div>
             <div class="kHint">PEG Ratio</div>
           </div>
-
           <div class="kpi">
             <div class="kLabel">ROE</div>
             <div class="kVal">${fmtPct(data.roe, 1)}</div>
             <div class="kHint">Equity Return</div>
           </div>
-
           <div class="kpi">
             <div class="kLabel">ROIC</div>
             <div class="kVal">${fmtPct(data.roic, 1)}</div>
             <div class="kHint">Invested Capital</div>
           </div>
-
           <div class="kpi">
             <div class="kLabel">FCF 殖利率</div>
             <div class="kVal">${fmtPct(data.fcf_yield, 1)}</div>
             <div class="kHint">Free Cash Flow</div>
           </div>
-
           <div class="kpi">
             <div class="kLabel">營收 YoY</div>
             <div class="kVal">${fmtPct(data.revenue_growth, 1)}</div>
             <div class="kHint">Revenue Growth</div>
           </div>
-
           <div class="kpi">
             <div class="kLabel">EPS YoY</div>
             <div class="kVal">${fmtPct(data.eps_growth, 1)}</div>
             <div class="kHint">EPS Growth</div>
           </div>
-
           <div class="kpi">
             <div class="kLabel">β</div>
             <div class="kVal">${data.beta == null ? "—" : fmtNum(data.beta, 2)}</div>
             <div class="kHint">Volatility</div>
           </div>
         </div>
-
         <div class="note">
           若對於公司資訊及財報相關內容有更詳細需求，可使用懂才抱後續服務
         </div>
@@ -872,31 +784,27 @@ async function loadSnapshot() {
     </div>
   `;
 
-  // 先畫健診（在趨勢下面，自成一格）
   renderHealthSection(data);
 
-  // 再載入趨勢圖（只呼叫一次）
   requestAnimationFrame(async () => {
-  await loadQuickTrends(symbol);
+    await loadQuickTrends(symbol);
 
-  // ===== Pro-only 區塊（先留入口，之後加指標就放這裡）=====
-  if (requireProOrShowCard()) {
-    try {
-      const pro = await loadProMetrics(symbol);
-      renderProCard(pro);
-    } catch (e) {
-      // Pro 但抓不到資料：顯示錯誤（不影響其他區塊）
-      const host = document.getElementById("trends");
-      if (host) {
-        host.insertAdjacentHTML("beforeend", `
-          <div class="card" style="margin-top:14px;">
-            <div class="note">Pro 指標載入失敗：${e.message}</div>
-          </div>
-        `);
+    if (requireProOrShowCard()) {
+      try {
+        const pro = await loadProMetrics(symbol);
+        renderProCard(pro);
+      } catch (e) {
+        const host = document.getElementById("trends");
+        if (host) {
+          host.insertAdjacentHTML("beforeend", `
+            <div class="card" style="margin-top:14px;">
+              <div class="note">Pro 指標載入失敗：${e.message}</div>
+            </div>
+          `);
+        }
       }
     }
-  }
-});
+  });
 }
 
 loadSnapshot();
