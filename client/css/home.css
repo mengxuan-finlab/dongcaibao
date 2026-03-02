@@ -39,7 +39,7 @@
   color: rgba(255,255,255,.86);
   margin: 0 auto 0px;
 }
-#home .content p{ margin-bottom: 0px; }
+#home .content p{ margin-bottom: 16px; }
 #home .highlight{ color:#f3f1f1; font-weight: 600; font-size: 20px;}
 
 #home .cta-button{
