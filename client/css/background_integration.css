@@ -1,4 +1,4 @@
-/* --- 全域與重置 --- */
+
 * {
   margin: 0;
   padding: 0;
@@ -10,7 +10,7 @@ html {
   height: -webkit-fill-available;
 }
 
-/* --- Body 基礎樣式與背景 --- */
+
 body {
   font-family: 'Microsoft JhengHei', 'PingFang TC', sans-serif;
   background: #4a4ab6;
@@ -35,7 +35,7 @@ body::before {
   transform: translateZ(0);
 }
 
-/* --- 背景動畫粒子 --- */
+
 .particle {
   position: absolute;
   width: 4px;
@@ -57,12 +57,11 @@ body::before {
   100% { transform: translateY(-100px) translateX(30px); opacity: 0; }
 }
 
-/* --- 佈局與區段 --- */
+
 section {
   min-height: 100vh;
 }
 
-/* --- 股票資訊結果區域 (#result) --- */
 #result h2, #result h3 {
   margin-top: 20px;
   color: #ffdaa2;
@@ -77,7 +76,7 @@ section {
   padding-left: 20px;
 }
 
-/* --- 輸入框與按鈕 --- */
+
 input {
   padding: 8px;
   font-size: 18px;
@@ -96,7 +95,7 @@ button {
   color: #ede7f3;
 }
 
-/* --- 方案標籤 (Plan Tags) --- */
+
 .plan-tag {
   padding: 2px 8px;
   border-radius: 4px;
@@ -109,7 +108,7 @@ button {
 .plan-plus { background: #6366f1; color: white; }
 .plan-pro { background: #d97706; color: white; border: 1px solid #fcd34d; }
 
-/* --- Pro 報告專屬樣式 --- */
+
 .pro-report-style {
   border: 2px solid #D4AF37 !important;
   background: linear-gradient(to bottom, #fffdf0, #ffffff) !important;
@@ -151,7 +150,7 @@ button {
   text-align: left;
 }
 
-/* --- 彈窗組件 (Modal) --- */
+
 .dc-modal {
   position: fixed;
   inset: 0;
@@ -208,7 +207,7 @@ button {
   font-weight: 600;
 }
 
-/* --- RWD 手機版優化 --- */
+
 @media (max-width: 768px) {
   body {
     background: #4a4ab6 !important;
