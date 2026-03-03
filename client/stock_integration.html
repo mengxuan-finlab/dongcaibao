@@ -144,6 +144,7 @@
     const debugEl = document.getElementById("debug");
     const resultEl = document.getElementById("result");
     const symbolInput = document.getElementById("symbolInput");
+    const fetchBtn = document.getElementById("fetchBtn");
     
     const symbol = symbolInput.value.trim().toUpperCase();
     if (!symbol) {
@@ -157,8 +158,11 @@
       return;
     }
 
+    // UX 優化：點擊後禁用按鈕並顯示狀態
+    fetchBtn.disabled = true;
+    fetchBtn.textContent = "正在分析數據...";
     debugEl.textContent = "查詢中…正在分析數據...";
-    resultEl.innerHTML = "<p>正在生成公司報告，請稍候...(約 15-30 秒)</p>";
+    resultEl.innerHTML = "<p>正在生成公司報告，請稍候...(約 30-45 秒)</p>";
 
     try {
       const response = await fetch(BACKEND_URL, {
@@ -184,14 +188,30 @@
       
       const resultElement = document.getElementById("result");
 
+      // 處理方案樣式
       if (data.plan === 'pro') {
           resultElement.classList.add("pro-report-style");
       } else {
           resultElement.classList.remove("pro-report-style");
       }
 
+      // --- 核心優化：整合圖表與報告 ---
+      // 1. 先將 Markdown 內容解析出來
       const htmlContent = marked.parse(data.text);
-      resultElement.innerHTML = htmlContent;
+      
+      // 2. 準備 TradingView 圖表 HTML
+      const chartHtml = `
+        <div style="height:450px; margin-bottom:25px; border-radius: 12px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 4px 20px rgba(0,0,0,0.3);">
+          <iframe 
+            src="https://s.tradingview.com/widgetembed/?symbol=${symbol}&interval=D&theme=dark&style=1&timezone=Asia%2FTaipei" 
+            width="100%" height="100%" frameborder="0" allowfullscreen>
+          </iframe>
+        </div>`;
+
+      // 3. 一次性更新畫面：圖表在上，分析報告在下
+      resultElement.innerHTML = chartHtml + htmlContent;
+
+      // 更新狀態變數
       currentSearchContext = data.searchContext; 
       currentSymbol = symbol;
       document.getElementById("chatContainer").style.display = "block";
@@ -206,6 +226,10 @@
       console.error(err);
       debugEl.textContent = "錯誤：" + err.message;
       resultEl.innerHTML = `<p style='color:red'>發生錯誤，請確認後端是否已啟動。</p>`;
+    } finally {
+      // 無論成功失敗，都要恢復按鈕狀態
+      fetchBtn.disabled = false;
+      fetchBtn.textContent = "產生公司介紹";
     }
   });
 
