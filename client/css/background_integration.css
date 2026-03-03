@@ -1,9 +1,16 @@
+/* --- 全域與重置 --- */
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
+html {
+  scroll-behavior: smooth;
+  height: -webkit-fill-available;
+}
+
+/* --- Body 基礎樣式與背景 --- */
 body {
   font-family: 'Microsoft JhengHei', 'PingFang TC', sans-serif;
   background: #4a4ab6;
@@ -11,6 +18,8 @@ body {
   position: relative;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
+  color: white;
+  padding: 20px;
 }
 
 body::before {
@@ -26,6 +35,7 @@ body::before {
   transform: translateZ(0);
 }
 
+/* --- 背景動畫粒子 --- */
 .particle {
   position: absolute;
   width: 4px;
@@ -47,15 +57,46 @@ body::before {
   100% { transform: translateY(-100px) translateX(30px); opacity: 0; }
 }
 
-html {
-  scroll-behavior: smooth;
-  height: -webkit-fill-available;
-}
-
+/* --- 佈局與區段 --- */
 section {
   min-height: 100vh;
 }
 
+/* --- 股票資訊結果區域 (#result) --- */
+#result h2, #result h3 {
+  margin-top: 20px;
+  color: #ffdaa2;
+}
+
+#result p, #result li {
+  line-height: 1.7;
+  font-size: 17px;
+}
+
+#result ul {
+  padding-left: 20px;
+}
+
+/* --- 輸入框與按鈕 --- */
+input {
+  padding: 8px;
+  font-size: 18px;
+}
+
+button {
+  padding: 8px 15px;
+  font-size: 16px;
+  cursor: pointer;
+  margin-left: 5px;
+}
+
+#usageInfo {
+  margin-top: 8px;
+  font-size: 14px;
+  color: #ede7f3;
+}
+
+/* --- 方案標籤 (Plan Tags) --- */
 .plan-tag {
   padding: 2px 8px;
   border-radius: 4px;
@@ -68,6 +109,7 @@ section {
 .plan-plus { background: #6366f1; color: white; }
 .plan-pro { background: #d97706; color: white; border: 1px solid #fcd34d; }
 
+/* --- Pro 報告專屬樣式 --- */
 .pro-report-style {
   border: 2px solid #D4AF37 !important;
   background: linear-gradient(to bottom, #fffdf0, #ffffff) !important;
@@ -109,6 +151,64 @@ section {
   text-align: left;
 }
 
+/* --- 彈窗組件 (Modal) --- */
+.dc-modal {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+.dc-modal.show {
+  display: flex;
+}
+.dc-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.5);
+}
+.dc-modal-content {
+  position: relative;
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 24px 20px;
+  max-width: 360px;
+  width: 90%;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.18);
+  z-index: 1;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft JhengHei", sans-serif;
+}
+.dc-modal-content h3 {
+  margin: 0 0 8px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #111827;
+}
+.dc-modal-content p {
+  margin: 0 0 16px;
+  font-size: 14px;
+  color: #4b5563;
+  line-height: 1.6;
+  white-space: pre-line;
+}
+.dc-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.dc-btn-primary {
+  border: none;
+  border-radius: 999px;
+  padding: 8px 16px;
+  font-size: 14px;
+  cursor: pointer;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+/* --- RWD 手機版優化 --- */
 @media (max-width: 768px) {
   body {
     background: #4a4ab6 !important;
