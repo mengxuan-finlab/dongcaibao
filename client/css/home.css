@@ -343,3 +343,55 @@ header.top-logo {
         z-index: 0;
     }
 }
+.desktop-footer {
+  display: block;
+  width: 100%;
+  padding: 48px 24px;
+  margin-top: 80px;
+  background: rgba(10, 18, 35, 0.9);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(8px);
+}
+
+.footer-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr 1.5fr;
+  gap: 40px;
+  align-items: start;
+}
+
+.desktop-footer h3,
+.desktop-footer h4 {
+  color: #ffffff;
+  margin-bottom: 12px;
+}
+
+.desktop-footer h3 {
+  font-size: 1.4rem;
+}
+
+.desktop-footer h4 {
+  font-size: 1rem;
+}
+
+.desktop-footer p {
+  color: rgba(255, 255, 255, 0.78);
+  line-height: 1.8;
+  font-size: 0.95rem;
+  margin: 0 0 8px 0;
+}
+
+.footer-brand p,
+.footer-info p,
+.footer-disclaimer p {
+  max-width: 420px;
+}
+
+/* 手機版不顯示 */
+@media (max-width: 768px) {
+  .desktop-footer {
+    display: none;
+  }
+}
