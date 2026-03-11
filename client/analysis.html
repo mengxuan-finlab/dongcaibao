@@ -493,39 +493,43 @@ function buildInsight(d, s) {
   const lines = [];
   const rev = d.revenue_growth;
   const eps = d.eps_growth;
+
   if (rev == null || eps == null) {
-    lines.push("成長：部分成長指標缺值，建議再確認營收與 EPS 的最新趨勢。");
+    lines.push("成長：目前資料中營收或 EPS 成長率存在缺值。");
   } else if (rev >= 0.15 && eps >= 0.15) {
-    lines.push("成長：營收與 EPS 皆維持高速成長，支撐成長評分。");
+    lines.push("成長：營收成長率與 EPS 成長率皆處於較高區間。");
   } else if (rev < 0.05 && eps < 0.05) {
-    lines.push("成長：營收與 EPS 成長偏弱（或趨緩），使成長評分受壓。");
+    lines.push("成長：營收與 EPS 成長率均處於相對較低區間。");
   } else {
-    lines.push("成長：成長動能分歧（營收與 EPS 一強一弱），建議留意可持續性。");
+    lines.push("成長：營收與 EPS 成長率呈現不同方向或強度。");
   }
 
   const roe = d.roe;
   const roic = d.roic;
+
   if (roe == null || roic == null) {
-    lines.push("品質：ROE/ROIC 指標缺值，無法完整判斷資本效率。");
+    lines.push("品質：目前資料中 ROE 或 ROIC 指標存在缺值。");
   } else if (roe >= 0.2 && roic >= 0.15) {
-    lines.push("品質：ROE 與 ROIC 皆偏高，代表資本效率與獲利品質良好。");
+    lines.push("品質：ROE 與 ROIC 指標皆處於較高水準區間。");
   } else if (roe < 0.1 || roic < 0.08) {
-    lines.push("品質：ROE 或 ROIC 偏低，顯示資本效率較保守，品質評分偏弱。");
+    lines.push("品質：ROE 或 ROIC 至少一項處於較低水準區間。");
   } else {
-    lines.push("品質：資本效率落在中段水準，屬於穩定但不極強的品質結構。");
+    lines.push("品質：ROE 與 ROIC 指標位於中段區間。");
   }
 
   const pe = d.pe;
   const fcfy = d.fcf_yield;
+
   if (pe == null || fcfy == null) {
-    lines.push("估值：估值指標缺值，建議補齊 PE 與 FCF 殖利率再評估。");
+    lines.push("估值：目前資料中 PE 或 FCF 殖利率存在缺值。");
   } else if (pe <= 20 && fcfy >= 0.04) {
-    lines.push("估值：PE 偏合理且 FCF 殖利率較佳，估值面相對友善。");
+    lines.push("估值：PE 位於相對較低區間，FCF 殖利率處於較高區間。");
   } else if (pe > 30 && fcfy < 0.02) {
-    lines.push("估值：PE 偏高且 FCF 殖利率偏低，估值評分容易被拉低。");
+    lines.push("估值：PE 位於較高區間且 FCF 殖利率處於較低區間。");
   } else {
-    lines.push("估值：估值落在中性區間，建議搭配成長性一起衡量是否合理。");
+    lines.push("估值：PE 與 FCF 殖利率位於中間區間。");
   }
+
   return lines.slice(0, 3);
 }
 
@@ -589,14 +593,14 @@ function buildHealthChecks(d) {
     const total = checks.length;
     const ratio = pass / total;
     const level = ratio >= 0.75 ? "good" : ratio >= 0.5 ? "mid" : "bad";
-    const label = ratio >= 0.75 ? "偏符合" : ratio >= 0.5 ? "中性" : "偏不符合";
+    const label = ratio >= 0.75 ? "項達標" : ratio >= 0.5 ? "項達標" : "項達標";
     return { title, checks, pass, total, level, label };
   }
 
   return [
-    pack("成長型投資適配度", growthChecks),
-    pack("定存型投資適配度", incomeChecks),
-    pack("價值型投資適配度", valueChecks),
+    pack("成長型指標條件", growthChecks),
+    pack("定期穩定型指標條件", incomeChecks),
+    pack("價值評估條件檢視", valueChecks),
     pack("財務健康與避雷", riskChecks),
   ];
 }
@@ -610,7 +614,7 @@ function renderHealthSection(d){
   host.innerHTML = `
       <div class="healthCard">
         <div class="healthHeader">
-          <h3>投資風格適配度分析</h3>
+          <h3>投資相關條件檢視</h3>
         </div>
         <div class="healthGrid">
           ${blocks.map(b => `
