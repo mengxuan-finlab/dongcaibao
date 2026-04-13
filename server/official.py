@@ -48,7 +48,7 @@ def process_stock(stock_row):
         clean_text = re.sub(r'\s+', ' ', clean_text).strip()[:500000]
 
         # Step 3: 調用 AI 模型
-        model = genai.GenerativeModel('gemini-2.5-flash')
+        model = genai.GenerativeModel('gemini-3-flash')
         
         full_prompt = f"""
 你是一個財報文件摘要助手。
