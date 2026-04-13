@@ -364,7 +364,11 @@ app.post('/api/analyze-stock', async (req, res) => {
       : getBasePrompt(symbol, searchContext);
 
     // C. 呼叫動態模型
-    const dynamicModel = genAI.getGenerativeModel({ model: modelName });
+    const dynamicModel = genAI.getGenerativeModel({ 
+      model: modelName 
+    }, { 
+      apiVersion: "v1beta" 
+    });
     const aiResult = await dynamicModel.generateContent(finalPrompt);
     const responseText = aiResult.response.text();
 
@@ -455,7 +459,11 @@ app.post('/api/chat-with-report', async (req, res) => {
     res.setHeader('Transfer-Encoding', 'chunked');
 
     // 使用 generateContentStream 啟動串流
-    const chatModel = genAI.getGenerativeModel({ model: modelName });
+    const chatModel = genAI.getGenerativeModel({ 
+      model: modelName 
+    }, { 
+      apiVersion: "v1beta" // ★ 必須加上這行，否則 Streaming 會失敗
+    });
     const result = await chatModel.generateContentStream(chatPrompt);
 
     // 逐塊讀取 AI 生成的文字並發送給前端
