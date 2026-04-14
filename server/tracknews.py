@@ -109,7 +109,7 @@ def fetch_news():
 
 def analyze_and_send(news_item, rule):
     """AI 分析並寄信 (Pro 方案將啟動全文分析)"""
-    model = genai.GenerativeModel('gemini-3-flash')
+    model = genai.GenerativeModel('gemini-2.5-flash')
     
     user_plan = rule.get('plan', 'free')
     keywords_str = ", ".join(rule['keywords'])
