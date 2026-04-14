@@ -24,7 +24,7 @@ const supabase = createClient(
 // 注意：目前最新且穩定的是 gemini-3-flash，使用 v1beta 通道
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({ 
-  model: "gemini-3-flash" 
+  model: "gemini-2.5-flash" 
 }, { 
   apiVersion: "v1beta" 
 });
@@ -341,7 +341,7 @@ app.post('/api/analyze-stock', async (req, res) => {
     // ==========================================
 
     // --- ★ 關鍵修正 2：修正模型名稱 (Gemini 無 2.5 版本) ---
-    const modelName = isPro ? "gemini-3-flash" : "gemini-3-flash"; 
+    const modelName = isPro ? "gemini-2.5-flash" : "gemini-2.5-flash"; 
     const searchNum = isPro ? 20 : 10;
 
     // 診斷用：請在部署後的 Log 觀察這裡輸出什麼
@@ -400,7 +400,7 @@ app.post('/api/chat-with-report', async (req, res) => {
     const { data: profile } = await supabase.from('profiles').select('plan').eq('id', user.id).single();
     const userPlan = (profile?.plan || 'free').toLowerCase();
     
-    const modelName = "gemini-3-flash"; 
+    const modelName = "gemini-2.5-flash"; 
 
     // --- (保留原本的問答限流攔截器邏輯) ---
     if (userPlan !== 'pro') {
