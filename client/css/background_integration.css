@@ -300,6 +300,111 @@ button {
   margin-top: 30px;
 }
 
+.company-timeline {
+  margin: 28px 0 34px;
+  padding: 26px;
+  color: #172033;
+  background: linear-gradient(145deg, #fffdf7, #f2f4ff);
+  border: 1px solid rgba(103, 89, 205, 0.18);
+  border-radius: 20px;
+  box-shadow: 0 18px 45px rgba(21, 18, 70, 0.18);
+}
+
+.company-timeline__heading {
+  margin-bottom: 26px;
+}
+
+.company-timeline__heading span {
+  color: #6d5bd0;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+}
+
+#result .company-timeline__heading h2 {
+  margin: 6px 0;
+  color: #19152f;
+  font-size: clamp(22px, 3vw, 30px);
+}
+
+#result .company-timeline__heading p {
+  color: #667085;
+  font-size: 14px;
+}
+
+.company-timeline__track {
+  position: relative;
+  display: grid;
+  gap: 0;
+}
+
+.company-timeline__track::before {
+  content: "";
+  position: absolute;
+  top: 22px;
+  bottom: 22px;
+  left: 21px;
+  width: 2px;
+  background: linear-gradient(#7c67e5, #ffb454);
+}
+
+.company-timeline__item {
+  position: relative;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 16px;
+  padding-bottom: 22px;
+}
+
+.company-timeline__item:last-child {
+  padding-bottom: 0;
+}
+
+.company-timeline__marker {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  color: #ffffff;
+  background: linear-gradient(145deg, #7662dc, #5a47bd);
+  border: 4px solid #f7f5ff;
+  border-radius: 50%;
+  box-shadow: 0 5px 14px rgba(90, 71, 189, 0.28);
+}
+
+.company-timeline__marker span {
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.company-timeline__content {
+  padding: 15px 18px;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(103, 89, 205, 0.13);
+  border-radius: 14px;
+}
+
+#result .company-timeline__period {
+  margin-bottom: 4px;
+  color: #c36f13;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+#result .company-timeline__content h3 {
+  margin: 0 0 6px;
+  color: #25203f;
+  font-size: 17px;
+}
+
+#result .company-timeline__impact {
+  color: #5d6578;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
 
 .dc-modal {
   position: fixed;
@@ -414,5 +519,18 @@ button {
   .value-chain__revenue {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .company-timeline {
+    padding: 20px 15px;
+    border-radius: 16px;
+  }
+
+  .company-timeline__item {
+    gap: 10px;
+  }
+
+  .company-timeline__content {
+    padding: 13px 14px;
   }
 }

@@ -129,6 +129,48 @@
     }
   }
 
+  function extractTimeline(responseText) {
+    const text = String(responseText || "");
+    const startMarker = "<" + "!-- TIMELINE_START --" + ">";
+    const endMarker = "<" + "!-- TIMELINE_END --" + ">";
+    const startIndex = text.indexOf(startMarker);
+    const endIndex = text.indexOf(endMarker, startIndex + startMarker.length);
+
+    if (startIndex === -1 || endIndex === -1) {
+      return { timeline: null, reportText: responseText };
+    }
+
+    const rawBlockEnd = endIndex + endMarker.length;
+    const rawJsonBlock = text.slice(startIndex + startMarker.length, endIndex);
+    const reportText = (text.slice(0, startIndex) + text.slice(rawBlockEnd)).trim();
+
+    try {
+      const rawJson = rawJsonBlock
+        .replace(/^```(?:json)?\s*/i, "")
+        .replace(/\s*```$/i, "")
+        .trim();
+      const parsed = JSON.parse(rawJson);
+      const items = Array.isArray(parsed.items)
+        ? parsed.items
+            .map(item => ({
+              period: String(item?.period || "").trim(),
+              event: String(item?.event || "").trim(),
+              impact: String(item?.impact || "").trim()
+            }))
+            .filter(item => item.period && item.event)
+            .slice(0, 6)
+        : [];
+
+      return {
+        timeline: items.length ? { items } : null,
+        reportText
+      };
+    } catch (error) {
+      console.warn("公司時間線資料解析失敗，改用純文字報告。", error);
+      return { timeline: null, reportText };
+    }
+  }
+
   function renderValueChainList(items) {
     const safeItems = items.length ? items : ["未披露"];
     return `<ul>${safeItems.map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`;
@@ -177,6 +219,36 @@
         <div class="value-chain__revenue">
           <strong>收入來源</strong>
           <div>${valueChain.revenue.map(item => `<span>${escapeHtml(item)}</span>`).join("") || "<span>未披露</span>"}</div>
+        </div>
+      </section>
+    `;
+  }
+
+  function renderTimeline(timeline) {
+    if (!timeline?.items?.length) return "";
+
+    const itemsHtml = timeline.items.map((item, index) => `
+      <article class="company-timeline__item">
+        <div class="company-timeline__marker" aria-hidden="true">
+          <span>${String(index + 1).padStart(2, "0")}</span>
+        </div>
+        <div class="company-timeline__content">
+          <p class="company-timeline__period">${escapeHtml(item.period)}</p>
+          <h3>${escapeHtml(item.event)}</h3>
+          ${item.impact ? `<p class="company-timeline__impact">${escapeHtml(item.impact)}</p>` : ""}
+        </div>
+      </article>
+    `).join("");
+
+    return `
+      <section class="company-timeline" aria-labelledby="companyTimelineTitle">
+        <div class="company-timeline__heading">
+          <span>COMPANY JOURNEY</span>
+          <h2 id="companyTimelineTitle">公司發展時間線</h2>
+          <p>從關鍵節點看懂公司如何走到現在。</p>
+        </div>
+        <div class="company-timeline__track">
+          ${itemsHtml}
         </div>
       </section>
     `;
@@ -302,8 +374,10 @@
       }
 
    
-      const { valueChain, reportText } = extractValueChain(data.text);
+      const { valueChain, reportText: reportWithoutValueChain } = extractValueChain(data.text);
+      const { timeline, reportText } = extractTimeline(reportWithoutValueChain);
       const valueChainHtml = renderValueChain(valueChain, symbol);
+      const timelineHtml = renderTimeline(timeline);
       const htmlContent = marked.parse(reportText);
       
      
@@ -316,7 +390,7 @@
         </div>`;
 
     
-      resultElement.innerHTML = chartHtml + valueChainHtml + htmlContent;
+      resultElement.innerHTML = chartHtml + valueChainHtml + timelineHtml + htmlContent;
 
      
       currentSearchContext = data.searchContext; 
