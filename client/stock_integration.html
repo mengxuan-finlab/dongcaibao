@@ -75,6 +75,113 @@
     planModal.classList.remove("show");
   }
 
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function normalizeValueChainItems(items) {
+    if (!Array.isArray(items)) return [];
+    return items
+      .map(item => String(item || "").trim())
+      .filter(Boolean)
+      .slice(0, 3);
+  }
+
+  function extractValueChain(responseText) {
+    const text = String(responseText || "");
+    const startMarker = "<" + "!-- VALUE_CHAIN_START --" + ">";
+    const endMarker = "<" + "!-- VALUE_CHAIN_END --" + ">";
+    const startIndex = text.indexOf(startMarker);
+    const endIndex = text.indexOf(endMarker, startIndex + startMarker.length);
+
+    if (startIndex === -1 || endIndex === -1) {
+      return { valueChain: null, reportText: responseText };
+    }
+
+    const rawBlockEnd = endIndex + endMarker.length;
+    const rawJsonBlock = text.slice(startIndex + startMarker.length, endIndex);
+    const reportText = (text.slice(0, startIndex) + text.slice(rawBlockEnd)).trim();
+
+    try {
+      const rawJson = rawJsonBlock
+        .replace(/^```(?:json)?\s*/i, "")
+        .replace(/\s*```$/i, "")
+        .trim();
+      const parsed = JSON.parse(rawJson);
+      const valueChain = {
+        company: String(parsed.company || "").trim(),
+        position: String(parsed.position || "").trim(),
+        upstream: normalizeValueChainItems(parsed.upstream),
+        offerings: normalizeValueChainItems(parsed.offerings),
+        customers: normalizeValueChainItems(parsed.customers),
+        revenue: normalizeValueChainItems(parsed.revenue)
+      };
+
+      return { valueChain, reportText };
+    } catch (error) {
+      console.warn("價值鏈資料解析失敗，改用純文字報告。", error);
+      return { valueChain: null, reportText };
+    }
+  }
+
+  function renderValueChainList(items) {
+    const safeItems = items.length ? items : ["未披露"];
+    return `<ul>${safeItems.map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`;
+  }
+
+  function renderValueChain(valueChain, fallbackSymbol) {
+    if (!valueChain) return "";
+
+    const company = valueChain.company || fallbackSymbol;
+    const position = valueChain.position || "產業鏈定位未披露";
+
+    return `
+      <section class="value-chain" aria-labelledby="valueChainTitle">
+        <div class="value-chain__heading">
+          <span>BUSINESS MAP</span>
+          <h2 id="valueChainTitle">商業模式與產業價值鏈</h2>
+          <p>快速看懂公司從哪裡取得資源、提供什麼價值，以及向誰收費。</p>
+        </div>
+
+        <div class="value-chain__flow">
+          <article class="value-chain__card">
+            <div class="value-chain__icon" aria-hidden="true">01</div>
+            <p class="value-chain__label">上游資源</p>
+            ${renderValueChainList(valueChain.upstream)}
+          </article>
+
+          <div class="value-chain__arrow" aria-hidden="true">→</div>
+
+          <article class="value-chain__card value-chain__card--company">
+            <div class="value-chain__icon" aria-hidden="true">02</div>
+            <p class="value-chain__label">核心公司</p>
+            <h3>${escapeHtml(company)}</h3>
+            <p class="value-chain__position">${escapeHtml(position)}</p>
+            ${renderValueChainList(valueChain.offerings)}
+          </article>
+
+          <div class="value-chain__arrow" aria-hidden="true">→</div>
+
+          <article class="value-chain__card">
+            <div class="value-chain__icon" aria-hidden="true">03</div>
+            <p class="value-chain__label">客戶與市場</p>
+            ${renderValueChainList(valueChain.customers)}
+          </article>
+        </div>
+
+        <div class="value-chain__revenue">
+          <strong>收入來源</strong>
+          <div>${valueChain.revenue.map(item => `<span>${escapeHtml(item)}</span>`).join("") || "<span>未披露</span>"}</div>
+        </div>
+      </section>
+    `;
+  }
+
   planModalClose.addEventListener("click", hidePlanModal);
   planModalBackdrop.addEventListener("click", hidePlanModal);
 
@@ -195,7 +302,9 @@
       }
 
    
-      const htmlContent = marked.parse(data.text);
+      const { valueChain, reportText } = extractValueChain(data.text);
+      const valueChainHtml = renderValueChain(valueChain, symbol);
+      const htmlContent = marked.parse(reportText);
       
      
       const chartHtml = `
@@ -207,7 +316,7 @@
         </div>`;
 
     
-      resultElement.innerHTML = chartHtml + htmlContent;
+      resultElement.innerHTML = chartHtml + valueChainHtml + htmlContent;
 
      
       currentSearchContext = data.searchContext; 

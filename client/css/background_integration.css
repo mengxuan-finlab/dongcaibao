@@ -150,6 +150,156 @@ button {
   text-align: left;
 }
 
+.value-chain {
+  --chain-accent: #ffb454;
+  margin: 28px 0 34px;
+  padding: 26px;
+  color: #eaf0ff;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(111, 91, 255, 0.24), transparent 44%),
+    linear-gradient(145deg, #111936, #171248);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 20px;
+  box-shadow: 0 18px 45px rgba(10, 8, 40, 0.28);
+}
+
+.value-chain__heading {
+  text-align: center;
+  margin-bottom: 22px;
+}
+
+.value-chain__heading span {
+  color: var(--chain-accent);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+}
+
+#result .value-chain__heading h2 {
+  margin: 6px 0;
+  color: #ffffff;
+  font-size: clamp(22px, 3vw, 30px);
+}
+
+#result .value-chain__heading p {
+  color: #aeb9d8;
+  font-size: 14px;
+}
+
+.value-chain__flow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 36px minmax(0, 1.2fr) 36px minmax(0, 1fr);
+  align-items: stretch;
+  gap: 10px;
+}
+
+.value-chain__card {
+  min-width: 0;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+}
+
+.value-chain__card--company {
+  background: linear-gradient(155deg, rgba(132, 102, 255, 0.34), rgba(255, 180, 84, 0.12));
+  border-color: rgba(255, 180, 84, 0.5);
+  box-shadow: inset 0 0 28px rgba(120, 92, 255, 0.12);
+}
+
+.value-chain__icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  margin-bottom: 14px;
+  color: #16112f;
+  background: var(--chain-accent);
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+#result .value-chain__label {
+  margin-bottom: 9px;
+  color: #aeb9d8;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+#result .value-chain__card h3 {
+  margin: 0 0 6px;
+  color: #ffffff;
+  font-size: 23px;
+}
+
+#result .value-chain__position {
+  margin-bottom: 13px;
+  color: #ffd49b;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+#result .value-chain__card ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+#result .value-chain__card li {
+  padding: 8px 10px;
+  color: #edf1ff;
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.value-chain__arrow {
+  display: grid;
+  place-items: center;
+  color: var(--chain-accent);
+  font-size: 28px;
+  font-weight: 300;
+}
+
+.value-chain__revenue {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 16px;
+  padding: 14px 18px;
+  background: rgba(4, 7, 25, 0.3);
+  border-radius: 12px;
+}
+
+.value-chain__revenue strong {
+  flex: 0 0 auto;
+  color: #ffffff;
+}
+
+.value-chain__revenue div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.value-chain__revenue span {
+  padding: 6px 10px;
+  color: #ffd49b;
+  background: rgba(255, 180, 84, 0.12);
+  border: 1px solid rgba(255, 180, 84, 0.3);
+  border-radius: 999px;
+  font-size: 13px;
+}
+
+.pro-report-style .value-chain {
+  margin-top: 30px;
+}
+
 
 .dc-modal {
   position: fixed;
@@ -245,5 +395,24 @@ button {
   #result h1:first-child {
     margin-top: 5px !important;
     font-size: 1.4rem !important;
+  }
+
+  .value-chain {
+    padding: 20px 15px;
+    border-radius: 16px;
+  }
+
+  .value-chain__flow {
+    grid-template-columns: 1fr;
+  }
+
+  .value-chain__arrow {
+    height: 24px;
+    transform: rotate(90deg);
+  }
+
+  .value-chain__revenue {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
