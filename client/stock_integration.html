@@ -171,6 +171,51 @@
     }
   }
 
+  function extractCoreSummary(responseText) {
+    const text = String(responseText || "");
+    const startMarker = "<" + "!-- CORE_SUMMARY_START --" + ">";
+    const endMarker = "<" + "!-- CORE_SUMMARY_END --" + ">";
+    const startIndex = text.indexOf(startMarker);
+    const endIndex = text.indexOf(endMarker, startIndex + startMarker.length);
+
+    if (startIndex === -1 || endIndex === -1) {
+      return { coreSummary: null, reportText: responseText };
+    }
+
+    const rawBlockEnd = endIndex + endMarker.length;
+    const rawJsonBlock = text.slice(startIndex + startMarker.length, endIndex);
+    const reportText = (text.slice(0, startIndex) + text.slice(rawBlockEnd)).trim();
+
+    try {
+      const rawJson = rawJsonBlock
+        .replace(/^```(?:json)?\s*/i, "")
+        .replace(/\s*```$/i, "")
+        .trim();
+      const parsed = JSON.parse(rawJson);
+      const normalizeText = value => String(value || "未披露").trim() || "未披露";
+      const focus = Array.isArray(parsed.focus)
+        ? parsed.focus.map(normalizeText).filter(Boolean).slice(0, 4)
+        : [];
+
+      return {
+        coreSummary: {
+          company: normalizeText(parsed.company),
+          identity: normalizeText(parsed.identity),
+          problem: normalizeText(parsed.problem),
+          revenue: normalizeText(parsed.revenue),
+          edge: normalizeText(parsed.edge),
+          momentum: normalizeText(parsed.momentum),
+          pressure: normalizeText(parsed.pressure),
+          focus: focus.length ? focus : ["未披露"]
+        },
+        reportText
+      };
+    } catch (error) {
+      console.warn("核心摘要資料解析失敗，改用純文字報告。", error);
+      return { coreSummary: null, reportText };
+    }
+  }
+
   function renderValueChainList(items) {
     const safeItems = items.length ? items : ["未披露"];
     return `<ul>${safeItems.map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`;
@@ -249,6 +294,58 @@
         </div>
         <div class="company-timeline__track">
           ${itemsHtml}
+        </div>
+      </section>
+    `;
+  }
+
+  function renderCoreSummary(coreSummary, fallbackSymbol) {
+    if (!coreSummary) return "";
+
+    const company = coreSummary.company === "未披露"
+      ? fallbackSymbol
+      : coreSummary.company;
+    const cards = [
+      ["01", "公司定位", coreSummary.identity],
+      ["02", "解決痛點", coreSummary.problem],
+      ["03", "收入引擎", coreSummary.revenue],
+      ["04", "模式特色", coreSummary.edge]
+    ];
+
+    return `
+      <section class="core-summary" aria-labelledby="coreSummaryTitle">
+        <div class="core-summary__heading">
+          <div>
+            <span>INVESTMENT SNAPSHOT</span>
+            <h2 id="coreSummaryTitle">${escapeHtml(company)} 核心摘要</h2>
+          </div>
+          <p>先用一張圖掌握公司如何創造價值，以及近期最該注意的變化。</p>
+        </div>
+
+        <div class="core-summary__grid">
+          ${cards.map(([number, label, content]) => `
+            <article class="core-summary__card">
+              <span class="core-summary__number">${number}</span>
+              <p class="core-summary__label">${label}</p>
+              <p class="core-summary__text">${escapeHtml(content)}</p>
+            </article>
+          `).join("")}
+        </div>
+
+        <div class="core-summary__signals">
+          <article class="core-summary__signal core-summary__signal--positive">
+            <p class="core-summary__label">成長動能</p>
+            <p>${escapeHtml(coreSummary.momentum)}</p>
+          </article>
+          <article class="core-summary__signal core-summary__signal--risk">
+            <p class="core-summary__label">主要壓力</p>
+            <p>${escapeHtml(coreSummary.pressure)}</p>
+          </article>
+        </div>
+
+        <div class="core-summary__focus">
+          <strong>後續研究焦點</strong>
+          <div>${coreSummary.focus.map(item => `<span>${escapeHtml(item)}</span>`).join("")}</div>
         </div>
       </section>
     `;
@@ -375,9 +472,11 @@
 
    
       const { valueChain, reportText: reportWithoutValueChain } = extractValueChain(data.text);
-      const { timeline, reportText } = extractTimeline(reportWithoutValueChain);
+      const { timeline, reportText: reportWithoutTimeline } = extractTimeline(reportWithoutValueChain);
+      const { coreSummary, reportText } = extractCoreSummary(reportWithoutTimeline);
       const valueChainHtml = renderValueChain(valueChain, symbol);
       const timelineHtml = renderTimeline(timeline);
+      const coreSummaryHtml = renderCoreSummary(coreSummary, symbol);
       const htmlContent = marked.parse(reportText);
       
      
@@ -390,7 +489,7 @@
         </div>`;
 
     
-      resultElement.innerHTML = chartHtml + valueChainHtml + timelineHtml + htmlContent;
+      resultElement.innerHTML = chartHtml + valueChainHtml + timelineHtml + coreSummaryHtml + htmlContent;
 
      
       currentSearchContext = data.searchContext; 
