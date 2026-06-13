@@ -216,6 +216,53 @@
     }
   }
 
+  function extractProductPortfolio(responseText) {
+    const text = String(responseText || "");
+    const startMarker = "<" + "!-- PRODUCT_PORTFOLIO_START --" + ">";
+    const endMarker = "<" + "!-- PRODUCT_PORTFOLIO_END --" + ">";
+    const startIndex = text.indexOf(startMarker);
+    const endIndex = text.indexOf(endMarker, startIndex + startMarker.length);
+
+    if (startIndex === -1 || endIndex === -1) {
+      return { productPortfolio: null, reportText: responseText };
+    }
+
+    const rawBlockEnd = endIndex + endMarker.length;
+    const rawJsonBlock = text.slice(startIndex + startMarker.length, endIndex);
+    const reportText = (text.slice(0, startIndex) + text.slice(rawBlockEnd)).trim();
+
+    try {
+      const rawJson = rawJsonBlock
+        .replace(/^```(?:json)?\s*/i, "")
+        .replace(/\s*```$/i, "")
+        .trim();
+      const parsed = JSON.parse(rawJson);
+      const normalizeText = value => String(value || "未披露").trim() || "未披露";
+      const items = Array.isArray(parsed.items)
+        ? parsed.items
+            .map(item => ({
+              area: normalizeText(item?.area),
+              type: normalizeText(item?.type),
+              examples: Array.isArray(item?.examples)
+                ? item.examples.map(normalizeText).slice(0, 3)
+                : ["未披露"],
+              significance: normalizeText(item?.significance)
+            }))
+            .slice(0, 6)
+        : [];
+
+      return {
+        productPortfolio: items.length
+          ? { overview: normalizeText(parsed.overview), items }
+          : null,
+        reportText
+      };
+    } catch (error) {
+      console.warn("產品組合資料解析失敗，改用純文字報告。", error);
+      return { productPortfolio: null, reportText };
+    }
+  }
+
   function renderValueChainList(items) {
     const safeItems = items.length ? items : ["未披露"];
     return `<ul>${safeItems.map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`;
@@ -351,6 +398,40 @@
     `;
   }
 
+  function renderProductPortfolio(productPortfolio) {
+    if (!productPortfolio?.items?.length) return "";
+
+    const itemsHtml = productPortfolio.items.map((item, index) => `
+      <article class="product-portfolio__card">
+        <div class="product-portfolio__topline">
+          <span>${String(index + 1).padStart(2, "0")}</span>
+          <p>${escapeHtml(item.area)}</p>
+        </div>
+        <h3>${escapeHtml(item.type)}</h3>
+        <div class="product-portfolio__examples">
+          ${item.examples.map(example => `<span>${escapeHtml(example)}</span>`).join("")}
+        </div>
+        <div class="product-portfolio__meaning">
+          <strong>對公司的意義</strong>
+          <p>${escapeHtml(item.significance)}</p>
+        </div>
+      </article>
+    `).join("");
+
+    return `
+      <section class="product-portfolio" aria-labelledby="productPortfolioTitle">
+        <div class="product-portfolio__heading">
+          <span>PRODUCT PORTFOLIO</span>
+          <h2 id="productPortfolioTitle">主要產品與服務</h2>
+          <p>${escapeHtml(productPortfolio.overview)}</p>
+        </div>
+        <div class="product-portfolio__grid">
+          ${itemsHtml}
+        </div>
+      </section>
+    `;
+  }
+
   planModalClose.addEventListener("click", hidePlanModal);
   planModalBackdrop.addEventListener("click", hidePlanModal);
 
@@ -473,10 +554,12 @@
    
       const { valueChain, reportText: reportWithoutValueChain } = extractValueChain(data.text);
       const { timeline, reportText: reportWithoutTimeline } = extractTimeline(reportWithoutValueChain);
-      const { coreSummary, reportText } = extractCoreSummary(reportWithoutTimeline);
+      const { coreSummary, reportText: reportWithoutCoreSummary } = extractCoreSummary(reportWithoutTimeline);
+      const { productPortfolio, reportText } = extractProductPortfolio(reportWithoutCoreSummary);
       const valueChainHtml = renderValueChain(valueChain, symbol);
       const timelineHtml = renderTimeline(timeline);
       const coreSummaryHtml = renderCoreSummary(coreSummary, symbol);
+      const productPortfolioHtml = renderProductPortfolio(productPortfolio);
       const htmlContent = marked.parse(reportText);
       
      
@@ -489,7 +572,7 @@
         </div>`;
 
     
-      resultElement.innerHTML = chartHtml + valueChainHtml + timelineHtml + coreSummaryHtml + htmlContent;
+      resultElement.innerHTML = chartHtml + valueChainHtml + timelineHtml + coreSummaryHtml + productPortfolioHtml + htmlContent;
 
      
       currentSearchContext = data.searchContext; 
