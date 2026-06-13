@@ -125,7 +125,7 @@
       return { valueChain, reportText };
     } catch (error) {
       console.warn("價值鏈資料解析失敗，改用純文字報告。", error);
-      return { valueChain: null, reportText };
+      return { valueChain: null, reportText: reportText.trim() };
     }
   }
 
@@ -167,7 +167,7 @@
       };
     } catch (error) {
       console.warn("公司時間線資料解析失敗，改用純文字報告。", error);
-      return { timeline: null, reportText };
+      return { timeline: null, reportText: reportText.trim() };
     }
   }
 
@@ -212,7 +212,7 @@
       };
     } catch (error) {
       console.warn("核心摘要資料解析失敗，改用純文字報告。", error);
-      return { coreSummary: null, reportText };
+      return { coreSummary: null, reportText: reportText.trim() };
     }
   }
 
@@ -259,8 +259,313 @@
       };
     } catch (error) {
       console.warn("產品組合資料解析失敗，改用純文字報告。", error);
-      return { productPortfolio: null, reportText };
+      return { productPortfolio: null, reportText: reportText.trim() };
     }
+  }
+
+  function extractResearchDashboard(responseText) {
+    const text = String(responseText || "");
+    const startMarker = "<" + "!-- RESEARCH_DASHBOARD_START --" + ">";
+    const endMarker = "<" + "!-- RESEARCH_DASHBOARD_END --" + ">";
+    const startIndex = text.indexOf(startMarker);
+    const endIndex = text.indexOf(endMarker, startIndex + startMarker.length);
+
+    if (startIndex === -1 || endIndex === -1) {
+      return { dashboard: null, reportText: responseText };
+    }
+
+    const rawBlockEnd = endIndex + endMarker.length;
+    const rawJsonBlock = text.slice(startIndex + startMarker.length, endIndex);
+    const reportText = (text.slice(0, startIndex) + text.slice(rawBlockEnd)).trim();
+
+    try {
+      const rawJson = rawJsonBlock
+        .replace(/^```(?:json)?\s*/i, "")
+        .replace(/\s*```$/i, "")
+        .trim();
+      return { dashboard: JSON.parse(rawJson), reportText };
+    } catch (error) {
+      console.warn("研究儀表板資料解析失敗，改用純文字報告。", error);
+      return { dashboard: null, reportText: reportText.trim() };
+    }
+  }
+
+  function safeText(value) {
+    return String(value || "未披露").trim() || "未披露";
+  }
+
+  function safeItems(value, limit = 10) {
+    return Array.isArray(value) ? value.slice(0, limit) : [];
+  }
+
+  function renderDashboardHeading(eyebrow, title, description) {
+    return `
+      <div class="research-panel__heading">
+        <span>${escapeHtml(eyebrow)}</span>
+        <h2>${escapeHtml(title)}</h2>
+        ${description ? `<p>${escapeHtml(description)}</p>` : ""}
+      </div>
+    `;
+  }
+
+  function renderInfoCards(items, className = "") {
+    return `
+      <div class="research-card-grid ${className}">
+        ${items.map((item, index) => `
+          <article class="research-card">
+            <span class="research-card__number">${String(index + 1).padStart(2, "0")}</span>
+            <p class="research-card__label">${escapeHtml(item.label)}</p>
+            <p class="research-card__text">${escapeHtml(safeText(item.text))}</p>
+          </article>
+        `).join("")}
+      </div>
+    `;
+  }
+
+  function renderDataTable(headers, rows) {
+    if (!rows.length) return `<p class="research-empty">目前資料不足以判斷</p>`;
+    return `
+      <div class="research-table-wrap">
+        <table class="research-table">
+          <thead><tr>${headers.map(header => `<th>${escapeHtml(header)}</th>`).join("")}</tr></thead>
+          <tbody>
+            ${rows.map(row => `
+              <tr>${row.map(cell => `<td>${escapeHtml(safeText(cell))}</td>`).join("")}</tr>
+            `).join("")}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  function renderResearchDashboard(dashboard, symbol) {
+    if (!dashboard) return "";
+
+    const vision = dashboard.vision || {};
+    const operating = dashboard.operatingModel || {};
+    const revenue = dashboard.revenueModel || {};
+    const industry = dashboard.industry || {};
+    const governance = dashboard.governance || {};
+    const research = dashboard.research || {};
+
+    const visionHtml = `
+      <section class="research-panel research-panel--light">
+        ${renderDashboardHeading("COMPANY PURPOSE", "公司願景與客戶痛點", "從公司想解決的問題，看它如何降低門檻並建立信任。")}
+        ${renderInfoCards([
+          { label: "公司想做什麼", text: vision.goal },
+          { label: "傳統痛點", text: vision.pain },
+          { label: "降低門檻", text: vision.access },
+          { label: "信任與便利", text: vision.trust }
+        ])}
+      </section>
+    `;
+
+    const operatingSteps = safeItems(operating.steps, 5);
+    const operatingHtml = `
+      <section class="research-panel research-panel--dark">
+        ${renderDashboardHeading("OPERATING MODEL", `${symbol} 怎麼做生意？`, safeText(operating.overview))}
+        <div class="process-flow">
+          ${operatingSteps.map((item, index) => `
+            <article class="process-flow__step">
+              <div class="process-flow__index">${String(index + 1).padStart(2, "0")}</div>
+              <p class="process-flow__stage">${escapeHtml(safeText(item.step))}</p>
+              <h3>${escapeHtml(safeText(item.action))}</h3>
+              <p><strong>客戶優勢</strong>${escapeHtml(safeText(item.customerBenefit))}</p>
+              <p><strong>商業影響</strong>${escapeHtml(safeText(item.businessImpact))}</p>
+            </article>
+          `).join("")}
+        </div>
+        <h3 class="research-subtitle">產品策略</h3>
+        ${renderDataTable(
+          ["領域", "產品定位與特點", "戰略意義"],
+          safeItems(operating.strategies, 6).map(item => [item.area, item.positioning, item.significance])
+        )}
+        <h3 class="research-subtitle">技術與營運效率</h3>
+        ${renderInfoCards(
+          safeItems(operating.capabilities, 8).map(item => ({
+            label: safeText(item.name),
+            text: `${safeText(item.mechanism)}｜${safeText(item.impact)}`
+          })),
+          "research-card-grid--three"
+        )}
+      </section>
+    `;
+
+    const revenueHtml = `
+      <section class="research-panel research-panel--light">
+        ${renderDashboardHeading("REVENUE ENGINE", "收入怎麼來？", "拆解付費者、付費機制、收入品質與成本結構。")}
+        ${renderInfoCards([
+          { label: "誰付錢", text: revenue.payer },
+          { label: "付費理由", text: revenue.reason },
+          { label: "付費方式", text: revenue.payment },
+          { label: "收入可預測性", text: revenue.predictability },
+          { label: "交叉銷售機會", text: revenue.crossSell }
+        ], "research-card-grid--revenue")}
+        <h3 class="research-subtitle">成本結構與毛利特性</h3>
+        ${renderDataTable(
+          ["成本要素", "優勢或壓力", "財務影響"],
+          safeItems(revenue.costs, 8).map(item => [item.factor, item.advantageOrPressure, item.financialImpact])
+        )}
+      </section>
+    `;
+
+    const advantagesHtml = `
+      <section class="research-panel research-panel--dark">
+        ${renderDashboardHeading("COMPETITIVE MOAT", `${symbol} 憑什麼贏？`, "每項優勢都連結競爭差異、護城河類型與可驗證指標。")}
+        <div class="moat-grid">
+          ${safeItems(dashboard.advantages, 5).map(item => `
+            <article class="moat-card">
+              <div class="moat-card__top">
+                <span>${escapeHtml(safeText(item.moatType))}</span>
+                <h3>${escapeHtml(safeText(item.source))}</h3>
+              </div>
+              <p><strong>厲害在哪</strong>${escapeHtml(safeText(item.strength))}</p>
+              <p><strong>競爭差異</strong>${escapeHtml(safeText(item.difference))}</p>
+              <p class="moat-card__metric"><strong>追蹤指標</strong>${escapeHtml(safeText(item.metric))}</p>
+            </article>
+          `).join("")}
+        </div>
+      </section>
+    `;
+
+    const risksHtml = `
+      <section class="research-panel research-panel--risk">
+        ${renderDashboardHeading("RISK RADAR", `${symbol} 的潛在風險`, "從發生原因一路連結到財務影響與預警訊號。")}
+        <div class="risk-grid">
+          ${safeItems(dashboard.risks, 5).map((item, index) => `
+            <article class="risk-card">
+              <span class="risk-card__index">${String(index + 1).padStart(2, "0")}</span>
+              <h3>${escapeHtml(safeText(item.risk))}</h3>
+              <p><strong>發生原因</strong>${escapeHtml(safeText(item.cause))}</p>
+              <p><strong>為何重要</strong>${escapeHtml(safeText(item.importance))}</p>
+              <p><strong>影響指標</strong>${escapeHtml(safeText(item.affectedMetrics))}</p>
+              <p><strong>追蹤方式</strong>${escapeHtml(safeText(item.monitoring))}</p>
+            </article>
+          `).join("")}
+        </div>
+      </section>
+    `;
+
+    const themes = safeItems(industry.themes, 8);
+    const industryHtml = `
+      <section class="research-panel research-panel--light">
+        ${renderDashboardHeading("INDUSTRY LANDSCAPE", "產業位置與競爭", safeText(industry.overview))}
+        ${renderInfoCards([
+          { label: "成長原因與需求", text: industry.growthDrivers },
+          { label: "滲透率與週期性", text: industry.penetrationCycle }
+        ], "research-card-grid--two")}
+        <div class="research-tags">${themes.map(item => `<span>${escapeHtml(safeText(item))}</span>`).join("")}</div>
+        <h3 class="research-subtitle">競爭者威脅</h3>
+        ${renderDataTable(
+          ["競爭者", "定位", "優勢", "劣勢", "客群重疊度"],
+          safeItems(industry.competitors, 8).map(item => [
+            item.name, item.positioning, item.strength, item.weakness, item.overlap
+          ])
+        )}
+        <h3 class="research-subtitle">產業順風與逆風</h3>
+        <div class="wind-grid">
+          ${safeItems(industry.winds, 6).map(item => {
+            const isTailwind = safeText(item.type).includes("順");
+            return `
+              <article class="wind-card ${isTailwind ? "wind-card--tail" : "wind-card--head"}">
+                <span>${escapeHtml(safeText(item.type))}</span>
+                <h3>${escapeHtml(safeText(item.factor))}</h3>
+                <p>${escapeHtml(safeText(item.companyImpact))}</p>
+              </article>
+            `;
+          }).join("")}
+        </div>
+      </section>
+    `;
+
+    const financialsHtml = `
+      <section class="research-panel research-panel--dark">
+        ${renderDashboardHeading("FINANCIAL FUNDAMENTALS", "財務基本面分析", "不只看數字，也說明每項指標為什麼重要、接下來該看什麼。")}
+        <div class="financial-grid">
+          ${safeItems(dashboard.financials, 5).map(item => `
+            <article class="financial-card">
+              <h3>${escapeHtml(safeText(item.area))}</h3>
+              <p class="financial-card__assessment">${escapeHtml(safeText(item.assessment))}</p>
+              <p><strong>重要性</strong>${escapeHtml(safeText(item.importance))}</p>
+              <p><strong>後續觀察</strong>${escapeHtml(safeText(item.watch))}</p>
+            </article>
+          `).join("")}
+        </div>
+      </section>
+    `;
+
+    const variablesHtml = `
+      <section class="research-panel research-panel--light">
+        ${renderDashboardHeading("KEY VARIABLES", "未來 1-3 年關鍵變數", "用正面與負面訊號驗證成長及競爭力是否延續。")}
+        ${renderDataTable(
+          ["關鍵變數", "為什麼重要", "正面訊號", "負面訊號"],
+          safeItems(dashboard.variables, 8).map(item => [
+            item.variable, item.importance, item.positiveSignal, item.negativeSignal
+          ])
+        )}
+      </section>
+    `;
+
+    const governanceHtml = `
+      <section class="research-panel research-panel--dark">
+        ${renderDashboardHeading("MANAGEMENT & GOVERNANCE", "管理層與公司治理", "觀察策略執行、風險應對與治理品質。")}
+        ${renderInfoCards([
+          { label: "領導與執行風格", text: governance.leadership },
+          { label: "長期目標與策略", text: governance.strategy },
+          { label: "主要風險應對", text: governance.riskResponse },
+          { label: "治理觀察訊號", text: governance.signals }
+        ])}
+      </section>
+    `;
+
+    const researchHtml = `
+      <section class="research-panel research-panel--light">
+        ${renderDashboardHeading("RESEARCH PLAYBOOK", "分析與後續研究", "把公司研究轉成可持續驗證的問題、清單與財報閱讀框架。")}
+        <h3 class="research-subtitle">最值得研究的核心問題</h3>
+        <div class="question-grid">
+          ${safeItems(research.questions, 5).map((item, index) => `
+            <article class="question-card">
+              <span>Q${index + 1}</span>
+              <h3>${escapeHtml(safeText(item.question))}</h3>
+              <p>${escapeHtml(safeText(item.importance))}</p>
+            </article>
+          `).join("")}
+        </div>
+        <h3 class="research-subtitle">後續追蹤清單</h3>
+        ${renderDataTable(
+          ["追蹤主題", "要看什麼", "為什麼重要"],
+          safeItems(research.tracking, 10).map(item => [item.topic, item.watch, item.importance])
+        )}
+        <h3 class="research-subtitle">懂才抱財報閱讀指南</h3>
+        <div class="metric-grid">
+          ${safeItems(research.metrics, 10).map(item => `
+            <article class="metric-card">
+              <h3>${escapeHtml(safeText(item.metric))}</h3>
+              <p>${escapeHtml(safeText(item.importance))}</p>
+              <div><strong>關注方向</strong>${escapeHtml(safeText(item.direction))}</div>
+            </article>
+          `).join("")}
+        </div>
+      </section>
+    `;
+
+    const newsHtml = `
+      <section class="research-panel research-panel--news">
+        ${renderDashboardHeading("NEWS MONITORING", "關鍵新訊追蹤清單", `為 ${symbol} 建立五個自動化新聞監測維度。`)}
+        <div class="news-monitor-grid">
+          ${safeItems(dashboard.newsTags, 5).map((group, index) => `
+            <article class="news-monitor-card">
+              <span>${String(index + 1).padStart(2, "0")}</span>
+              <h3>${escapeHtml(safeText(group.category))}</h3>
+              <div>${safeItems(group.items, 4).map(item => `<p>${escapeHtml(safeText(item))}</p>`).join("")}</div>
+            </article>
+          `).join("")}
+        </div>
+      </section>
+    `;
+
+    return visionHtml + operatingHtml + revenueHtml + advantagesHtml + risksHtml +
+      industryHtml + financialsHtml + variablesHtml + governanceHtml + researchHtml + newsHtml;
   }
 
   function renderValueChainList(items) {
@@ -555,11 +860,13 @@
       const { valueChain, reportText: reportWithoutValueChain } = extractValueChain(data.text);
       const { timeline, reportText: reportWithoutTimeline } = extractTimeline(reportWithoutValueChain);
       const { coreSummary, reportText: reportWithoutCoreSummary } = extractCoreSummary(reportWithoutTimeline);
-      const { productPortfolio, reportText } = extractProductPortfolio(reportWithoutCoreSummary);
+      const { productPortfolio, reportText: reportWithoutProductPortfolio } = extractProductPortfolio(reportWithoutCoreSummary);
+      const { dashboard, reportText } = extractResearchDashboard(reportWithoutProductPortfolio);
       const valueChainHtml = renderValueChain(valueChain, symbol);
       const timelineHtml = renderTimeline(timeline);
       const coreSummaryHtml = renderCoreSummary(coreSummary, symbol);
       const productPortfolioHtml = renderProductPortfolio(productPortfolio);
+      const dashboardHtml = renderResearchDashboard(dashboard, symbol);
       const htmlContent = marked.parse(reportText);
       
      
@@ -572,7 +879,8 @@
         </div>`;
 
     
-      resultElement.innerHTML = chartHtml + valueChainHtml + timelineHtml + coreSummaryHtml + productPortfolioHtml + htmlContent;
+      resultElement.innerHTML = chartHtml + valueChainHtml + timelineHtml + coreSummaryHtml +
+        productPortfolioHtml + dashboardHtml + htmlContent;
 
      
       currentSearchContext = data.searchContext; 
