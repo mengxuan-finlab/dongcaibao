@@ -568,6 +568,104 @@
       industryHtml + financialsHtml + variablesHtml + governanceHtml + researchHtml + newsHtml;
   }
 
+  function findJsonObjectEnd(text, startIndex) {
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+
+    for (let index = startIndex; index < text.length; index += 1) {
+      const char = text[index];
+
+      if (inString) {
+        if (escaped) {
+          escaped = false;
+        } else if (char === "\\") {
+          escaped = true;
+        } else if (char === '"') {
+          inString = false;
+        }
+        continue;
+      }
+
+      if (char === '"') {
+        inString = true;
+      } else if (char === "{") {
+        depth += 1;
+      } else if (char === "}") {
+        depth -= 1;
+        if (depth === 0) return index + 1;
+      }
+    }
+
+    return -1;
+  }
+
+  function formatUnexpectedOverviewJson(data) {
+    if (!data || typeof data.overview !== "string" || !Array.isArray(data.items)) {
+      return null;
+    }
+
+    const sections = data.items
+      .map(item => {
+        const area = String(item?.area || "").trim();
+        const type = String(item?.type || "").trim();
+        const examples = Array.isArray(item?.examples)
+          ? item.examples.map(example => String(example || "").trim()).filter(Boolean)
+          : [];
+        const significance = String(item?.significance || "").trim();
+
+        if (!area && !type && !examples.length && !significance) return "";
+
+        const title = [area, type].filter(Boolean).join("｜") || "產品與服務";
+        const lines = [`### ${title}`];
+        if (examples.length) lines.push(`- **代表項目：** ${examples.join("、")}`);
+        if (significance) lines.push(`- **對公司的意義：** ${significance}`);
+        return lines.join("\n");
+      })
+      .filter(Boolean);
+
+    return [
+      "## 主要產品與服務",
+      data.overview.trim(),
+      ...sections
+    ].filter(Boolean).join("\n\n");
+  }
+
+  function normalizeUnexpectedJson(responseText) {
+    let text = String(responseText || "");
+    let searchIndex = 0;
+
+    while (searchIndex < text.length) {
+      const startIndex = text.indexOf("{", searchIndex);
+      if (startIndex === -1) break;
+
+      const endIndex = findJsonObjectEnd(text, startIndex);
+      if (endIndex === -1) break;
+
+      const candidate = text.slice(startIndex, endIndex);
+
+      try {
+        const parsed = JSON.parse(candidate);
+        const replacement = formatUnexpectedOverviewJson(parsed);
+
+        if (replacement) {
+          text = text.slice(0, startIndex) + replacement + text.slice(endIndex);
+          searchIndex = startIndex + replacement.length;
+          continue;
+        }
+      } catch (error) {
+        // This brace belongs to normal report text, so continue searching.
+      }
+
+      searchIndex = startIndex + 1;
+    }
+
+    return text
+      .replace(/```json\s*(?=\{)/gi, "")
+      .replace(/(\})\s*```/g, "$1")
+      .trim();
+  }
+
   function renderValueChainList(items) {
     const safeItems = items.length ? items : ["未披露"];
     return `<ul>${safeItems.map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`;
@@ -861,7 +959,8 @@
       const { timeline, reportText: reportWithoutTimeline } = extractTimeline(reportWithoutValueChain);
       const { coreSummary, reportText: reportWithoutCoreSummary } = extractCoreSummary(reportWithoutTimeline);
       const { productPortfolio, reportText: reportWithoutProductPortfolio } = extractProductPortfolio(reportWithoutCoreSummary);
-      const { dashboard, reportText } = extractResearchDashboard(reportWithoutProductPortfolio);
+      const { dashboard, reportText: reportWithoutDashboard } = extractResearchDashboard(reportWithoutProductPortfolio);
+      const reportText = normalizeUnexpectedJson(reportWithoutDashboard);
       const valueChainHtml = renderValueChain(valueChain, symbol);
       const timelineHtml = renderTimeline(timeline);
       const coreSummaryHtml = renderCoreSummary(coreSummary, symbol);
