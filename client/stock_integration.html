@@ -287,7 +287,7 @@
         .trim();
       return { dashboard: JSON.parse(rawJson), reportText };
     } catch (error) {
-      console.warn("研究儀表板資料解析失敗，改用純文字報告。", error);
+      console.debug("研究儀表板資料解析失敗，已略過儀表板區塊。", error);
       return { dashboard: null, reportText: reportText.trim() };
     }
   }
