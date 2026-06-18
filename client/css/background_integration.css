@@ -1399,3 +1399,39 @@ button {
     min-height: 0;
   }
 }
+
+.section-ai-tools {
+  display: flex;
+  justify-content: flex-end;
+  margin: 14px 0 0;
+}
+
+.section-ai-btn {
+  padding: 8px 12px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #7c3aed, #2563eb);
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(79, 70, 229, .22);
+}
+
+.section-ai-btn:hover {
+  transform: translateY(-1px);
+}
+
+.chat-context-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 12px;
+  padding: 6px 10px;
+  color: #c4b5fd;
+  background: rgba(139, 92, 246, .12);
+  border: 1px solid rgba(139, 92, 246, .35);
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+}
