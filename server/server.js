@@ -32,9 +32,44 @@ const model = genAI.getGenerativeModel({
 // 方案限制設定
 const PLAN_LIMIT = { free: 2, plus: 10, pro: Infinity };
 
+function normalizeSymbol(symbol) {
+  return String(symbol || '').trim().toUpperCase();
+}
+
+function detectMarket(symbol) {
+  const value = normalizeSymbol(symbol);
+  if (/^\d{4}(\.TW|\.TWO)?$/.test(value)) return 'TW';
+  return 'US';
+}
+
+function buildSearchQueries(symbol, market, isPro) {
+  const normalizedSymbol = normalizeSymbol(symbol);
+  if (market === 'TW') {
+    return [
+      `${normalizedSymbol} 台股 公司介紹 主要產品 商業模式`,
+      `${normalizedSymbol} 產業鏈 客戶 供應商 競爭對手`,
+      `${normalizedSymbol} 法說會 年報 產業展望 風險`
+    ];
+  }
+
+  const queries = [
+    `${normalizedSymbol} stock business model competitive advantage risks analysis`,
+    `${normalizedSymbol} investor presentation business segments competitors risks`,
+    `${normalizedSymbol} annual report business overview industry outlook`
+  ];
+
+  return isPro ? queries : queries.slice(0, 2);
+}
+
 // --- 這裡放 Prompt 產生器 (定義在路由外面) ---
-const getBasePrompt = (symbol, searchContext) => `
+const getBasePrompt = (symbol, searchContext, market = 'US') => `
 你將收到一段「搜尋結果」資料。請內化事實後，輸出一份給台灣一般投資人閱讀的【公司介紹與投資研究筆記】。
+本頁定位是「公司與產業研究入口」，重點是讓讀者先看懂公司與產業，不要把內容寫成完整財報分析或官方文件摘要。
+
+==============================
+【市場別】
+${market}
+==============================
 
 ==============================
 【輸入資料】
@@ -67,6 +102,18 @@ Step 0：資料除噪。若資訊缺失，標示「未披露」，不要編造�
 Step 1：建立事實清單。
 Step 2：把事實轉成「公司故事 + 商業模式 + 投資人追蹤框架」。
 Step 3：依照下方結構撰寫。將資料融入文字中，像是你本來就知道這些事實一樣。
+
+==============================
+【市場別補充規則】
+若市場別為 TW，請以台灣上市櫃公司的研究習慣整理：
+- 優先說明公司在台灣或全球產業鏈的位置、主要產品、客戶類型、供應鏈角色與景氣循環。
+- 可將月營收、法說會、年報、毛利率、產品組合、匯率、庫存與主要客戶需求列為後續追蹤方向。
+- 不要使用 10-K、10-Q、SEC filing 等美股官方文件語境。
+- 不需要完整分析三大財報，只需說明哪些營運或財務訊號可以驗證商業模式。
+
+若市場別為 US，請以美股公司研究習慣整理：
+- 優先說明商業模式、產品線、客戶、競爭優勢、產業地位與風險。
+- 財報與官方文件會由另一個功能頁處理，本頁只整理理解公司與產業所需的追蹤方向。
 
 ==============================
 【推論規則】
@@ -120,7 +167,7 @@ JSON 字串內容不可使用未跳脫的半形雙引號；若需要引號，請
 4. advantages：整理 3-5 個可驗證優勢，包含厲害之處、競爭差異、可追蹤指標及護城河分類。護城河類型限品牌、無形資產、轉換成本、成本優勢、網路效應、規模經濟、資料優勢、通路優勢。
 5. risks：整理 3-5 個具體風險，包含發生原因、重要性、可能影響的財務或營運指標及追蹤方式。
 6. industry：說明市場成長原因、主要需求、滲透率或週期性及明確成長主題；competitors 比較定位、優勢、劣勢、客群重疊度；winds 整理 4-6 個順風或逆風並連結公司營運。
-7. financials：完整分析營收成長、毛利率或獲利能力、關鍵營運指標、現金流與資本支出、資產負債表健康度。缺少精確數字仍需說明該指標的重要性。
+7. financials：不要做完整財報分析；請整理理解公司與產業時最值得後續追蹤的財務或營運訊號。台股可包含月營收、毛利率、營益率、EPS、存貨、應收帳款、法說會展望；美股可包含營收成長、毛利率、客戶數、訂閱數、自由現金流、官方文件風險揭露。缺少精確數字仍需說明該訊號的重要性。
 8. variables：整理未來 1-3 年最重要的成長與競爭變數，包含重要性、正面訊號、負面訊號。
 9. governance：完整說明領導團隊與執行風格、長期目標或公開策略、主要風險應對、投資人可觀察的治理訊號。
 10. research：列出 3-5 個最值得研究的核心問題及重要性；tracking 為後續追蹤清單；metrics 從指定清單挑選 6-10 個最有分析價值的指標，說明重要性及應關注的變化方向。
@@ -315,25 +362,38 @@ app.post('/api/analyze-stock', async (req, res) => {
     // --- ★ 關鍵修正 2：修正模型名稱 (Gemini 無 2.5 版本) ---
     const modelName = isPro ? "gemini-2.5-flash" : "gemini-2.5-flash"; 
     const searchNum = isPro ? 20 : 10;
+    const normalizedSymbol = normalizeSymbol(symbol);
+    const market = detectMarket(normalizedSymbol);
 
     // 診斷用：請在部署後的 Log 觀察這裡輸出什麼
-    console.log(`[系統診斷] 用戶方案: ${userPlan} | 調用模型: ${modelName} | 是否為 Pro 模式: ${isPro}`);
+    console.log(`[系統診斷] 用戶方案: ${userPlan} | 調用模型: ${modelName} | 市場別: ${market} | 是否為 Pro 模式: ${isPro}`);
 
     // A. 搜尋階段
-    const searchQuery = `${symbol} stock business model competitive advantage risks analysis`;
-    const serpApiUrl = `https://serpapi.com/search.json?engine=google&q=${encodeURIComponent(searchQuery)}&api_key=${process.env.SERPAPI_KEY}&num=${searchNum}&hl=zh-tw&gl=tw`;
-    
-    const searchResponse = await axios.get(serpApiUrl);
-    const searchResults = searchResponse.data.organic_results || [];
+    const searchQueries = buildSearchQueries(normalizedSymbol, market, isPro);
+    const perQueryNum = Math.max(3, Math.ceil(searchNum / searchQueries.length));
+    const searchResponses = await Promise.all(searchQueries.map(query => {
+      const serpApiUrl = `https://serpapi.com/search.json?engine=google&q=${encodeURIComponent(query)}&api_key=${process.env.SERPAPI_KEY}&num=${perQueryNum}&hl=zh-tw&gl=tw`;
+      return axios.get(serpApiUrl);
+    }));
+    const seenLinks = new Set();
+    const searchResults = searchResponses.flatMap((response, queryIndex) => {
+      const query = searchQueries[queryIndex];
+      return (response.data.organic_results || []).map(item => ({ ...item, query }));
+    }).filter(item => {
+      const key = item.link || `${item.title}-${item.snippet}`;
+      if (seenLinks.has(key)) return false;
+      seenLinks.add(key);
+      return true;
+    }).slice(0, searchNum);
 
     const searchContext = searchResults.map((item, index) => 
-      `[資料 ${index + 1}] ${item.title}: ${item.snippet}`
+      `[資料 ${index + 1}] 搜尋主題「${item.query}」｜${item.title}: ${item.snippet}`
     ).join("\n\n");
 
     // B. 選擇 Prompt (確認調用外部定義的函數)
     const finalPrompt = isPro 
       ? getProPrompt(symbol, searchContext) 
-      : getBasePrompt(symbol, searchContext);
+      : getBasePrompt(normalizedSymbol, searchContext, market);
 
     // C. 呼叫動態模型
     const dynamicModel = genAI.getGenerativeModel({ 
