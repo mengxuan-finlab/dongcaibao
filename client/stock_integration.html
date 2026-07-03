@@ -952,14 +952,9 @@
     await updateUsageInfo(user, plan);
   });
 
-  function getTradingViewSymbol(symbol) {
+  function isTaiwanStock(symbol) {
     const value = String(symbol || "").trim().toUpperCase();
-    const twMatch = value.match(/^(\d{4})(?:\.TW)?$/);
-    const twoMatch = value.match(/^(\d{4})\.TWO$/);
-
-    if (twoMatch) return `TPEX:${twoMatch[1]}`;
-    if (twMatch) return `TWSE:${twMatch[1]}`;
-    return value;
+    return /^\d{4}(\.TW|\.TWO)?$/.test(value);
   }
 
   document.getElementById("symbolInput").addEventListener("keydown", event => {
@@ -1040,18 +1035,19 @@
       const productPortfolioHtml = renderProductPortfolio(productPortfolio);
       const dashboardHtml = renderResearchDashboard(dashboard, symbol);
       const htmlContent = marked.parse(reportText);
-      const tvSymbol = encodeURIComponent(getTradingViewSymbol(symbol));
-      
-     
-      const chartHtml = `
+      const chartHtml = isTaiwanStock(symbol)
+        ? `
+        <div style="margin-bottom:25px; padding:18px 20px; border-radius:12px; background:rgba(15,23,42,0.72); border:1px solid rgba(148,163,184,0.25); color:#cbd5e1;">
+          台股圖表暫不嵌入 TradingView，本頁先聚焦公司與產業分析。
+        </div>`
+        : `
         <div style="height:450px; margin-bottom:25px; border-radius: 12px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 4px 20px rgba(0,0,0,0.3);">
-          <iframe 
-            src="https://s.tradingview.com/widgetembed/?symbol=${tvSymbol}&interval=D&theme=dark&style=1&timezone=Asia%2FTaipei" 
+          <iframe
+            src="https://s.tradingview.com/widgetembed/?symbol=${encodeURIComponent(symbol)}&interval=D&theme=dark&style=1&timezone=Asia%2FTaipei"
             width="100%" height="100%" frameborder="0" allowfullscreen>
           </iframe>
         </div>`;
-
-    
+      
       resultElement.innerHTML = chartHtml + valueChainHtml + timelineHtml + coreSummaryHtml +
         productPortfolioHtml + dashboardHtml + htmlContent;
 
