@@ -189,22 +189,6 @@
       line-height: 1.75;
     }
 
-    .dimensions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      margin-top: 14px;
-    }
-
-    .dim {
-      padding: 4px 8px;
-      color: #3730a3;
-      background: #eef2ff;
-      border-radius: 999px;
-      font-size: 12px;
-      font-weight: 750;
-    }
-
     .follow {
       margin-top: 12px;
       padding: 12px;
@@ -237,7 +221,7 @@
     <section class="hero">
       <p class="kicker">NEWS RADAR</p>
       <h1>公司新聞雷達</h1>
-      <p class="subtitle">輸入股票代號，AI 會整理近期新聞並判斷重要性、影響方向、影響面向，以及下一步該追蹤什麼。</p>
+      <p class="subtitle">輸入股票代號，AI 會整理近期新聞並判斷重要性、可能利多利空、影響性質，以及下一步該追蹤什麼。</p>
       <div class="search">
         <input id="symbolInput" placeholder="例如 HIMS、NVDA、2330" autocomplete="off" />
         <button id="scanBtn">掃描新聞</button>
@@ -281,8 +265,8 @@
       if (text.includes("高")) return "high";
       if (text.includes("中")) return "medium";
       if (text.includes("低")) return "low";
-      if (text.includes("正")) return "positive";
-      if (text.includes("負")) return "negative";
+      if (text.includes("利多")) return "positive";
+      if (text.includes("利空")) return "negative";
       if (text.includes("中性")) return "neutral";
       return "";
     }
@@ -307,16 +291,12 @@
               <div class="source">${escapeHtml(item.source || "未知來源")} ${item.date ? `｜${escapeHtml(item.date)}` : ""}</div>
             </div>
             <div class="badges">
-              <span class="badge ${badgeClass(item.relevance)}">關聯：${escapeHtml(item.relevance || "未判斷")}</span>
               <span class="badge ${badgeClass(item.importance)}">重要性：${escapeHtml(item.importance || "未判斷")}</span>
-              <span class="badge ${badgeClass(item.direction)}">方向：${escapeHtml(item.direction || "不確定")}</span>
-              <span class="badge">期間：${escapeHtml(item.horizon || "未判斷")}</span>
+              <span class="badge ${badgeClass(item.impact || item.direction)}">可能影響：${escapeHtml(item.impact || item.direction || "尚不明確")}</span>
+              <span class="badge">影響性質：${escapeHtml(item.impactType || item.horizon || "未判斷")}</span>
             </div>
           </div>
-          <div class="body">${escapeHtml(item.why || "目前資料不足以判斷。")}</div>
-          <div class="dimensions">
-            ${(item.dimensions || []).map(dim => `<span class="dim">${escapeHtml(dim)}</span>`).join("")}
-          </div>
+          <div class="body"><strong>AI 判讀：</strong>${escapeHtml(item.why || "目前資料不足以判斷。")}</div>
           <div class="follow"><strong>後續追蹤：</strong>${escapeHtml(item.followUp || "持續觀察後續新聞與財報訊號。")}</div>
         </article>
       `).join("");
