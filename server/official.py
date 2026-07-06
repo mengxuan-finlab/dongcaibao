@@ -12,9 +12,20 @@ genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 # 這裡建議使用 service_role key 以確保有權限更新資料
 supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
 
+def is_tw_stock(symbol):
+    value = str(symbol or "").strip().upper()
+    if value.endswith(".TW") or value.endswith(".TWO"):
+        value = value.split(".")[0]
+    return value.isdigit() and len(value) == 4
+
 def process_stock(stock_row):
     symbol = stock_row['symbol']
     row_id = stock_row['id']
+
+    if is_tw_stock(symbol):
+        print(f"⏭️ {symbol} 為台股，交由 tw_financial.py 處理。")
+        return
+
     print(f"🚀 開始處理：{symbol} (ID: {row_id})")
 
     try:

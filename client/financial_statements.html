@@ -529,7 +529,14 @@
     }
     listEl.innerHTML = tracked
       .map(s => {
-        let statusText = s.status === "ready" ? "已完成" : s.status === "review" ? "審核中" : "準備中";
+        const statusMap = {
+          ready: "已完成",
+          review: "審核中",
+          tw_review: "月營收完成",
+          tw_ready: "已完成",
+          no_report: "無資料"
+        };
+        let statusText = statusMap[s.status] || "準備中";
         const activeClass = s.id === selectedStockId ? "active" : "";
 
         return `
@@ -557,6 +564,11 @@
 
     document.querySelectorAll('.view-section').forEach(sec => sec.classList.remove('active'));
     document.getElementById(`view-${viewName}`).classList.add('active');
+  }
+
+  function isTaiwanStock(symbol) {
+    const value = String(symbol || "").trim().toUpperCase();
+    return /^\d{4}(\.TW|\.TWO)?$/.test(value);
   }
 
   function getReportIllustration(index) {
@@ -708,13 +720,14 @@ async function renderDashboards() {
 
     const s = tracked.find(item => item.id === selectedStockId);
     if (!s) { container.innerHTML = ""; return; }
+    const isTw = isTaiwanStock(s.symbol);
 
     if (s.status === "pending") {
       container.innerHTML = `
         <div class="dash-card" style="text-align:center; padding: 60px;">
           <div style="font-size:40px; margin-bottom:10px;">⏳</div>
           <h2>AI 正在分析 ${s.symbol} ...</h2>
-          <p>系統正在讀取 10-Q 財報並生成摘要，請稍候約 10-20 分鐘。</p>
+          <p>${isTw ? "系統正在抓取台股月營收並生成分析，請稍候約 10-20 分鐘。" : "系統正在讀取 10-Q 財報並生成摘要，請稍候約 10-20 分鐘。"}</p>
         </div>`;
       return;
     }
@@ -731,18 +744,22 @@ async function renderDashboards() {
     
     const iframeHtml = authenticatedUrl 
       ? `<iframe src="${authenticatedUrl}"></iframe>` 
-      : `<div style="text-align:center; padding:40px; background:#f9fafb; border-radius:8px;">尚未連結圖表數據</div>`;
+      : `<div style="text-align:center; padding:40px; background:#f9fafb; border-radius:8px;">${isTw ? "台股圖表資料生成中，請稍候排程更新。" : "尚未連結圖表數據"}</div>`;
+
+    const reportTitle = isTw ? `${s.symbol} 台股財務追蹤報告` : `${s.symbol} 財務分析報告`;
+    const financialTabText = isTw ? "月營收與季報追蹤" : "三大財報及估值分析";
+    const docTabText = isTw ? "台股月營收分析" : "最新季度官方文件";
 
     container.innerHTML = `
       <div class="dash-card">
         <div style="display:flex; justify-content:space-between; align-items:center;">
-          <h2>${s.symbol} 財務分析報告</h2>
+          <h2>${reportTitle}</h2>
           <span class="status-badge">已完成</span>
         </div>
 
         <div class="tab-container">
-          <button id="btn-financial" class="tab-btn active" onclick="switchView('financial')">三大財報及估值分析</button>
-          <button id="btn-doc" class="tab-btn" onclick="switchView('doc')">最新季度官方文件</button>
+          <button id="btn-financial" class="tab-btn active" onclick="switchView('financial')">${financialTabText}</button>
+          <button id="btn-doc" class="tab-btn" onclick="switchView('doc')">${docTabText}</button>
         </div>
 
         <div id="view-financial" class="view-section active">
