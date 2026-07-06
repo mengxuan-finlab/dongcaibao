@@ -61,6 +61,48 @@ function buildSearchQueries(symbol, market, isPro) {
   return isPro ? queries : queries.slice(0, 2);
 }
 
+function stripJsonFence(text) {
+  return String(text || "")
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+}
+
+function buildNewsQuery(symbol, market) {
+  const value = normalizeSymbol(symbol);
+  if (market === "TW") {
+    return `${value} 台股 公司 新聞 營收 法說會 產業`;
+  }
+  return `${value} stock news earnings business risks`;
+}
+
+async function fetchNewsRadarItems(symbol, market) {
+  if (!process.env.SERPAPI_KEY) {
+    throw new Error("尚未設定 SERPAPI_KEY，無法抓取新聞。");
+  }
+
+  const query = buildNewsQuery(symbol, market);
+  const response = await axios.get("https://serpapi.com/search.json", {
+    params: {
+      engine: "google_news",
+      q: query,
+      api_key: process.env.SERPAPI_KEY,
+      hl: "zh-tw",
+      gl: "tw",
+      num: 10
+    }
+  });
+
+  const newsResults = response.data.news_results || response.data.organic_results || [];
+  return newsResults.slice(0, 10).map(item => ({
+    title: item.title || "",
+    snippet: item.snippet || item.description || "",
+    url: item.link || "",
+    source: item.source?.name || item.source || "",
+    date: item.date || ""
+  })).filter(item => item.title && item.url);
+}
+
 // --- 這裡放 Prompt 產生器 (定義在路由外面) ---
 const getBasePrompt = (symbol, searchContext, market = 'US') => `
 你將收到一段「搜尋結果」資料。請內化事實後，輸出一份給台灣一般投資人閱讀的【公司介紹與投資研究筆記】。
@@ -659,6 +701,85 @@ app.get("/api/fmp/cash-flow-statement", async (req, res) => {
     return res.status(r.ok ? 200 : r.status).json(data);
   } catch (e) {
     return res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.post("/api/news-radar", async (req, res) => {
+  const { symbol } = req.body;
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader) return res.status(401).json({ error: "未登入" });
+
+  try {
+    const token = authHeader.split(" ")[1];
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    if (authError || !user) throw new Error("身分驗證失敗");
+
+    const normalizedSymbol = normalizeSymbol(symbol);
+    if (!normalizedSymbol) {
+      return res.status(400).json({ error: "請輸入股票代號" });
+    }
+
+    const market = detectMarket(normalizedSymbol);
+    const newsItems = await fetchNewsRadarItems(normalizedSymbol, market);
+    if (!newsItems.length) {
+      return res.json({ symbol: normalizedSymbol, market, items: [] });
+    }
+
+    const prompt = `
+你是一位投資研究助理。請根據新聞標題與摘要，判斷每則新聞對 ${normalizedSymbol} 的研究重要性。
+
+市場別：${market}
+
+請回傳純 JSON，不要 Markdown，不要 code fence。
+格式如下：
+{
+  "items": [
+    {
+      "title": "新聞標題",
+      "url": "新聞連結",
+      "source": "來源",
+      "date": "日期",
+      "relevance": "高 / 中 / 低",
+      "importance": "高 / 中 / 低",
+      "direction": "正面 / 負面 / 中性 / 不確定",
+      "horizon": "短期 / 中期 / 長期",
+      "dimensions": ["營收", "成本", "法規", "競爭", "產品", "財務", "管理層", "市場情緒"],
+      "why": "一句話說明為什麼重要",
+      "followUp": "下一步要追蹤什麼"
+    }
+  ]
+}
+
+判斷規則：
+- relevance 是新聞與該公司的關聯度；若只是同產業但沒有直接提到公司，最多給中。
+- importance 是對研究假設或財務表現可能造成的影響，不是新聞熱度。
+- 不要提供買賣建議、目標價或投資評等。
+- dimensions 最多 3 個。
+- 如果資料不足，direction 請填「不確定」。
+
+新聞資料：
+${JSON.stringify(newsItems, null, 2)}
+`;
+
+    const radarModel = genAI.getGenerativeModel({
+      model: "gemini-2.5-flash"
+    }, {
+      apiVersion: "v1beta"
+    });
+    const aiResult = await radarModel.generateContent(prompt);
+    const parsed = JSON.parse(stripJsonFence(aiResult.response.text()));
+    const analyzedItems = Array.isArray(parsed.items) ? parsed.items : [];
+
+    res.json({
+      symbol: normalizedSymbol,
+      market,
+      generatedAt: new Date().toISOString(),
+      items: analyzedItems
+    });
+  } catch (err) {
+    console.error("新聞雷達錯誤:", err);
+    res.status(500).json({ error: err.message || "新聞雷達分析失敗" });
   }
 });
 
