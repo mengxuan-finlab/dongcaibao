@@ -3,7 +3,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+const { GoogleGenAI } = require("@google/genai");
 const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
@@ -21,14 +21,13 @@ const supabase = createClient(
 );
 
 // 2. Gemini AI 設定
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const genAI = new GoogleGenAI({
+  apiKey: process.env.GEMINI_API_KEY,
+  apiVersion: "v1"
+});
 const GEMINI_PRIMARY_MODEL = process.env.GEMINI_MODEL || "gemini-3.8-flash";
-const GEMINI_FALLBACK_MODEL = process.env.GEMINI_FALLBACK_MODEL || "gemini-3.5-flash-lite";
+const GEMINI_FALLBACK_MODEL = process.env.GEMINI_FALLBACK_MODEL || "gemini-2.5-flash-lite";
 const GEMINI_RETRYABLE_STATUS = new Set([408, 429, 500, 502, 503, 504]);
-
-function createGeminiModel(modelName) {
-  return genAI.getGenerativeModel({ model: modelName });
-}
 
 function isRetryableGeminiError(error) {
   const status = Number(error?.response?.status || error?.status);
@@ -46,11 +45,9 @@ async function runGeminiWithFallback(operation, label = "Gemini") {
   let lastError;
 
   for (const modelName of modelNames) {
-    const geminiModel = createGeminiModel(modelName);
-
     for (let attempt = 1; attempt <= 2; attempt += 1) {
       try {
-        return await operation(geminiModel, modelName);
+        return await operation(modelName);
       } catch (error) {
         lastError = error;
         if (!isRetryableGeminiError(error)) throw error;
@@ -72,7 +69,7 @@ async function runGeminiWithFallback(operation, label = "Gemini") {
 
 function generateContentWithFallback(prompt, label) {
   return runGeminiWithFallback(
-    (geminiModel, modelName) => geminiModel.generateContent(prompt)
+    modelName => genAI.models.generateContent({ model: modelName, contents: prompt })
       .then(result => ({ result, modelName })),
     label
   );
@@ -80,7 +77,7 @@ function generateContentWithFallback(prompt, label) {
 
 function generateContentStreamWithFallback(prompt, label) {
   return runGeminiWithFallback(
-    (geminiModel, modelName) => geminiModel.generateContentStream(prompt)
+    modelName => genAI.models.generateContentStream({ model: modelName, contents: prompt })
       .then(result => ({ result, modelName })),
     label
   );
@@ -495,7 +492,7 @@ app.post('/api/analyze-stock', async (req, res) => {
     // C. 呼叫 Gemini；暫時性錯誤會自動重試並切換備援模型
     const { result: aiResult, modelName } = await generateContentWithFallback(finalPrompt, "公司分析");
     console.log(`[公司分析] 成功使用模型: ${modelName}`);
-    const responseText = aiResult.response.text();
+    const responseText = aiResult.text;
 
     await supabase.from('usage_logs').insert({ user_id: user.id, action: 'company_intro' });
 
@@ -589,8 +586,8 @@ app.post('/api/chat-with-report', async (req, res) => {
     res.setHeader('Transfer-Encoding', 'chunked');
 
     // 逐塊讀取 AI 生成的文字並發送給前端
-    for await (const chunk of result.stream) {
-      const chunkText = chunk.text();
+    for await (const chunk of result) {
+      const chunkText = chunk.text || "";
       res.write(chunkText); 
     }
 
@@ -804,7 +801,7 @@ ${JSON.stringify(newsItems, null, 2)}
 
     const { result: aiResult, modelName } = await generateContentWithFallback(prompt, "新聞雷達");
     console.log(`[新聞雷達] 成功使用模型: ${modelName}`);
-    const parsed = JSON.parse(stripJsonFence(aiResult.response.text()));
+    const parsed = JSON.parse(stripJsonFence(aiResult.text));
     const analyzedItems = Array.isArray(parsed.items) ? parsed.items : [];
 
     res.json({
