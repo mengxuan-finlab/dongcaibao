@@ -21,13 +21,70 @@ const supabase = createClient(
 );
 
 // 2. Gemini AI 設定
-// 注意：目前最新且穩定的是 gemini-3-flash，使用 v1beta 通道
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ 
-  model: "gemini-2.5-flash" 
-}, { 
-  apiVersion: "v1beta" 
-});
+const GEMINI_PRIMARY_MODEL = process.env.GEMINI_MODEL || "gemini-3.8-flash";
+const GEMINI_FALLBACK_MODEL = process.env.GEMINI_FALLBACK_MODEL || "gemini-3.5-flash-lite";
+const GEMINI_RETRYABLE_STATUS = new Set([408, 429, 500, 502, 503, 504]);
+
+function createGeminiModel(modelName) {
+  return genAI.getGenerativeModel({ model: modelName });
+}
+
+function isRetryableGeminiError(error) {
+  const status = Number(error?.response?.status || error?.status);
+  const message = String(error?.message || "");
+  return GEMINI_RETRYABLE_STATUS.has(status)
+    || /\b(408|429|500|502|503|504)\b|high demand|temporarily unavailable|service unavailable/i.test(message);
+}
+
+function wait(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function runGeminiWithFallback(operation, label = "Gemini") {
+  const modelNames = [...new Set([GEMINI_PRIMARY_MODEL, GEMINI_FALLBACK_MODEL].filter(Boolean))];
+  let lastError;
+
+  for (const modelName of modelNames) {
+    const geminiModel = createGeminiModel(modelName);
+
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      try {
+        return await operation(geminiModel, modelName);
+      } catch (error) {
+        lastError = error;
+        if (!isRetryableGeminiError(error)) throw error;
+
+        console.warn(`[${label}] ${modelName} 第 ${attempt} 次呼叫失敗: ${error.message}`);
+        if (attempt < 2) {
+          const delayMs = 800 * (2 ** (attempt - 1)) + Math.floor(Math.random() * 400);
+          await wait(delayMs);
+        }
+      }
+    }
+  }
+
+  const unavailableError = new Error("AI 服務目前繁忙，系統已自動重試，請稍後再試。");
+  unavailableError.statusCode = 503;
+  unavailableError.cause = lastError;
+  throw unavailableError;
+}
+
+function generateContentWithFallback(prompt, label) {
+  return runGeminiWithFallback(
+    (geminiModel, modelName) => geminiModel.generateContent(prompt)
+      .then(result => ({ result, modelName })),
+    label
+  );
+}
+
+function generateContentStreamWithFallback(prompt, label) {
+  return runGeminiWithFallback(
+    (geminiModel, modelName) => geminiModel.generateContentStream(prompt)
+      .then(result => ({ result, modelName })),
+    label
+  );
+}
 
 // 方案限制設定
 const PLAN_LIMIT = { free: 2, plus: 10, pro: Infinity };
@@ -401,14 +458,12 @@ app.post('/api/analyze-stock', async (req, res) => {
     // 往下才是原本的執行邏輯 (通過檢查才執行)
     // ==========================================
 
-    // --- ★ 關鍵修正 2：修正模型名稱 (Gemini 無 2.5 版本) ---
-    const modelName = isPro ? "gemini-2.5-flash" : "gemini-2.5-flash"; 
     const searchNum = isPro ? 20 : 10;
     const normalizedSymbol = normalizeSymbol(symbol);
     const market = detectMarket(normalizedSymbol);
 
     // 診斷用：請在部署後的 Log 觀察這裡輸出什麼
-    console.log(`[系統診斷] 用戶方案: ${userPlan} | 調用模型: ${modelName} | 市場別: ${market} | 是否為 Pro 模式: ${isPro}`);
+    console.log(`[系統診斷] 用戶方案: ${userPlan} | 主要模型: ${GEMINI_PRIMARY_MODEL} | 市場別: ${market} | 是否為 Pro 模式: ${isPro}`);
 
     // A. 搜尋階段
     const searchQueries = buildSearchQueries(normalizedSymbol, market, isPro);
@@ -437,13 +492,9 @@ app.post('/api/analyze-stock', async (req, res) => {
       ? getProPrompt(symbol, searchContext) 
       : getBasePrompt(normalizedSymbol, searchContext, market);
 
-    // C. 呼叫動態模型
-    const dynamicModel = genAI.getGenerativeModel({ 
-      model: modelName 
-    }, { 
-      apiVersion: "v1beta" 
-    });
-    const aiResult = await dynamicModel.generateContent(finalPrompt);
+    // C. 呼叫 Gemini；暫時性錯誤會自動重試並切換備援模型
+    const { result: aiResult, modelName } = await generateContentWithFallback(finalPrompt, "公司分析");
+    console.log(`[公司分析] 成功使用模型: ${modelName}`);
     const responseText = aiResult.response.text();
 
     await supabase.from('usage_logs').insert({ user_id: user.id, action: 'company_intro' });
@@ -456,7 +507,7 @@ app.post('/api/analyze-stock', async (req, res) => {
 
   } catch (err) {
     console.error("後端錯誤:", err);
-    res.status(500).json({ error: err.message || '伺服器忙碌中' });
+    res.status(err.statusCode || 500).json({ error: err.message || '伺服器忙碌中' });
   }
 });
 // ===== 新增：AI 深度追問 Endpoint =====
@@ -474,8 +525,6 @@ app.post('/api/chat-with-report', async (req, res) => {
     const { data: profile } = await supabase.from('profiles').select('plan').eq('id', user.id).single();
     const userPlan = (profile?.plan || 'free').toLowerCase();
     
-    const modelName = "gemini-2.5-flash"; 
-
     // --- (保留原本的問答限流攔截器邏輯) ---
     if (userPlan !== 'pro') {
       const startOfWeek = new Date();
@@ -533,19 +582,11 @@ app.post('/api/chat-with-report', async (req, res) => {
     ### 關鍵觀察指標
     - (列出 2-3 個投資人應持續追蹤的具體後續變數)
     `;
-    // ==========================================
-    // ★ 修改開始：設定 HTTP Header 支援串流
-    // ==========================================
+    // 先成功建立串流，再送出 Header，讓 503 發生時仍可重試或回傳 JSON 錯誤。
+    const { result, modelName } = await generateContentStreamWithFallback(chatPrompt, "報告問答");
+    console.log(`[報告問答] 成功使用模型: ${modelName}`);
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
     res.setHeader('Transfer-Encoding', 'chunked');
-
-    // 使用 generateContentStream 啟動串流
-    const chatModel = genAI.getGenerativeModel({ 
-      model: modelName 
-    }, { 
-      apiVersion: "v1beta" // ★ 必須加上這行，否則 Streaming 會失敗
-    });
-    const result = await chatModel.generateContentStream(chatPrompt);
 
     // 逐塊讀取 AI 生成的文字並發送給前端
     for await (const chunk of result.stream) {
@@ -563,7 +604,7 @@ app.post('/api/chat-with-report', async (req, res) => {
     console.error("對話錯誤:", err);
     // 如果 Header 尚未發送，回傳 JSON 錯誤；若已開始串流，則直接結束
     if (!res.headersSent) {
-      res.status(500).json({ error: err.message || '對話發生錯誤' });
+      res.status(err.statusCode || 500).json({ error: err.message || '對話發生錯誤' });
     } else {
       res.end();
     }
@@ -761,12 +802,8 @@ app.post("/api/news-radar", async (req, res) => {
 ${JSON.stringify(newsItems, null, 2)}
 `;
 
-    const radarModel = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash"
-    }, {
-      apiVersion: "v1beta"
-    });
-    const aiResult = await radarModel.generateContent(prompt);
+    const { result: aiResult, modelName } = await generateContentWithFallback(prompt, "新聞雷達");
+    console.log(`[新聞雷達] 成功使用模型: ${modelName}`);
     const parsed = JSON.parse(stripJsonFence(aiResult.response.text()));
     const analyzedItems = Array.isArray(parsed.items) ? parsed.items : [];
 
@@ -778,7 +815,7 @@ ${JSON.stringify(newsItems, null, 2)}
     });
   } catch (err) {
     console.error("新聞雷達錯誤:", err);
-    res.status(500).json({ error: err.message || "新聞雷達分析失敗" });
+    res.status(err.statusCode || 500).json({ error: err.message || "新聞雷達分析失敗" });
   }
 });
 
