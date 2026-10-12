@@ -1124,7 +1124,11 @@
     } catch (err) {
       console.error(err);
       debugEl.textContent = "錯誤：" + err.message;
-      resultEl.innerHTML = `<p style='color:red'>發生錯誤，請確認後端是否已啟動。</p>`;
+      const errorMessage = /Request failed with status code 503/i.test(err.message)
+        ? "上游資料服務暫時無法使用，請稍後重新產生報告。"
+        : err.message || "報告生成失敗，請稍後再試。";
+      debugEl.textContent = "錯誤：" + errorMessage;
+      resultEl.innerHTML = `<p role="alert" style="color:#ffd0d6">${escapeHtml(errorMessage)}</p>`;
     } finally {
     
       fetchBtn.disabled = false;

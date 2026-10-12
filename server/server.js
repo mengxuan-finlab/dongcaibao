@@ -40,6 +40,24 @@ function wait(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+async function searchCompany(query, num) {
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    try {
+      return await axios.get("https://serpapi.com/search.json", {
+        params: { engine: "google", q: query, api_key: process.env.SERPAPI_KEY, num, hl: "zh-tw", gl: "tw" },
+        timeout: 20000
+      });
+    } catch (error) {
+      const status = Number(error.response?.status);
+      const retryable = [429, 500, 502, 503, 504].includes(status)
+        || ["ECONNABORTED", "ECONNRESET", "ETIMEDOUT"].includes(error.code);
+      console.warn(`[公司搜尋] 第 ${attempt} 次失敗，狀態: ${status || error.code || "unknown"}`);
+      if (!retryable || attempt === 2) throw error;
+      await wait(800);
+    }
+  }
+}
+
 async function runGeminiWithFallback(operation, label = "Gemini") {
   const modelNames = [...new Set([GEMINI_PRIMARY_MODEL, GEMINI_FALLBACK_MODEL].filter(Boolean))];
   let lastError;
@@ -465,20 +483,26 @@ app.post('/api/analyze-stock', async (req, res) => {
     // A. 搜尋階段
     const searchQueries = buildSearchQueries(normalizedSymbol, market, isPro);
     const perQueryNum = Math.max(3, Math.ceil(searchNum / searchQueries.length));
-    const searchResponses = await Promise.all(searchQueries.map(query => {
-      const serpApiUrl = `https://serpapi.com/search.json?engine=google&q=${encodeURIComponent(query)}&api_key=${process.env.SERPAPI_KEY}&num=${perQueryNum}&hl=zh-tw&gl=tw`;
-      return axios.get(serpApiUrl);
-    }));
+    const searchResponses = await Promise.allSettled(
+      searchQueries.map(query => searchCompany(query, perQueryNum))
+    );
     const seenLinks = new Set();
     const searchResults = searchResponses.flatMap((response, queryIndex) => {
       const query = searchQueries[queryIndex];
-      return (response.data.organic_results || []).map(item => ({ ...item, query }));
+      if (response.status !== "fulfilled") return [];
+      return (response.value.data.organic_results || []).map(item => ({ ...item, query }));
     }).filter(item => {
       const key = item.link || `${item.title}-${item.snippet}`;
       if (seenLinks.has(key)) return false;
       seenLinks.add(key);
       return true;
     }).slice(0, searchNum);
+
+    if (!searchResults.length) {
+      const searchError = new Error("搜尋服務暫時無法取得公司資料，請稍後重新產生報告。");
+      searchError.statusCode = 503;
+      throw searchError;
+    }
 
     const searchContext = searchResults.map((item, index) => 
       `[資料 ${index + 1}] 搜尋主題「${item.query}」｜${item.title}: ${item.snippet}`
