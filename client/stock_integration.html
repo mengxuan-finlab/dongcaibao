@@ -473,15 +473,17 @@
       <section class="research-panel research-panel--risk">
         ${renderDashboardHeading("RISK RADAR", `${symbol} 的潛在風險`, "從發生原因一路連結到財務影響與預警訊號。")}
         ${renderSectionAskButton(`${symbol} 的潛在風險`, dashboard.risks)}
-        <div class="risk-grid">
+        <div class="risk-paths">
           ${safeItems(dashboard.risks, 5).map((item, index) => `
             <article class="risk-card">
               <span class="risk-card__index">${String(index + 1).padStart(2, "0")}</span>
               <h3>${escapeHtml(safeText(item.risk))}</h3>
-              <p><strong>發生原因</strong>${escapeHtml(safeText(item.cause))}</p>
-              <p><strong>為何重要</strong>${escapeHtml(safeText(item.importance))}</p>
-              <p><strong>影響指標</strong>${escapeHtml(safeText(item.affectedMetrics))}</p>
-              <p><strong>追蹤方式</strong>${escapeHtml(safeText(item.monitoring))}</p>
+              <div class="risk-path">
+                <p><strong>觸發原因</strong>${escapeHtml(safeText(item.cause))}</p>
+                <p><strong>營運影響</strong>${escapeHtml(safeText(item.importance))}</p>
+                <p><strong>財務與指標</strong>${escapeHtml(safeText(item.affectedMetrics))}</p>
+                <p><strong>觀察訊號</strong>${escapeHtml(safeText(item.monitoring))}</p>
+              </div>
             </article>
           `).join("")}
         </div>
@@ -612,8 +614,57 @@
       </section>
     `;
 
-    return visionHtml + operatingHtml + revenueHtml + advantagesHtml + risksHtml +
-      industryHtml + financialsHtml + variablesHtml + governanceHtml + researchHtml + newsHtml;
+    return [
+      ["公司願景與客戶痛點", vision.goal, visionHtml],
+      ["營運流程與產品策略", operating.overview, operatingHtml],
+      ["收入與成本結構", revenue.payment, revenueHtml],
+      ["競爭優勢與護城河", dashboard.advantages?.[0]?.source, advantagesHtml],
+      ["風險傳導路徑", dashboard.risks?.[0]?.risk, risksHtml],
+      ["產業位置與競爭", industry.overview, industryHtml],
+      ["財務基本面", dashboard.financials?.[0]?.assessment, financialsHtml],
+      ["未來關鍵變數", dashboard.variables?.[0]?.variable, variablesHtml],
+      ["管理層與治理", governance.strategy, governanceHtml],
+      ["研究與財報追蹤", research.questions?.[0]?.question, researchHtml],
+      ["新聞監測", "核心業務、財務、競爭、宏觀與治理", newsHtml]
+    ].map(([title, preview, content]) => renderReadingChapter(title, preview, content)).join("");
+  }
+
+  function renderReadingChapter(title, preview, content) {
+    if (!content) return "";
+    return `<details class="reading-chapter">
+      <summary><span class="reading-chapter__title">${escapeHtml(title)}</span>
+        <span class="reading-chapter__preview">${escapeHtml(safeText(preview))}</span>
+        <span class="reading-chapter__toggle" aria-hidden="true">+</span>
+      </summary>
+      <div class="reading-chapter__body">${content}</div>
+    </details>`;
+  }
+
+  function renderQuickOverview(summary, dashboard, valueChain, symbol) {
+    if (!summary && !dashboard) return "";
+    const revenue = dashboard?.revenueModel || {};
+    const metrics = safeItems(dashboard?.research?.metrics, 3);
+    const sources = [
+      ["如何賺錢", summary?.revenue || revenue.payment],
+      ["成長動能", summary?.momentum],
+      ["風險焦點", dashboard?.risks?.[0]?.risk || summary?.pressure]
+    ];
+    const chain = [
+      ["提供價值", safeItems(valueChain?.offerings, 3).join("、") || summary?.identity],
+      ["服務客戶", safeItems(valueChain?.customers, 3).join("、") || revenue.payer],
+      ["取得收入", revenue.payment || summary?.revenue]
+    ];
+    return `<section class="quick-overview">
+      <span class="quick-overview__eyebrow">QUICK READ · 一分鐘總覽</span>
+      <h2>${escapeHtml(symbol)}，先掌握這幾件事</h2>
+      <p class="quick-overview__intro">${escapeHtml(safeText(summary?.identity || dashboard?.operatingModel?.overview))}</p>
+      <div class="quick-overview__highlights">${sources.map(([label, text], index) => `
+        <article class="quick-highlight quick-highlight--${index}"><h3>${label}</h3><p>${escapeHtml(safeText(text))}</p></article>
+      `).join("")}</div>
+      <div class="business-route">${chain.map(([label, text]) => `<div><strong>${label}</strong><p>${escapeHtml(safeText(text))}</p></div>`).join("")}</div>
+      ${metrics.length ? `<div class="quick-metrics"><h3>優先追蹤的三個指標</h3>${metrics.map(item => `<div><strong>${escapeHtml(safeText(item.metric))}</strong><p>${escapeHtml(safeText(item.direction))}</p></div>`).join("")}</div>` : ""}
+      <p class="quick-overview__hint">下方點開章節，可閱讀完整分析與追蹤方法。總覽依報告順序列出重點。</p>
+    </section>`;
   }
 
   function findJsonObjectEnd(text, startIndex) {
@@ -1048,8 +1099,14 @@
           </iframe>
         </div>`;
       
-      resultElement.innerHTML = chartHtml + valueChainHtml + timelineHtml + coreSummaryHtml +
-        productPortfolioHtml + dashboardHtml + htmlContent;
+      const quickOverviewHtml = renderQuickOverview(coreSummary, dashboard, valueChain, symbol);
+      resultElement.innerHTML = quickOverviewHtml +
+        renderReadingChapter("股價走勢", symbol, chartHtml) +
+        renderReadingChapter("商業模式與產業價值鏈", valueChain?.position, valueChainHtml) +
+        renderReadingChapter("公司發展時間線", timeline?.items?.[0]?.event, timelineHtml) +
+        renderReadingChapter("完整核心摘要", coreSummary?.identity, coreSummaryHtml) +
+        renderReadingChapter("主要產品與服務", productPortfolio?.overview, productPortfolioHtml) +
+        dashboardHtml + htmlContent;
 
      
       currentSearchContext = data.searchContext; 
