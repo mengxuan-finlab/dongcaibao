@@ -6,6 +6,8 @@ const axios = require('axios');
 const { GoogleGenAI } = require("@google/genai");
 const { createClient } = require('@supabase/supabase-js');
 const guestAccess = require('./guest-access');
+const { generateValidatedReport, collectSearchResults, createReportCache } = require('./company-report');
+const getCompanyReport = createReportCache();
 
 const app = express();
 // Render sits behind one reverse proxy; local requests use the socket address.
@@ -46,12 +48,18 @@ function wait(ms) {
 async function searchCompany(query, num) {
   for (let attempt = 1; attempt <= 2; attempt += 1) {
     try {
-      return await axios.get("https://serpapi.com/search.json", {
+      const response = await axios.get("https://serpapi.com/search.json", {
         params: { engine: "google", q: query, api_key: process.env.SERPAPI_KEY, num, hl: "zh-tw", gl: "tw" },
         timeout: 20000
       });
+      if (response.data.error || !response.data.organic_results?.length) {
+        const error = new Error('搜尋服務未提供有效結果。');
+        error.status = 502;
+        throw error;
+      }
+      return response;
     } catch (error) {
-      const status = Number(error.response?.status);
+      const status = Number(error.response?.status || error.status);
       const retryable = [429, 500, 502, 503, 504].includes(status)
         || ["ECONNABORTED", "ECONNRESET", "ETIMEDOUT"].includes(error.code);
       console.warn(`[公司搜尋] 第 ${attempt} 次失敗，狀態: ${status || error.code || "unknown"}`);
@@ -140,7 +148,7 @@ function detectMarket(symbol) {
   return 'US';
 }
 
-function buildSearchQueries(symbol, market, isPro) {
+function buildSearchQueries(symbol, market) {
   const normalizedSymbol = normalizeSymbol(symbol);
   if (market === 'TW') {
     return [
@@ -156,7 +164,7 @@ function buildSearchQueries(symbol, market, isPro) {
     `${normalizedSymbol} annual report business overview industry outlook`
   ];
 
-  return isPro ? queries : queries.slice(0, 2);
+  return queries;
 }
 
 function stripJsonFence(text) {
@@ -456,7 +464,7 @@ app.post('/api/analyze-stock', async (req, res) => {
   let settleGuest;
   
   try {
-    if (typeof symbol !== 'string' || !symbol.trim() || symbol.length > 30) {
+    if (typeof symbol !== 'string' || !/^[A-Z0-9][A-Z0-9.^-]{0,19}$/i.test(symbol.trim())) {
       return res.status(400).json({ error: '請輸入有效股票代碼。' });
     }
     const { user, plan: userPlan } = await getReportIdentity(req);
@@ -493,62 +501,54 @@ app.post('/api/analyze-stock', async (req, res) => {
     // 往下才是原本的執行邏輯 (通過檢查才執行)
     // ==========================================
 
-    const searchNum = 10;
     const normalizedSymbol = normalizeSymbol(symbol);
     const market = detectMarket(normalizedSymbol);
 
     // 診斷用：請在部署後的 Log 觀察這裡輸出什麼
     console.log(`[系統診斷] 用戶方案: ${userPlan} | 主要模型: ${GEMINI_PRIMARY_MODEL} | 市場別: ${market} | 報告模式: 一般公司介紹`);
 
-    // A. 搜尋階段
-    const searchQueries = buildSearchQueries(normalizedSymbol, market, false);
-    const perQueryNum = Math.max(3, Math.ceil(searchNum / searchQueries.length));
-    const searchResponses = await Promise.allSettled(
-      searchQueries.map(query => searchCompany(query, perQueryNum))
-    );
-    const seenLinks = new Set();
-    const searchResults = searchResponses.flatMap((response, queryIndex) => {
-      const query = searchQueries[queryIndex];
-      if (response.status !== "fulfilled") return [];
-      return (response.value.data.organic_results || []).map(item => ({ ...item, query }));
-    }).filter(item => {
-      const key = item.link || `${item.title}-${item.snippet}`;
-      if (seenLinks.has(key)) return false;
-      seenLinks.add(key);
-      return true;
-    }).slice(0, searchNum);
+    const reportResult = await getCompanyReport(`${market}:${normalizedSymbol}`, async () => {
+      // Balance coverage across business model, competitors and official filings.
+      const searchNum = 12;
+      const searchQueries = buildSearchQueries(normalizedSymbol, market);
+      const perQueryNum = Math.max(3, Math.ceil(searchNum / searchQueries.length));
+      const searchResponses = await Promise.allSettled(
+        searchQueries.map(query => searchCompany(query, perQueryNum))
+      );
+      const { results: searchResults, successfulQueries, limited } = collectSearchResults(searchResponses, searchQueries, searchNum);
 
-    if (!searchResults.length) {
-      const searchError = new Error("搜尋服務暫時無法取得公司資料，請稍後重新產生報告。");
-      searchError.statusCode = 503;
-      throw searchError;
-    }
+      const searchContext = searchResults.map((item, index) =>
+        `[資料 ${index + 1}] 搜尋主題「${item.query}」｜${item.title}: ${item.snippet}\n網址：${item.link || '未提供'}`
+      ).join("\n\n");
 
-    const searchContext = searchResults.map((item, index) => 
-      `[資料 ${index + 1}] 搜尋主題「${item.query}」｜${item.title}: ${item.snippet}`
-    ).join("\n\n");
-
-    // B. 選擇 Prompt (確認調用外部定義的函數)
-    const finalPrompt = getBasePrompt(normalizedSymbol, searchContext, market);
-
-    // C. 呼叫 Gemini；暫時性錯誤會自動重試並切換備援模型
-    const { result: aiResult, modelName } = await generateContentWithFallback(finalPrompt, "公司分析");
-    console.log(`[公司分析] 成功使用模型: ${modelName}`);
-    const responseText = aiResult.text;
+      const finalPrompt = getBasePrompt(normalizedSymbol, searchContext, market);
+      const generated = await generateValidatedReport({
+        basePrompt: finalPrompt,
+        models: [GEMINI_PRIMARY_MODEL, GEMINI_FALLBACK_MODEL],
+        generate: args => genAI.models.generateContent(args),
+        isRetryable: isRetryableGeminiError,
+        log: info => console.warn('[公司分析重試]', info)
+      });
+      console.log(`[公司分析] 完整報告驗證成功，模型: ${generated.modelName}, 資料筆數: ${searchResults.length}`);
+      return {
+        ...generated, searchContext,
+        generatedAt: new Date().toISOString(),
+        sourceInfo: { count: searchResults.length, successfulQueries, totalQueries: searchQueries.length, limited }
+      };
+    });
 
     if (user) await supabase.from('usage_logs').insert({ user_id: user.id, action: 'company_intro' });
     if (settleGuest) settleGuest(true);
 
     res.json({ 
-      text: responseText, 
+      ...reportResult,
       plan: userPlan,
       reportMode: 'base',
-      searchContext: searchContext
     });
 
   } catch (err) {
-    console.error("後端錯誤:", err);
-    res.status(err.statusCode || 500).json({ error: err.message || '伺服器忙碌中', loginRequired: !!err.loginRequired });
+    console.error("公司報告錯誤:", { status: err.statusCode || err.status || err.response?.status, code: err.code });
+    res.status(err.statusCode || 500).json({ error: err.statusCode ? err.message : '報告服務暫時無法完成，請稍後再試。', loginRequired: !!err.loginRequired });
   } finally {
     if (settleGuest) settleGuest(false);
   }
