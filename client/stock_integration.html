@@ -1122,7 +1122,7 @@
           resultEl.innerHTML = "";
           return;
         }
-        throw new Error(data.error || "伺服器發生錯誤");
+        throw new Error((data.error || "伺服器發生錯誤") + (data.requestId ? `（查詢編號：${data.requestId}）` : ""));
       }
       
       const resultElement = document.getElementById("result");

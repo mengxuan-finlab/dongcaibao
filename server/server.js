@@ -6,7 +6,8 @@ const axios = require('axios');
 const { GoogleGenAI } = require("@google/genai");
 const { createClient } = require('@supabase/supabase-js');
 const guestAccess = require('./guest-access');
-const { generateValidatedReport, collectSearchResults, createReportCache } = require('./company-report');
+const { randomUUID } = require('crypto');
+const { generateValidatedReport, collectSearchResults, createReportCache, safeErrorMessage, reportErrorResponse } = require('./company-report');
 const getCompanyReport = createReportCache();
 
 const app = express();
@@ -461,6 +462,7 @@ ${searchContext}
 // --- 主要 API ---
 app.post('/api/analyze-stock', async (req, res) => {
   const { symbol } = req.body;
+  const requestId = randomUUID();
   let settleGuest;
   
   try {
@@ -527,7 +529,7 @@ app.post('/api/analyze-stock', async (req, res) => {
         models: [GEMINI_PRIMARY_MODEL, GEMINI_FALLBACK_MODEL],
         generate: args => genAI.models.generateContent(args),
         isRetryable: isRetryableGeminiError,
-        log: info => console.warn('[公司分析重試]', info)
+        log: info => console.warn('[公司分析重試]', { requestId, ...info })
       });
       console.log(`[公司分析] 完整報告驗證成功，模型: ${generated.modelName}, 資料筆數: ${searchResults.length}`);
       return {
@@ -547,8 +549,9 @@ app.post('/api/analyze-stock', async (req, res) => {
     });
 
   } catch (err) {
-    console.error("公司報告錯誤:", { status: err.statusCode || err.status || err.response?.status, code: err.code });
-    res.status(err.statusCode || 500).json({ error: err.statusCode ? err.message : '報告服務暫時無法完成，請稍後再試。', loginRequired: !!err.loginRequired });
+    const failure = reportErrorResponse(err);
+    console.error("公司報告錯誤:", { requestId, status: failure.status, upstreamStatus: err.status || err.response?.status, code: failure.code, message: safeErrorMessage(err) });
+    res.status(failure.status).json({ error: failure.message, code: failure.code, requestId, loginRequired: !!err.loginRequired });
   } finally {
     if (settleGuest) settleGuest(false);
   }

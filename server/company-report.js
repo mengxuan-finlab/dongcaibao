@@ -53,7 +53,38 @@ function buildContract(basePrompt) {
 原始資料不足時明確寫「未披露」或「目前資料不足以判斷」，不要編造公司、事件、年份或數據。
 timeline 整理 4-6 個發展節點，productPortfolio 整理 3-6 個主要領域；核心摘要說明公司定位、痛點、收入、特色、成長與壓力。
 ${requirements}`;
-  return { schema: schemaFor(template), prompt };
+  const schema = schemaFor(template);
+  const shape = JSON.stringify(template);
+  const counts = Object.entries(ARRAY_LIMITS).map(([path, [min, max]]) => `${path}: ${min}-${max} 項`).join('\n');
+  return { schema, prompt: `${prompt}\n【完整欄位格式範例，請以真實分析替換示意文字】\n${shape}\n【陣列項目數量】\n${counts}` };
+}
+
+// Keep strict count checks locally; nested array bounds can exceed Gemini's decoder complexity limit.
+function providerSchema(schema) {
+  if (schema.type === 'object') return {
+    type: 'object', required: schema.required,
+    properties: Object.fromEntries(Object.entries(schema.properties).map(([key, child]) => [key, providerSchema(child)]))
+  };
+  if (schema.type === 'array') return { type: 'array', items: providerSchema(schema.items) };
+  return { type: 'string', ...(schema.enum ? { enum: schema.enum } : {}) };
+}
+
+function safeErrorMessage(error) {
+  return String(error?.message || 'Unknown error')
+    .replace(/AIza[\w-]+/g, '[REDACTED]')
+    .replace(/(Bearer\s+)[^\s"']+/gi, '$1[REDACTED]')
+    .replace(/([?&](?:key|api_key)=)[^&\s"']+/gi, '$1[REDACTED]')
+    .replace(/("(?:api_key|apiKey|access_token|refresh_token)"\s*:\s*")[^"]+/gi, '$1[REDACTED]')
+    .slice(0, 1200);
+}
+
+function reportErrorResponse(error) {
+  const upstream = Number(error.status || error.response?.status);
+  if (error.statusCode) return { status: error.statusCode, code: error.code || 'REPORT_UNAVAILABLE', message: error.message };
+  if (upstream === 400) return { status: 502, code: 'REPORT_REQUEST_REJECTED', message: 'AI 服務拒絕了報告請求，請將查詢編號提供給管理者。' };
+  if ([401, 403, 404].includes(upstream)) return { status: 503, code: 'REPORT_AI_CONFIG', message: 'AI 服務的金鑰、權限或模型設定需要檢查，請聯絡管理者。' };
+  if (upstream === 429) return { status: 503, code: 'REPORT_AI_LIMIT', message: 'AI 服務暫時達到使用限制，請稍後再試。' };
+  return { status: 500, code: 'REPORT_INTERNAL', message: '報告服務暫時無法完成，請將查詢編號提供給管理者。' };
 }
 
 function validateReport(value, schema, path = 'report') {
@@ -86,28 +117,44 @@ async function generateValidatedReport({ basePrompt, models, generate, isRetryab
   const uniqueModels = [...new Set(models.filter(Boolean))];
   const attempts = uniqueModels.length === 1 ? [uniqueModels[0], uniqueModels[0]] : uniqueModels.slice(0, 2);
   let lastError;
-  for (const model of attempts) {
+  let jsonOnly = false;
+  const deadline = Date.now() + timeoutMs * 2;
+  let attemptCount = 0;
+  while (attempts.length && attemptCount < 3) {
+    const model = attempts.shift();
+    attemptCount++;
+    const remainingMs = Math.min(timeoutMs, deadline - Date.now());
+    if (remainingMs <= 0) break;
     let received = false;
     try {
       const result = await generate({
         model, contents: prompt,
         config: {
-          responseMimeType: 'application/json', responseJsonSchema: schema,
+          responseMimeType: 'application/json',
+          ...(!jsonOnly ? { responseJsonSchema: providerSchema(schema) } : {}),
           temperature: 0.3, maxOutputTokens: 32768,
           ...(model.startsWith('gemini-2.5') ? { thinkingConfig: { thinkingBudget: 1024 } } : {}),
-          httpOptions: { apiVersion: 'v1beta', timeout: timeoutMs },
-          abortSignal: AbortSignal.timeout(timeoutMs)
+          httpOptions: { apiVersion: 'v1beta', timeout: remainingMs },
+          abortSignal: AbortSignal.timeout(remainingMs)
         }
       });
       received = true;
       const finishReason = result.candidates?.[0]?.finishReason;
       if (finishReason && finishReason !== 'STOP') throw new Error(`Incomplete generation: ${finishReason}`);
-      const report = JSON.parse(result.text || '');
+      const report = JSON.parse(String(result.text || '').replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim());
       validateReport(report, schema);
       return { report, modelName: model, text: serializeReport(report) };
     } catch (error) {
       lastError = error;
-      log({ model, status: error.status || error.response?.status, validation: received, message: received ? error.message : 'AI request failed' });
+      const status = Number(error.status || error.response?.status);
+      log({ model, status, mode: jsonOnly ? 'json' : 'schema', validation: received, message: safeErrorMessage(error) });
+      // Retry one rejected request without provider-side schema constraints.
+      // Local validation remains identical in both modes.
+      if (!received && status === 400 && !jsonOnly) {
+        jsonOnly = true;
+        attempts.unshift(model);
+        continue;
+      }
       if (!received && !isRetryable(error) && !['AbortError', 'TimeoutError'].includes(error.name)) throw error;
     }
   }
@@ -165,4 +212,4 @@ function createReportCache({ now = Date.now, ttlMs = 6 * 3600000, maxEntries = 1
   };
 }
 
-module.exports = { SECTIONS, buildContract, validateReport, generateValidatedReport, collectSearchResults, createReportCache };
+module.exports = { SECTIONS, buildContract, providerSchema, safeErrorMessage, reportErrorResponse, validateReport, generateValidatedReport, collectSearchResults, createReportCache };

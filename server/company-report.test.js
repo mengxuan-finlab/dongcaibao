@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { readFileSync } = require('node:fs');
-const { buildContract, validateReport, generateValidatedReport, collectSearchResults, createReportCache } = require('./company-report');
+const { buildContract, providerSchema, safeErrorMessage, reportErrorResponse, validateReport, generateValidatedReport, collectSearchResults, createReportCache } = require('./company-report');
 
 const server = readFileSync(`${__dirname}/server.js`, 'utf8');
 const promptCode = server.slice(server.indexOf('const getBasePrompt ='), server.indexOf('const getProPrompt ='));
@@ -71,6 +71,65 @@ test('non-retryable configuration errors are not multiplied', async () => {
     generate: async () => { calls++; throw Object.assign(new Error('invalid key'), { status: 401 }); }
   }), { status: 401 });
   assert.equal(calls, 1);
+});
+
+test('provider schema is simpler while local completeness checks remain strict', () => {
+  const remote = providerSchema(schema);
+  assert.equal(remote.properties.timeline.properties.items.minItems, undefined);
+  assert.equal(schema.properties.timeline.properties.items.minItems, 4);
+  assert.equal(remote.required.length, 5);
+  const report = sample(schema);
+  report.timeline.items.pop();
+  assert.throws(() => validateReport(report, schema), /timeline.items/);
+});
+
+test('400 retries once without provider schema and accepts complete fenced JSON', async () => {
+  const seen = [];
+  const result = await generateValidatedReport({
+    basePrompt, models: ['gemini-2.5-flash'], isRetryable: () => false,
+    generate: async request => {
+      seen.push(request);
+      if (seen.length === 1) throw Object.assign(new Error('schema rejected'), { status: 400 });
+      return { text: '```json\n' + JSON.stringify(sample(schema)) + '\n```' };
+    }
+  });
+  assert.equal(seen.length, 2);
+  assert.equal(!!seen[0].config.responseJsonSchema, true);
+  assert.equal(seen[1].config.responseJsonSchema, undefined);
+  assert.equal(seen[1].contents.includes('"productPortfolio"'), true);
+  assert.equal(result.report.dashboard.research.metrics.length, 6);
+});
+
+test('JSON fallback still rejects partial reports and has bounded attempts', async () => {
+  let calls = 0;
+  await assert.rejects(generateValidatedReport({
+    basePrompt, models: ['model'], isRetryable: () => false,
+    generate: async () => {
+      calls++;
+      if (calls === 1) throw Object.assign(new Error('schema rejected'), { status: 400 });
+      return { text: '{}' };
+    }
+  }), { statusCode: 503 });
+  assert.equal(calls, 3);
+});
+
+test('persistent 400 stops after compatibility retry', async () => {
+  let calls = 0;
+  await assert.rejects(generateValidatedReport({
+    basePrompt, models: ['primary', 'fallback'], isRetryable: () => false,
+    generate: async () => { calls++; throw Object.assign(new Error('bad request'), { status: 400 }); }
+  }), { status: 400 });
+  assert.equal(calls, 2);
+});
+
+test('provider errors are classified and secret values are redacted from diagnostics', () => {
+  assert.equal(reportErrorResponse({ status: 400 }).code, 'REPORT_REQUEST_REJECTED');
+  assert.equal(reportErrorResponse({ status: 429 }).code, 'REPORT_AI_LIMIT');
+  assert.equal(reportErrorResponse({ status: 403 }).code, 'REPORT_AI_CONFIG');
+  assert.equal(reportErrorResponse({ statusCode: 503, message: 'incomplete' }).message, 'incomplete');
+  const message = safeErrorMessage(new Error('AIzaSECRET https://example.com?key=secret Bearer token {"apiKey":"private"}'));
+  for (const secret of ['AIzaSECRET', '=secret', 'Bearer token', '"private"']) assert.equal(message.includes(secret), false);
+  assert.equal(safeErrorMessage(new Error('x'.repeat(2000))).length, 1200);
 });
 
 const fulfilled = rows => ({ status: 'fulfilled', value: { data: { organic_results: rows } } });
