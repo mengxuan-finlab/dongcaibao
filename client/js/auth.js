@@ -43,6 +43,8 @@ const supabaseUrl = "https://zlkexplsleznuebighte.supabase.co";
     const { data: { user } } = await supabaseClient.auth.getUser();
 
     const isMember = !!user && !user.is_anonymous;
+    const guestMenu = document.getElementById("guest-menu");
+    if (isMember && guestMenu?.open) guestMenu.close();
     if (guestTrialLink) guestTrialLink.style.display = isMember ? "none" : "inline-flex";
 
     if (!isMember) {

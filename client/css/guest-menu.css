@@ -1,0 +1,62 @@
+.guest-menu {
+  width: min(780px, calc(100% - 32px));
+  max-height: calc(100dvh - 40px);
+  margin: auto;
+  padding: 28px;
+  overflow-y: auto;
+  color: #25324b;
+  background: #faf9ff;
+  border: 1px solid #e3def5;
+  border-radius: 22px;
+  box-shadow: 0 24px 80px #14103755;
+  text-align: left;
+  font-family: inherit;
+}
+
+.guest-menu::backdrop { background: #15112a99; }
+.guest-menu__heading { position: relative; padding-right: 30px; }
+.guest-menu__heading > span { color: #7662bd; font-size: 12px; font-weight: 800; }
+.guest-menu__heading h2 { margin: 8px 0; color: #25213d; font-size: clamp(23px, 4vw, 29px); }
+.guest-menu__heading p { margin: 0; color: #677086; font-size: 14px; line-height: 1.6; }
+.guest-menu__close {
+  position: absolute;
+  top: -10px;
+  right: -8px;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  color: #59516f;
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+  font-size: 28px;
+  cursor: pointer;
+}
+.guest-menu__options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 24px 0; }
+.guest-menu__option {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 20px 16px;
+  color: inherit;
+  background: white;
+  border: 1px solid #e2dcef;
+  border-radius: 14px;
+  text-decoration: none;
+  transition: border-color .15s, background .15s;
+}
+.guest-menu__option:hover { border-color: #8b78c9; background: #f3f0ff; }
+.guest-menu__tag { color: #7862b9; font-size: 11px; font-weight: 800; }
+.guest-menu__option h3 { margin: 8px 0; color: #302a4b; font-size: 17px; }
+.guest-menu__option p { margin: 0 0 18px; color: #657085; font-size: 13px; line-height: 1.7; }
+.guest-menu__option strong { margin-top: auto; color: #63509f; font-size: 12px; line-height: 1.7; }
+.guest-menu__footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; border-top: 1px solid #e3def0; padding-top: 18px; }
+.guest-menu__footer p { margin: 0; color: #677086; font-size: 13px; }
+.guest-menu__footer button { padding: 10px 16px; color: white; background: #6851b4; border: 0; border-radius: 10px; cursor: pointer; font: inherit; font-size: 13px; }
+.guest-menu :focus-visible { outline: 3px solid #b18733; outline-offset: 3px; }
+@media (max-width: 650px) {
+  .guest-menu { padding: 22px 18px; }
+  .guest-menu__options { grid-template-columns: 1fr; gap: 10px; margin: 18px 0; }
+  .guest-menu__option { padding: 16px; }
+  .guest-menu__option p { margin-bottom: 10px; }
+}
