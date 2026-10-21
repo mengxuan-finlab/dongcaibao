@@ -38,8 +38,11 @@ const supabaseUrl = "https://zlkexplsleznuebighte.supabase.co";
     const authUserEl = document.getElementById("auth-user");
     const logoutBtn = document.getElementById("logout-btn");
     const openPanelBtn = document.getElementById("open-auth-panel");
+    const guestTrialLink = document.getElementById("guest-trial-link");
 
     const { data: { user } } = await supabaseClient.auth.getUser();
+
+    if (guestTrialLink) guestTrialLink.style.display = user ? "none" : "inline-flex";
 
     if (!user) {
       authUserEl.textContent = "訪客｜登入可取得更多免費額度";
@@ -188,6 +191,10 @@ const supabaseUrl = "https://zlkexplsleznuebighte.supabase.co";
         authPanel.classList.add("show");
       }
       setupPasswordToggle();
+  });
+
+  supabaseClient.auth.onAuthStateChange(() => {
+    setTimeout(() => refreshAuthUI(), 0);
   });
 
   function scrollDown() {
