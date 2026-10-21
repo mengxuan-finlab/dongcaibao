@@ -5,8 +5,11 @@ const cors = require('cors');
 const axios = require('axios');
 const { GoogleGenAI } = require("@google/genai");
 const { createClient } = require('@supabase/supabase-js');
+const guestAccess = require('./guest-access');
 
 const app = express();
+// Render sits behind one reverse proxy; local requests use the socket address.
+app.set('trust proxy', 1);
 
 // 允許跨網域請求
 app.use(cors());
@@ -102,7 +105,29 @@ function generateContentStreamWithFallback(prompt, label) {
 }
 
 // 方案限制設定
-const PLAN_LIMIT = { free: 2, plus: 10, pro: Infinity };
+const PLAN_LIMIT = { free: 10, plus: 10, pro: Infinity };
+
+async function getReportIdentity(req) {
+  if (!req.headers.authorization) return { user: null, plan: 'guest' };
+  const token = req.headers.authorization.split(' ')[1];
+  const { data: { user }, error } = await supabase.auth.getUser(token);
+  if (error || !user) {
+    const authError = new Error('登入已失效，請重新登入。');
+    authError.statusCode = 401;
+    throw authError;
+  }
+  const { data: profile } = await supabase.from('profiles').select('plan').eq('id', user.id).single();
+  return { user, plan: (profile?.plan || 'free').toLowerCase() };
+}
+
+app.get('/api/guest-usage', (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  try {
+    res.json(guestAccess.getUsage(req.ip));
+  } catch (error) {
+    res.status(error.statusCode || 500).json({ error: error.message });
+  }
+});
 
 function normalizeSymbol(symbol) {
   return String(symbol || '').trim().toUpperCase();
@@ -427,20 +452,14 @@ ${searchContext}
 // --- 主要 API ---
 app.post('/api/analyze-stock', async (req, res) => {
   const { symbol } = req.body;
-  const authHeader = req.headers.authorization;
-
-  if (!authHeader) return res.status(401).json({ error: '未登入' });
+  let settleGuest;
   
   try {
-    const token = authHeader.split(' ')[1];
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !user) throw new Error('身分驗證失敗');
-
-    const { data: profile } = await supabase.from('profiles').select('plan').eq('id', user.id).single();
-    
-    // --- ★ 關鍵修正 1：統一轉小寫，防止 PRO/pro 判定錯誤 ---
-    const userPlan = (profile?.plan || 'free').toLowerCase();
-    const isPro = (userPlan === 'pro');
+    if (typeof symbol !== 'string' || !symbol.trim() || symbol.length > 30) {
+      return res.status(400).json({ error: '請輸入有效股票代碼。' });
+    }
+    const { user, plan: userPlan } = await getReportIdentity(req);
+    if (!user) settleGuest = guestAccess.reserve(req.ip, 'company_intro');
 
     // ==========================================
     // ★ 新增：限流攔截器 (放在搜尋之前)
@@ -452,36 +471,36 @@ app.post('/api/analyze-stock', async (req, res) => {
     startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
 
     // 2. 向 Supabase 查詢該用戶本週已使用次數
-    const { count: usedCount, error: countError } = await supabase
+    const { count: usedCount, error: countError } = user ? await supabase
       .from("usage_logs")
       .select("*", { count: 'exact', head: true })
       .eq("user_id", user.id)
       .eq("action", "company_intro")
-      .gte("created_at", startOfWeek.toISOString());
+      .gte("created_at", startOfWeek.toISOString()) : { count: 0, error: null };
 
     if (countError) throw new Error("無法讀取使用紀錄");
 
     // 3. 檢查是否超過限制 (Pro 方案為 Infinity，永遠不會進入此 if)
-    const limit = PLAN_LIMIT[userPlan] || 2;
+    const limit = PLAN_LIMIT[userPlan] ?? PLAN_LIMIT.free;
     if (usedCount >= limit) {
       return res.status(403).json({ 
-        error: `已達本週使用上限。您的 ${userPlan} 方案額度為每週 ${limit} 次，請升級方案以繼續使用。`,
-        plan: userPlan 
+        error: `已達本週 ${limit} 份報告額度，請下週再試。`,
+        plan: 'free'
       });
     }
     // ==========================================
     // 往下才是原本的執行邏輯 (通過檢查才執行)
     // ==========================================
 
-    const searchNum = isPro ? 20 : 10;
+    const searchNum = 10;
     const normalizedSymbol = normalizeSymbol(symbol);
     const market = detectMarket(normalizedSymbol);
 
     // 診斷用：請在部署後的 Log 觀察這裡輸出什麼
-    console.log(`[系統診斷] 用戶方案: ${userPlan} | 主要模型: ${GEMINI_PRIMARY_MODEL} | 市場別: ${market} | 是否為 Pro 模式: ${isPro}`);
+    console.log(`[系統診斷] 用戶方案: ${userPlan} | 主要模型: ${GEMINI_PRIMARY_MODEL} | 市場別: ${market} | 報告模式: 一般公司介紹`);
 
     // A. 搜尋階段
-    const searchQueries = buildSearchQueries(normalizedSymbol, market, isPro);
+    const searchQueries = buildSearchQueries(normalizedSymbol, market, false);
     const perQueryNum = Math.max(3, Math.ceil(searchNum / searchQueries.length));
     const searchResponses = await Promise.allSettled(
       searchQueries.map(query => searchCompany(query, perQueryNum))
@@ -509,45 +528,44 @@ app.post('/api/analyze-stock', async (req, res) => {
     ).join("\n\n");
 
     // B. 選擇 Prompt (確認調用外部定義的函數)
-    const finalPrompt = isPro 
-      ? getProPrompt(symbol, searchContext) 
-      : getBasePrompt(normalizedSymbol, searchContext, market);
+    const finalPrompt = getBasePrompt(normalizedSymbol, searchContext, market);
 
     // C. 呼叫 Gemini；暫時性錯誤會自動重試並切換備援模型
     const { result: aiResult, modelName } = await generateContentWithFallback(finalPrompt, "公司分析");
     console.log(`[公司分析] 成功使用模型: ${modelName}`);
     const responseText = aiResult.text;
 
-    await supabase.from('usage_logs').insert({ user_id: user.id, action: 'company_intro' });
+    if (user) await supabase.from('usage_logs').insert({ user_id: user.id, action: 'company_intro' });
+    if (settleGuest) settleGuest(true);
 
     res.json({ 
       text: responseText, 
       plan: userPlan,
+      reportMode: 'base',
       searchContext: searchContext
     });
 
   } catch (err) {
     console.error("後端錯誤:", err);
-    res.status(err.statusCode || 500).json({ error: err.message || '伺服器忙碌中' });
+    res.status(err.statusCode || 500).json({ error: err.message || '伺服器忙碌中', loginRequired: !!err.loginRequired });
+  } finally {
+    if (settleGuest) settleGuest(false);
   }
 });
 // ===== 新增：AI 深度追問 Endpoint =====
 app.post('/api/chat-with-report', async (req, res) => {
   const { symbol, searchContext, sectionTitle, sectionContext, userQuery } = req.body;
-  const authHeader = req.headers.authorization;
-
-  if (!authHeader) return res.status(401).json({ error: '未登入' });
+  let settleGuest;
 
   try {
-    const token = authHeader.split(' ')[1];
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !user) throw new Error('身分驗證失敗');
-
-    const { data: profile } = await supabase.from('profiles').select('plan').eq('id', user.id).single();
-    const userPlan = (profile?.plan || 'free').toLowerCase();
+    if (typeof userQuery !== 'string' || !userQuery.trim() || userQuery.length > 2000) {
+      return res.status(400).json({ error: '請輸入 2000 字以內的問題。' });
+    }
+    const { user, plan: userPlan } = await getReportIdentity(req);
+    if (!user) settleGuest = guestAccess.reserve(req.ip, 'chat_query');
     
     // --- (保留原本的問答限流攔截器邏輯) ---
-    if (userPlan !== 'pro') {
+    if (user && userPlan !== 'pro') {
       const startOfWeek = new Date();
       startOfWeek.setHours(0, 0, 0, 0);
       startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
@@ -561,10 +579,10 @@ app.post('/api/chat-with-report', async (req, res) => {
 
       if (countError) throw new Error("無法讀取對話紀錄");
 
-      const chatLimit = userPlan === 'plus' ? 20 : 5; 
+      const chatLimit = 20;
       if (chatCount >= chatLimit) {
         return res.status(403).json({ 
-          error: `已達本週對話上限。您的 ${userPlan} 方案配額為每週 ${chatLimit} 次，請升級 Pro 方案以解鎖無限對話。` 
+          error: `已達本週 ${chatLimit} 次對話額度，請下週再試。`
         });
       }
     }
@@ -616,7 +634,8 @@ app.post('/api/chat-with-report', async (req, res) => {
     }
 
     // 成功完成後紀錄行為
-    await supabase.from('usage_logs').insert({ user_id: user.id, action: 'chat_query' });
+    if (user) await supabase.from('usage_logs').insert({ user_id: user.id, action: 'chat_query' });
+    if (settleGuest) settleGuest(true);
     
     // 正式結束 HTTP 連線
     res.end();
@@ -625,10 +644,12 @@ app.post('/api/chat-with-report', async (req, res) => {
     console.error("對話錯誤:", err);
     // 如果 Header 尚未發送，回傳 JSON 錯誤；若已開始串流，則直接結束
     if (!res.headersSent) {
-      res.status(err.statusCode || 500).json({ error: err.message || '對話發生錯誤' });
+      res.status(err.statusCode || 500).json({ error: err.message || '對話發生錯誤', loginRequired: !!err.loginRequired });
     } else {
       res.end();
     }
+  } finally {
+    if (settleGuest) settleGuest(false);
   }
 });
 // === 額外：Stock Data Supabase（讀 core_metrics 用）===
@@ -663,11 +684,10 @@ app.get('/api/pro-metrics', async (req, res) => {
 
     if (!authHeader) return res.status(401).json({ error: "未登入" });
 
-    // 1. 權限與方案驗證
+    // Personal financial tools remain available to authenticated members.
     const token = authHeader.split(" ")[1];
     const { data: { user }, error: authErr } = await supabase.auth.getUser(token);
-    const { data: profile } = await supabase.from("profiles").select("plan").eq("id", user.id).single();
-    if (profile?.plan !== "pro") return res.status(403).json({ error: "限 Pro 方案解鎖高品質趨勢" });
+    if (authErr || !user) return res.status(401).json({ error: "登入已失效，請重新登入。" });
 
     // 2. 抓取五年歷史數據 (使用 Stable 端點)
     const [kmRes, ratioRes] = await Promise.all([

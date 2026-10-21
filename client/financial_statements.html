@@ -436,14 +436,14 @@
   <aside class="sidebar">
     <h1>財報追蹤管理</h1>
     <div class="plan">
-      目前方案：<span id="planName">載入中...</span><br>
+      目前身分：<span id="planName">載入中...</span><br>
       可追蹤檔數上限：<span id="planLimit">-</span> 檔
     </div>
 
     <label for="symbolInput">新增追蹤股票（美股代號，例如 HIMS）</label>
     <input id="symbolInput" placeholder="輸入股票代號（英文）" />
     <button id="addBtn">新增追蹤</button>
-    <div style="font-size:12px; margin-top:4px; color:#9ca3af;">Free: 1 檔、Plus: 3 檔、Pro: 5 檔</div>
+    <div style="font-size:12px; margin-top:4px; color:#9ca3af;">登入後可建立個人財報追蹤清單</div>
 
     <div class="stock-list" id="stockList"></div>
   </aside>
@@ -458,11 +458,10 @@
   const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpsa2V4cGxzbGV6bnVlYmlnaHRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0MzAwNjUsImV4cCI6MjA4MTAwNjA2NX0.HPVn3jcN88M4U3-RCVW-YO-b65rDOKv6pxEaVWwbm68";
   const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
 
-  const planLimitMap = { free: 1, plus: 3, pro: 5 };
+  const FINANCIAL_TRACKING_LIMIT = 5;
 
   let currentUser = null;
-  let currentPlan = "free";
-  let currentLimit = 1;
+  const currentLimit = FINANCIAL_TRACKING_LIMIT;
   let tracked = [];
   let selectedStockId = null;
 
@@ -474,21 +473,7 @@
     }
     currentUser = session.user;
 
-    const { data: profile, error } = await supabaseClient
-      .from("profiles")
-      .select("plan")
-      .eq("id", currentUser.id)
-      .single();
-
-    if (error) {
-      console.error("讀取 profile 失敗，使用預設值");
-      currentPlan = "free";
-    } else {
-      currentPlan = profile.plan || "free";
-    }
-    currentLimit = planLimitMap[currentPlan] || 1;
-
-    document.getElementById("planName").textContent = currentPlan.toUpperCase();
+    document.getElementById("planName").textContent = "免費會員";
     document.getElementById("planLimit").textContent = currentLimit;
 
     await loadTrackedStocks();
@@ -754,7 +739,12 @@ async function renderDashboards() {
       <div class="dash-card">
         <div style="display:flex; justify-content:space-between; align-items:center;">
           <h2>${reportTitle}</h2>
-          <span class="status-badge">已完成</span>
+          <span class="status-badge">${s.status === "review" ? "AI 分析待更新" : "已完成"}</span>
+        </div>
+
+        <div style="margin:12px 0; display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
+          <button id="refreshReportBtn" type="button">重新整理狀態</button>
+          ${s.status === "review" ? '<span style="font-size:13px; color:#64748b;">已排入分析排程，完成後請重新整理。</span>' : ""}
         </div>
 
         <div class="tab-container">
@@ -771,13 +761,14 @@ async function renderDashboards() {
         </div>
       </div>
     `;
+    document.getElementById("refreshReportBtn").addEventListener("click", loadTrackedStocks);
 }
 
   function updateAddButtonState() {
     const addBtn = document.getElementById("addBtn");
     if (tracked.length >= currentLimit) {
       addBtn.disabled = true;
-      addBtn.textContent = "已達方案上限";
+      addBtn.textContent = "已達 5 檔追蹤上限";
     } else {
       addBtn.disabled = false;
       addBtn.textContent = "新增追蹤";
@@ -790,7 +781,7 @@ async function renderDashboards() {
     if (!symbolRaw) return;
 
     if (tracked.length >= currentLimit) {
-      alert(`目前方案 (${currentPlan}) 最多只能追蹤 ${currentLimit} 檔，請先移除或升級方案。`);
+      alert(`目前最多可追蹤 ${currentLimit} 檔，請先移除其他股票。`);
       return;
     }
 

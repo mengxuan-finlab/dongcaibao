@@ -270,7 +270,7 @@ button {
 }
 
 .pro-report-style::before {
-  content: "PRO INSTITUTIONAL REPORT";
+  content: "深度研究報告";
   position: absolute;
   top: -12px;
   right: 20px;

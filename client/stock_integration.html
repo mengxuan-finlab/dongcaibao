@@ -41,9 +41,10 @@
   <div id="planModal" class="dc-modal">
     <div class="dc-modal-backdrop" id="planModalBackdrop"></div>
     <div class="dc-modal-content">
-      <h3>已達本週使用上限</h3>
+      <h3>使用額度提醒</h3>
       <p id="planModalMessage"></p>
       <div class="dc-modal-actions">
+        <a id="guestLoginLink" href="index.html?login=1" target="_blank" rel="noopener" hidden>登入／免費註冊</a>
         <button id="planModalClose" class="dc-btn-primary">知道了</button>
       </div>
     </div>
@@ -61,7 +62,7 @@
   let activeSectionContext = { title: "整份公司報告", context: "" };
   
   const PLAN_LIMIT = {
-    free: 2,
+    free: 10,
     plus: 10,
     pro: Infinity
   };
@@ -71,7 +72,8 @@
   const planModalClose = document.getElementById("planModalClose");
   const planModalMessage = document.getElementById("planModalMessage");
 
-  function showPlanModal(message) {
+  function showPlanModal(message, loginRequired = false) {
+    document.getElementById("guestLoginLink").hidden = !loginRequired;
     planModalMessage.textContent = message;
     planModal.classList.add("show");
   }
@@ -943,7 +945,7 @@
 
   async function getCurrentUserPlan() {
     const { data: { user } } = await supabaseClient.auth.getUser();
-    if (!user) return { user: null, plan: null };
+    if (!user) return { user: null, plan: "guest" };
 
     const { data: profile } = await supabaseClient
       .from("profiles")
@@ -971,7 +973,19 @@
 
   async function updateUsageInfo(user, plan) {
     const usageInfoEl = document.getElementById("usageInfo");
-    if (!usageInfoEl || !user) return;
+    if (!usageInfoEl) return;
+    if (!user) {
+      usageInfoEl.innerHTML = '目前身分：訪客｜每日 1 份報告、3 次追問。<a href="index.html?login=1" target="_blank" rel="noopener">登入取得更多免費額度</a>';
+      try {
+        const response = await fetch(new URL("/api/guest-usage", BACKEND_URL));
+        if (!response.ok) return;
+        const usage = await response.json();
+        usageInfoEl.innerHTML = `目前身分：訪客｜今日報告：${Number(usage.used.company_intro)} / 1｜今日追問：${Number(usage.used.chat_query)} / 3<br><a href="index.html?login=1" target="_blank" rel="noopener">登入取得更多免費額度</a>`;
+      } catch (error) {
+        console.debug("訪客額度暫時無法讀取。", error);
+      }
+      return;
+    }
 
     const startOfWeek = new Date();
     startOfWeek.setHours(0, 0, 0, 0);
@@ -989,10 +1003,10 @@
       .eq("action", "chat_query")
       .gte("created_at", startOfWeek.toISOString());
 
-    const chatLimit = (plan === 'pro') ? "無限" : (plan === 'plus' ? 20 : 5);
+    const chatLimit = plan === 'pro' ? "無限" : 20;
     
     usageInfoEl.innerHTML = `
-      目前方案：<span class="plan-tag plan-${plan}">${plan}</span> 
+      目前身分：<span class="plan-tag plan-free">免費會員</span>
       ｜ 本週報告：${used} / ${limitText} 次
       <br>💬 本週對話：${chatUsed || 0} / ${chatLimit} 次
     `;
@@ -1001,6 +1015,12 @@
   window.addEventListener("DOMContentLoaded", async () => {
     const { user, plan } = await getCurrentUserPlan();
     await updateUsageInfo(user, plan);
+  });
+  supabaseClient.auth.onAuthStateChange(() => {
+    setTimeout(async () => {
+      const { user, plan } = await getCurrentUserPlan();
+      await updateUsageInfo(user, plan);
+    }, 0);
   });
 
   function isTaiwanStock(symbol) {
@@ -1029,10 +1049,6 @@
     }
 
     const { data: { session } } = await supabaseClient.auth.getSession();
-    if (!session) {
-      alert("請先登入才能使用產生公司介紹功能。");
-      return;
-    }
 
     
     fetchBtn.disabled = true;
@@ -1048,7 +1064,7 @@
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${session.access_token}`
+          ...(session ? { "Authorization": `Bearer ${session.access_token}` } : {})
         },
         body: JSON.stringify({ symbol: symbol })
       });
@@ -1057,7 +1073,7 @@
 
       if (!response.ok) {
         if (response.status === 403) {
-          showPlanModal(data.error || "已達本週使用上限，請升級方案。");
+          showPlanModal(data.error || "已達使用上限。", data.loginRequired);
           debugEl.textContent = "已達使用上限 ⛔";
           resultEl.innerHTML = "";
           return;
@@ -1067,11 +1083,7 @@
       
       const resultElement = document.getElementById("result");
 
-      if (data.plan === 'pro') {
-          resultElement.classList.add("pro-report-style");
-      } else {
-          resultElement.classList.remove("pro-report-style");
-      }
+      resultElement.classList.remove("pro-report-style");
 
    
       const { valueChain, reportText: reportWithoutValueChain } = extractValueChain(data.text);
@@ -1177,7 +1189,7 @@
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${session.access_token}`
+          ...(session ? { "Authorization": `Bearer ${session.access_token}` } : {})
         },
         body: JSON.stringify({
           symbol: currentSymbol,
@@ -1190,6 +1202,7 @@
 
       if (!response.ok) {
         const errorData = await response.json();
+        if (errorData.loginRequired) showPlanModal(errorData.error, true);
         throw new Error(errorData.error || "對話失敗");
       }
 
@@ -1214,7 +1227,7 @@
 
     } catch (err) {
       console.error(err);
-      aiDisplayEl.innerHTML = `<span style="color:red;">錯誤：${err.message}</span>`;
+      aiDisplayEl.innerHTML = `<span style="color:red;">錯誤：${escapeHtml(err.message)}</span>`;
     }
   });
 </script>

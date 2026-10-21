@@ -159,7 +159,7 @@
     if (error) throw error;
 
     CURRENT_PLAN = (data?.plan || "free").toLowerCase();
-    $("planPill").textContent = `Plan: ${CURRENT_PLAN}`;
+    $("planPill").textContent = "免費會員";
     $("countLimit").textContent = PLAN_LIMIT[CURRENT_PLAN] ?? 1;
   }
 

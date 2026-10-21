@@ -42,21 +42,14 @@ const supabaseUrl = "https://zlkexplsleznuebighte.supabase.co";
     const { data: { user } } = await supabaseClient.auth.getUser();
 
     if (!user) {
-      authUserEl.style.display = "none";
+      authUserEl.textContent = "訪客｜登入可取得更多免費額度";
+      authUserEl.style.display = "inline-flex";
       logoutBtn.style.display = "none";
       openPanelBtn.style.display = "inline-flex";
       return;
     }
 
-    const { data: profile, error } = await supabaseClient
-      .from("profiles")
-      .select("plan")
-      .eq("id", user.id)
-      .maybeSingle();
-
-    const plan = profile?.plan || "free";
-
-    authUserEl.textContent = `${user.email}｜方案：${plan}`;
+    authUserEl.textContent = `${user.email}｜免費會員`;
     authUserEl.style.display = "inline-flex";
     logoutBtn.style.display = "inline-flex";
     openPanelBtn.style.display = "none";
@@ -162,24 +155,7 @@ const supabaseUrl = "https://zlkexplsleznuebighte.supabase.co";
 
   async function handleCheckout(event) {
     event.preventDefault();
-
-    const btn = event.currentTarget;
-    if (!btn || !btn.href) return;
-
-    const { data: { user } } = await supabaseClient.auth.getUser();
-
-    if (!user) {
-      alert("請先登入後再進行訂閱！");
-      return;
-    }
-
-    const userId = user.id;
-    const url = new URL(btn.href);
-
-    url.searchParams.set('checkout[custom][user_id]', userId);
-
-    const checkoutUrl = url.toString();
-    window.location.href = checkoutUrl;
+    alert("目前提供訪客試用與免費會員，付費訂閱暫停開放。");
   }
 
   document.querySelectorAll('.lemonsqueezy-button')
@@ -208,7 +184,9 @@ const supabaseUrl = "https://zlkexplsleznuebighte.supabase.co";
 
   window.addEventListener("load", () => {
       refreshAuthUI();
-      startBindingProcess();
+      if (new URLSearchParams(location.search).get("login") === "1") {
+        authPanel.classList.add("show");
+      }
       setupPasswordToggle();
   });
 

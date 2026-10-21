@@ -73,29 +73,26 @@ function setPlanUI(plan){
   if (!el) return;
 
   const text =
-    plan === "pro"  ? "方案：Pro（已解鎖進階）" :
-    plan === "plus" ? "方案：Plus" :
-                      "方案：Free";
+    __user ? "免費會員" : "訪客";
 
   el.textContent = text;
 }
 
 function requireProOrShowCard() {
-  if (__isPro) return true;
+  if (__user) return true;
 
   const host = document.getElementById("trends");
   if (host && !document.getElementById("proOnlyCard")) {
     host.insertAdjacentHTML("beforeend", `
       <div id="proOnlyCard" class="card" style="margin-top:14px;">
         <div class="cardHeader">
-          <h3 class="cardTitle">高資產模式（Pro 限定）</h3>
-          <span class="pill">Pro Only</span>
+          <h3 class="cardTitle">財務指標分析</h3>
         </div>
         <div class="note">
-          進階指標（如：毛利率/營益率趨勢、ROIC 趨勢、資本結構、股本稀釋）僅限 Pro 方案使用。
+          訪客可閱讀本頁的基本財務指標。
         </div>
         <div class="note">
-          若要解鎖，請升級至 Pro 方案。
+          <a href="index.html?login=1" target="_blank" rel="noopener">登入免費會員即可閱讀進階財務指標。</a>
         </div>
       </div>
     `);
@@ -167,8 +164,7 @@ function renderProCard(p) {
   host.insertAdjacentHTML("beforeend", `
       <div class="card" style="margin-top:16px; border:2px solid #ffd700; background: rgba(255, 215, 0, 0.05);">
         <div class="cardHeader">
-          <h3 class="cardTitle" style="color:#ffd700;"> Pro 進階分析：護城營與估值安全邊際</h3>
-          <span class="pill" style="background:#ffd700; color:#000;">Pro Only</span>
+          <h3 class="cardTitle" style="color:#ffd700;">進階分析：護城河與估值安全邊際</h3>
         </div>
         <div style="margin: 12px 0; display: flex; gap: 8px; flex-wrap: wrap;">
           ${s.roic > 0.15 ? 
@@ -804,7 +800,7 @@ async function loadSnapshot() {
         if (host) {
           host.insertAdjacentHTML("beforeend", `
             <div class="card" style="margin-top:14px;">
-              <div class="note">Pro 指標載入失敗：${e.message}</div>
+              <div class="note">進階指標載入失敗：${e.message}</div>
             </div>
           `);
         }
