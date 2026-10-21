@@ -17,11 +17,11 @@ const ARRAY_LIMITS = {
 
 function schemaFor(value, path = '') {
   if (Array.isArray(value)) {
-    const limits = ARRAY_LIMITS[path] || [1, path.startsWith('valueChain.') || path.endsWith('.examples') ? 3 : 8];
+    const limits = ARRAY_LIMITS[path] || [1, path.startsWith('valueChain.') ? undefined : path.endsWith('.examples') ? 3 : 8];
     const items = schemaFor(value[0], path);
     if (path === 'dashboard.newsTags') items.properties.category.enum = value.map(item => item.category);
     if (path === 'dashboard.financials') items.properties.area.description = '財務或營運觀察面向，五項不可重複';
-    return { type: 'array', minItems: limits[0], maxItems: limits[1], items };
+    return { type: 'array', minItems: limits[0], ...(limits[1] === undefined ? {} : { maxItems: limits[1] }), items };
   }
   if (value && typeof value === 'object') {
     return {
@@ -52,6 +52,7 @@ function buildContract(basePrompt) {
 所有欄位都需完整填寫；每個分析保留具體原因、影響及追蹤方式，不得以標題或短詞代替解釋。
 原始資料不足時明確寫「未披露」或「目前資料不足以判斷」，不要編造公司、事件、年份或數據。
 timeline 整理 4-6 個發展節點，productPortfolio 整理 3-6 個主要領域；核心摘要說明公司定位、痛點、收入、特色、成長與壓力。
+valueChain 的 upstream、offerings、customers、revenue 都必須是非空陣列，依資料列出相關項目，不必為了三項上限刪除內容；未披露時以文字明確註明。
 ${requirements}`;
   const schema = schemaFor(template);
   const shape = JSON.stringify(template);
@@ -92,8 +93,9 @@ function validateReport(value, schema, path = 'report') {
     if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${path}: object required`);
     for (const key of schema.required) validateReport(value[key], schema.properties[key], `${path}.${key}`);
   } else if (schema.type === 'array') {
-    if (!Array.isArray(value) || value.length < schema.minItems || value.length > schema.maxItems) {
-      throw new Error(`${path}: expected ${schema.minItems}-${schema.maxItems} items`);
+    if (!Array.isArray(value) || value.length < schema.minItems || (schema.maxItems !== undefined && value.length > schema.maxItems)) {
+      const expected = schema.maxItems === undefined ? `at least ${schema.minItems}` : `${schema.minItems}-${schema.maxItems}`;
+      throw new Error(`${path}: expected ${expected} items, received ${Array.isArray(value) ? value.length : typeof value}`);
     }
     value.forEach((item, index) => validateReport(item, schema.items, `${path}[${index}]`));
     const uniqueKey = path === 'report.dashboard.newsTags' ? 'category'

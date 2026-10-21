@@ -38,6 +38,34 @@ test('missing chapter, empty field and duplicate news categories are rejected', 
   assert.throws(() => validateReport(duplicate, schema), /duplicate/);
 });
 
+test('value-chain lists retain more than three items without retrying or truncation', async () => {
+  const report = sample(schema);
+  for (const key of ['upstream', 'offerings', 'customers', 'revenue']) {
+    report.valueChain[key] = Array.from({ length: 9 }, (_, i) => `${key} ${i}`);
+  }
+  let calls = 0;
+  const generated = await generateValidatedReport({
+    basePrompt, models: ['model'], isRetryable: () => false,
+    generate: async () => { calls++; return { text: JSON.stringify(report) }; }
+  });
+  assert.equal(calls, 1);
+  const legacy = frontendReader()({ text: generated.text });
+  for (const key of ['upstream', 'offerings', 'customers', 'revenue']) {
+    assert.equal(generated.report.valueChain[key].length, 9);
+    assert.equal(legacy.valueChain[key].length, 9);
+  }
+});
+
+test('empty value-chain lists, wrong types and blank entries remain invalid', () => {
+  const report = sample(schema);
+  report.valueChain.upstream = [];
+  assert.throws(() => validateReport(report, schema), /upstream: expected at least 1 items, received 0/);
+  report.valueChain.upstream = 'not an array';
+  assert.throws(() => validateReport(report, schema), /received string/);
+  report.valueChain.upstream = ['valid', ' '];
+  assert.throws(() => validateReport(report, schema), /non-empty text/);
+});
+
 test('truncated output retries on fallback and retains legacy markers', async () => {
   const seen = [];
   const result = await generateValidatedReport({

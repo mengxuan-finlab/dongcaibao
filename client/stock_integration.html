@@ -127,8 +127,7 @@
     if (!Array.isArray(items)) return [];
     return items
       .map(item => String(item || "").trim())
-      .filter(Boolean)
-      .slice(0, 3);
+      .filter(Boolean);
   }
 
   function extractValueChain(responseText) {
