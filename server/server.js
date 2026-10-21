@@ -116,6 +116,7 @@ async function getReportIdentity(req) {
     authError.statusCode = 401;
     throw authError;
   }
+  if (user.is_anonymous) return { user: null, plan: 'guest' };
   const { data: profile } = await supabase.from('profiles').select('plan').eq('id', user.id).single();
   return { user, plan: (profile?.plan || 'free').toLowerCase() };
 }
@@ -796,6 +797,7 @@ app.post("/api/news-radar", async (req, res) => {
     const token = authHeader.split(" ")[1];
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     if (authError || !user) throw new Error("身分驗證失敗");
+    if (user.is_anonymous) return res.status(401).json({ error: "請登入免費會員後使用新聞雷達。" });
 
     const normalizedSymbol = normalizeSymbol(symbol);
     if (!normalizedSymbol) {

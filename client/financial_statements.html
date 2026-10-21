@@ -443,7 +443,8 @@
     <label for="symbolInput">新增追蹤股票（美股代號，例如 HIMS）</label>
     <input id="symbolInput" placeholder="輸入股票代號（英文）" />
     <button id="addBtn">新增追蹤</button>
-    <div style="font-size:12px; margin-top:4px; color:#9ca3af;">登入後可建立個人財報追蹤清單</div>
+    <div id="trialHint" style="font-size:12px; margin-top:4px; color:#cbd5e1;">訪客可試用 1 檔完整財報，登入後可追蹤 5 檔。</div>
+    <p><a href="index.html?login=1" target="_blank" rel="noopener" style="color:#c7d2fe">登入／免費註冊</a></p>
 
     <div class="stock-list" id="stockList"></div>
   </aside>
@@ -461,25 +462,42 @@
   const FINANCIAL_TRACKING_LIMIT = 5;
 
   let currentUser = null;
-  const currentLimit = FINANCIAL_TRACKING_LIMIT;
+  let currentLimit = FINANCIAL_TRACKING_LIMIT;
+  let isGuest = false;
   let tracked = [];
   let selectedStockId = null;
 
   async function init() {
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    if (!session) {
-      alert("請先登入後再使用財報追蹤功能");
-      return;
+    document.getElementById("addBtn").disabled = true;
+    try {
+      const { data, error } = await supabaseClient.auth.getSession();
+      if (error) throw error;
+      // Create the anonymous identity only when the visitor starts their trial.
+      currentUser = data.session?.user || null;
+      isGuest = !currentUser || !!currentUser.is_anonymous;
+      currentLimit = isGuest ? 1 : FINANCIAL_TRACKING_LIMIT;
+      document.getElementById("planName").textContent = isGuest ? "訪客試用" : "免費會員";
+      document.getElementById("planLimit").textContent = currentLimit;
+      document.getElementById("trialHint").textContent = isGuest
+        ? "可試用 1 檔完整財報。請保留此瀏覽器資料以找回報告；第二檔需登入。"
+        : "每位會員可保存 5 檔股票的財報追蹤清單。";
+      if (currentUser) await loadTrackedStocks();
+      else {
+        tracked = [];
+        selectedStockId = null;
+        renderStockList();
+        renderDashboards();
+      }
+    } catch (error) {
+      document.getElementById("dashboards").textContent = "無法讀取財報，請重新整理後再試。";
+      console.error(error);
+    } finally {
+      updateAddButtonState();
     }
-    currentUser = session.user;
-
-    document.getElementById("planName").textContent = "免費會員";
-    document.getElementById("planLimit").textContent = currentLimit;
-
-    await loadTrackedStocks();
   }
 
   async function loadTrackedStocks() {
+    if (!currentUser) return;
     const { data, error } = await supabaseClient
       .from("tracked_stocks")
       .select("id, symbol, status, report_url, summary")
@@ -530,7 +548,7 @@
               ${s.symbol}
               <span class="status-tag">${statusText}</span>
             </span>
-            <button onclick="event.stopPropagation(); removeStock(${s.id})">移除</button>
+            ${isGuest ? '<span class="status-tag">訪客試用</span>' : `<button onclick="event.stopPropagation(); removeStock(${s.id})">移除</button>`}
           </div>
         `;
       })
@@ -699,7 +717,9 @@ async function renderDashboards() {
     const container = document.getElementById("dashboards");
 
     if (tracked.length === 0 || !selectedStockId) {
-      container.innerHTML = "<div style='text-align:center; color:#6b7280; padding-top:50px;'>請從左側選擇股票</div>";
+      container.innerHTML = isGuest
+        ? "<div class='dash-card'><h2>免費試用一份完整財報</h2><p>從左側輸入股票代碼，即可排入財報與 AI 分析流程，不需要註冊。</p><p>完成前可關閉頁面，之後使用同一瀏覽器回來查看。第二檔股票需登入免費會員。</p></div>"
+        : "<div style='text-align:center; color:#6b7280; padding-top:50px;'>請從左側選擇股票</div>";
       return;
     }
 
@@ -712,8 +732,10 @@ async function renderDashboards() {
         <div class="dash-card" style="text-align:center; padding: 60px;">
           <div style="font-size:40px; margin-bottom:10px;">⏳</div>
           <h2>AI 正在分析 ${s.symbol} ...</h2>
-          <p>${isTw ? "系統正在抓取台股月營收並生成分析，請稍候約 10-20 分鐘。" : "系統正在讀取 10-Q 財報並生成摘要，請稍候約 10-20 分鐘。"}</p>
+          <p>${isTw ? "系統正在準備台股財務分析。" : "系統正在準備財報與 AI 分析。"}完成時間依排程與上游服務而定。</p>
+          <button type="button" id="pendingRefreshBtn">重新整理狀態</button>
         </div>`;
+      document.getElementById("pendingRefreshBtn").addEventListener("click", loadTrackedStocks);
       return;
     }
 
@@ -767,8 +789,8 @@ async function renderDashboards() {
   function updateAddButtonState() {
     const addBtn = document.getElementById("addBtn");
     if (tracked.length >= currentLimit) {
-      addBtn.disabled = true;
-      addBtn.textContent = "已達 5 檔追蹤上限";
+      addBtn.disabled = !isGuest;
+      addBtn.textContent = isGuest ? "登入以追蹤更多" : "已達 5 檔追蹤上限";
     } else {
       addBtn.disabled = false;
       addBtn.textContent = "新增追蹤";
@@ -776,6 +798,10 @@ async function renderDashboards() {
   }
 
   async function addStock() {
+    if (isGuest && tracked.length >= 1) {
+      window.open("index.html?login=1", "_blank", "noopener");
+      return;
+    }
     const input = document.getElementById("symbolInput");
     const symbolRaw = input.value.trim().toUpperCase();
     if (!symbolRaw) return;
@@ -785,27 +811,42 @@ async function renderDashboards() {
       return;
     }
 
-    const { error } = await supabaseClient
-      .from("tracked_stocks")
-      .upsert({
+    const addBtn = document.getElementById("addBtn");
+    addBtn.disabled = true;
+    try {
+      if (isGuest) {
+        const { data: ready, error: readinessError } = await supabaseClient.rpc("guest_financial_trial_ready");
+        if (readinessError || ready !== true) throw new Error("訪客財報試用尚未開放，請先登入免費會員。");
+      }
+      if (!currentUser) {
+        const { data, error } = await supabaseClient.auth.signInAnonymously();
+        if (error) throw new Error("訪客試用暫時無法建立，請稍後再試或登入免費會員。");
+        currentUser = data.user;
+        // Recover any task created in another tab before attempting an insert.
+        await loadTrackedStocks();
+        if (tracked.length) return;
+      }
+      const row = {
         user_id: currentUser.id,
         symbol: symbolRaw,
         status: "pending", 
         summary: null
-      }, { 
-        onConflict: 'user_id, symbol'
-      });
-
-    if (error) {
-      alert("新增/更新失敗：" + error.message);
-      return;
+      };
+      const query = supabaseClient.from("tracked_stocks");
+      const { error } = isGuest ? await query.insert(row)
+        : await query.upsert(row, { onConflict: 'user_id, symbol' });
+      if (error) throw error;
+      input.value = "";
+      await loadTrackedStocks();
+    } catch (error) {
+      alert("新增失敗：" + error.message);
+    } finally {
+      updateAddButtonState();
     }
-
-    input.value = "";
-    await loadTrackedStocks();
 }
 
   async function removeStock(id) {
+    if (isGuest || !currentUser) return;
     if(!confirm("確定要移除嗎？")) return;
     const { error } = await supabaseClient
       .from("tracked_stocks")
@@ -821,6 +862,9 @@ async function renderDashboards() {
   }
 
   document.getElementById("addBtn").addEventListener("click", addStock);
+  supabaseClient.auth.onAuthStateChange((event) => {
+    if (["SIGNED_IN", "SIGNED_OUT", "USER_UPDATED"].includes(event)) setTimeout(init, 0);
+  });
   init();
 </script>
 </body>

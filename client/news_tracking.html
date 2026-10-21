@@ -141,7 +141,7 @@
   async function requireLogin() {
     const { data, error } = await supabaseClient.auth.getUser();
     if (error) throw error;
-    if (!data?.user) {
+    if (!data?.user || data.user.is_anonymous) {
       $("loginHint").textContent = "尚未登入：請先完成登入，才能讀取/儲存你的追蹤設定。";
       throw new Error("NOT_LOGGED_IN");
     }

@@ -945,7 +945,7 @@
 
   async function getCurrentUserPlan() {
     const { data: { user } } = await supabaseClient.auth.getUser();
-    if (!user) return { user: null, plan: "guest" };
+    if (!user || user.is_anonymous) return { user: null, plan: "guest" };
 
     const { data: profile } = await supabaseClient
       .from("profiles")

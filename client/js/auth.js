@@ -42,9 +42,10 @@ const supabaseUrl = "https://zlkexplsleznuebighte.supabase.co";
 
     const { data: { user } } = await supabaseClient.auth.getUser();
 
-    if (guestTrialLink) guestTrialLink.style.display = user ? "none" : "inline-flex";
+    const isMember = !!user && !user.is_anonymous;
+    if (guestTrialLink) guestTrialLink.style.display = isMember ? "none" : "inline-flex";
 
-    if (!user) {
+    if (!isMember) {
       authUserEl.textContent = "訪客｜登入可取得更多免費額度";
       authUserEl.style.display = "inline-flex";
       logoutBtn.style.display = "none";

@@ -314,7 +314,7 @@
       }
 
       const { data: { session } } = await supabaseClient.auth.getSession();
-      if (!session) {
+      if (!session || session.user.is_anonymous) {
         status.textContent = "請先登入才能使用新聞雷達。";
         return;
       }
