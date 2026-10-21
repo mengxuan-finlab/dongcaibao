@@ -130,6 +130,58 @@
       .filter(Boolean);
   }
 
+  function startAdoptionCard(container) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+    const officialUrl = 'https://www.pet.gov.tw/AnimalApp/AnnounceMent.aspx?PageType=Adopt';
+    const sourceUrl = 'https://data.gov.tw/dataset/85903';
+    const render = data => {
+      if (!container.isConnected) return;
+      const animal = data?.animal;
+      let photo = '';
+      try {
+        const url = new URL(animal?.photo);
+        if (url.protocol === 'https:' && url.hostname.endsWith('.gov.tw') && !url.username && !url.password) photo = url.href;
+      } catch { /* Missing photos use the text-only card. */ }
+      container.innerHTML = `
+        <article class="adoption-card${photo ? ' adoption-card-with-photo' : ''}" aria-label="公益認養資訊">
+          ${photo ? `<div class="adoption-card-photo"><img src="${escapeHtml(photo)}" alt="待認養${escapeHtml(animal.kind)}的收容照片" referrerpolicy="no-referrer"></div>` : ''}
+          <div class="adoption-card-body">
+            <span class="adoption-card-label">公益認養資訊 · 非商業廣告</span>
+            <h2>你在等一份報告，牠在等一個家。</h2>
+            <p>等待的空檔，認識一位正在找家的小夥伴。認養前，請先評估長期照顧的責任。</p>
+            ${animal ? `<dl>
+              <div><dt>動物</dt><dd>${escapeHtml(animal.kind)}${animal.variety ? ` · ${escapeHtml(animal.variety)}` : ''}</dd></div>
+              <div><dt>收容所</dt><dd>${escapeHtml(animal.shelter)}</dd></div>
+              ${animal.location && animal.location !== animal.shelter ? `<div><dt>所在地</dt><dd>${escapeHtml(animal.location)}</dd></div>` : ''}
+              ${animal.reference ? `<div><dt>收容編號</dt><dd>${escapeHtml(animal.reference)}</dd></div>` : ''}
+            </dl>` : '<p>前往官方平台，查看各地待認養動物的最新資訊。</p>'}
+            <a class="adoption-card-link" href="${officialUrl}" target="_blank" rel="noopener noreferrer">前往官方認養平台 ↗</a>
+            <small>資料來源：<a href="${sourceUrl}" target="_blank" rel="noopener noreferrer">農業部動物認領養開放資料</a>（政府資料開放授權條款第 1 版）。非政府合作或背書。
+              ${animal?.sourceUpdatedAt ? `<br>來源更新：${escapeHtml(animal.sourceUpdatedAt)}` : ''}
+              ${data?.fetchedAt ? `<br>本站擷取：${escapeHtml(new Date(data.fetchedAt).toLocaleString('zh-TW'))}` : ''}
+              <br>實際認養狀態以收容所確認為準。連結另開分頁，不影響報告生成。
+            </small>
+          </div>
+        </article>`;
+      const image = container.querySelector('img');
+      if (image) image.addEventListener('error', () => {
+        container.querySelector('article').classList.remove('adoption-card-with-photo');
+        image.parentElement.remove();
+      }, { once: true });
+    };
+    render(null);
+    fetch(new URL('/api/adoption-card', BACKEND_URL), { signal: controller.signal })
+      .then(response => {
+        if (!response.ok) throw new Error('Adoption information unavailable');
+        return response.json();
+      })
+      .then(data => { if (!controller.signal.aborted) render(data); })
+      .catch(() => {})
+      .finally(() => clearTimeout(timeout));
+    return () => { clearTimeout(timeout); controller.abort(); };
+  }
+
   function extractValueChain(responseText) {
     const text = String(responseText || "");
     const startMarker = "<" + "!-- VALUE_CHAIN_START --" + ">";
@@ -1088,6 +1140,12 @@
     fetchBtn.textContent = "正在分析數據...";
     debugEl.textContent = "查詢中…正在分析數據...";
     resultEl.innerHTML = "<p>正在搜尋與驗證完整公司報告，首次生成可能需要 1–3 分鐘；相同股票若有近期報告會優先讀取。</p>";
+    let stopAdoptionCard = () => {};
+    if (!session?.user || session.user.is_anonymous) {
+      const adoptionContainer = document.createElement('div');
+      resultEl.appendChild(adoptionContainer);
+      stopAdoptionCard = startAdoptionCard(adoptionContainer);
+    }
     document.getElementById("chatContainer").style.display = "none";
     sectionContextRegistry = {};
     activeSectionContext = { title: "整份公司報告", context: "" };
@@ -1189,6 +1247,7 @@
       resultEl.innerHTML = `<p role="alert" style="color:#ffd0d6">${escapeHtml(errorMessage)}</p>`;
     } finally {
       clearTimeout(timeout);
+      stopAdoptionCard();
     
       fetchBtn.disabled = false;
       fetchBtn.textContent = "產生公司介紹";

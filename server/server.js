@@ -9,6 +9,16 @@ const guestAccess = require('./guest-access');
 const { randomUUID } = require('crypto');
 const { generateValidatedReport, collectSearchResults, createReportCache, safeErrorMessage, reportErrorResponse } = require('./company-report');
 const getCompanyReport = createReportCache();
+const { ADOPTION_API, createAdoptionFeed } = require('./adoption');
+const getAdoptionCard = createAdoptionFeed({
+  fetchRows: async () => {
+    const response = await axios.get(ADOPTION_API, {
+      params: { UnitId: 'QcbUEzN6E6DL', animal_status: 'OPEN', $top: 200 },
+      timeout: 8000, maxContentLength: 5 * 1024 * 1024, maxRedirects: 0
+    });
+    return response.data;
+  }
+});
 
 const app = express();
 // Render sits behind one reverse proxy; local requests use the socket address.
@@ -137,6 +147,11 @@ app.get('/api/guest-usage', (req, res) => {
   } catch (error) {
     res.status(error.statusCode || 500).json({ error: error.message });
   }
+});
+
+app.get('/api/adoption-card', async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json(await getAdoptionCard());
 });
 
 function normalizeSymbol(symbol) {
