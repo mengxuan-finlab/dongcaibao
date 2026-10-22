@@ -1,3 +1,6 @@
+const { performance } = require('node:perf_hooks');
+const { httpStatus, errorSource, safeErrorMessage, retryDelayMs } = require('./gemini-runtime');
+
 const SECTIONS = [
   ['valueChain', 'VALUE_CHAIN'], ['timeline', 'TIMELINE'],
   ['coreSummary', 'CORE_SUMMARY'], ['productPortfolio', 'PRODUCT_PORTFOLIO'],
@@ -71,15 +74,6 @@ function providerSchema(schema) {
   return { type: 'string', ...(schema.enum ? { enum: schema.enum } : {}) };
 }
 
-function safeErrorMessage(error) {
-  return String(error?.message || 'Unknown error')
-    .replace(/AIza[\w-]+/g, '[REDACTED]')
-    .replace(/(Bearer\s+)[^\s"']+/gi, '$1[REDACTED]')
-    .replace(/([?&](?:key|api_key)=)[^&\s"']+/gi, '$1[REDACTED]')
-    .replace(/("(?:api_key|apiKey|access_token|refresh_token)"\s*:\s*")[^"]+/gi, '$1[REDACTED]')
-    .slice(0, 1200);
-}
-
 function reportErrorResponse(error) {
   const upstream = Number(error.status || error.response?.status);
   if (error.statusCode) return { status: error.statusCode, code: error.code || 'REPORT_UNAVAILABLE', message: error.message };
@@ -115,55 +109,91 @@ function serializeReport(report) {
   return SECTIONS.map(([key, marker]) => `<!-- ${marker}_START -->\n${JSON.stringify(report[key])}\n<!-- ${marker}_END -->`).join('\n\n');
 }
 
-async function generateValidatedReport({ basePrompt, models, generate, isRetryable, log = () => {}, timeoutMs = 65000 }) {
+async function generateValidatedReport({
+  basePrompt, models, generate, isRetryable, log = () => {}, timeoutMs = 65000,
+  totalTimeoutMs = timeoutMs * 2, now = () => performance.now(),
+  sleep = ms => new Promise(resolve => setTimeout(resolve, ms)), random = Math.random
+}) {
   const { schema, prompt } = buildContract(basePrompt);
-  const uniqueModels = [...new Set(models.filter(Boolean))];
-  const attempts = uniqueModels.length === 1 ? [uniqueModels[0], uniqueModels[0]] : uniqueModels.slice(0, 2);
+  const uniqueModels = [...new Set(models.filter(Boolean))].slice(0, 2);
   let lastError;
+  let lastSource = 'sdk';
   let jsonOnly = false;
-  const deadline = Date.now() + timeoutMs * 2;
+  const deadline = now() + totalTimeoutMs;
   let attemptCount = 0;
-  while (attempts.length && attemptCount < 3) {
-    const model = attempts.shift();
-    attemptCount++;
-    const remainingMs = Math.min(timeoutMs, deadline - Date.now());
-    if (remainingMs <= 0) break;
-    let received = false;
-    try {
-      const result = await generate({
-        model, contents: prompt,
-        config: {
-          responseMimeType: 'application/json',
-          ...(!jsonOnly ? { responseJsonSchema: providerSchema(schema) } : {}),
-          temperature: model.startsWith('gemini-3.') ? 1 : 0.3, maxOutputTokens: 32768,
-          ...(model.startsWith('gemini-3.') ? { thinkingConfig: { thinkingLevel: 'low' } } : {}),
-          ...(model.startsWith('gemini-2.5') ? { thinkingConfig: { thinkingBudget: 1024 } } : {}),
-          httpOptions: { apiVersion: 'v1beta', timeout: remainingMs },
-          abortSignal: AbortSignal.timeout(remainingMs)
+  for (const [modelIndex, model] of uniqueModels.entries()) {
+    let apiRetries = 0;
+    let validationRetries = 0;
+    const reserveMs = modelIndex < uniqueModels.length - 1 ? Math.min(40000, timeoutMs) : 0;
+    while (attemptCount < (reserveMs ? 3 : 4)) {
+      const remainingMs = Math.floor(Math.min(timeoutMs, deadline - now() - reserveMs));
+      if (remainingMs < 1) break;
+      attemptCount++;
+      const started = now();
+      let received = false;
+      let stage = 'api';
+      try {
+        const result = await generate({
+          model, contents: prompt,
+          config: {
+            responseMimeType: 'application/json',
+            ...(!jsonOnly ? { responseJsonSchema: providerSchema(schema) } : {}),
+            temperature: model.startsWith('gemini-3.') ? 1 : 0.3, maxOutputTokens: 32768,
+            ...(model.startsWith('gemini-3.') ? { thinkingConfig: { thinkingLevel: 'low' } } : {}),
+            ...(model.startsWith('gemini-2.5') ? { thinkingConfig: { thinkingBudget: 1024 } } : {}),
+            httpOptions: { apiVersion: 'v1beta', timeout: remainingMs, retryOptions: { attempts: 1 } },
+            abortSignal: AbortSignal.timeout(remainingMs)
+          }
+        });
+        received = true;
+        stage = 'generation_finish';
+        const finishReason = result.candidates?.[0]?.finishReason;
+        if (finishReason && finishReason !== 'STOP') throw new Error(`Incomplete generation: ${finishReason}`);
+        stage = 'json_parse';
+        const report = JSON.parse(String(result.text || '').replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim());
+        stage = 'report_validation';
+        validateReport(report, schema);
+        log({ event: 'company_report_attempt', attempt: attemptCount, model, status: 200,
+          durationMs: Math.round(now() - started), timeoutMs: remainingMs, errorSource: null,
+          mode: jsonOnly ? 'json' : 'schema', outcome: 'success', validation: true });
+        return { report, modelName: model, text: serializeReport(report) };
+      } catch (error) {
+        lastError = error;
+        const status = received ? 200 : httpStatus(error);
+        lastSource = received ? stage : errorSource(error);
+        log({ event: 'company_report_attempt', attempt: attemptCount, model, status,
+          durationMs: Math.round(now() - started), timeoutMs: remainingMs, errorSource: lastSource,
+          mode: jsonOnly ? 'json' : 'schema', validation: received, outcome: 'failed', message: safeErrorMessage(error) });
+        // Retry one rejected request without provider-side schema constraints.
+        // Local validation remains identical in both modes.
+        if (!received && status === 400 && !jsonOnly) {
+          jsonOnly = true;
+          continue;
         }
-      });
-      received = true;
-      const finishReason = result.candidates?.[0]?.finishReason;
-      if (finishReason && finishReason !== 'STOP') throw new Error(`Incomplete generation: ${finishReason}`);
-      const report = JSON.parse(String(result.text || '').replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim());
-      validateReport(report, schema);
-      return { report, modelName: model, text: serializeReport(report) };
-    } catch (error) {
-      lastError = error;
-      const status = Number(error.status || error.response?.status);
-      log({ model, status, mode: jsonOnly ? 'json' : 'schema', validation: received, message: safeErrorMessage(error) });
-      // Retry one rejected request without provider-side schema constraints.
-      // Local validation remains identical in both modes.
-      if (!received && status === 400 && !jsonOnly) {
-        jsonOnly = true;
-        attempts.unshift(model);
-        continue;
+        if (received) {
+          // Invalid model output is not an HTTP outage. Retry it at most once.
+          if (uniqueModels.length === 1 && validationRetries++ === 0) continue;
+          break;
+        }
+        if (!isRetryable(error) && lastSource !== 'client_timeout') throw error;
+        if (apiRetries >= 2 || attemptCount >= (reserveMs ? 3 : 4)) break;
+        const delayMs = retryDelayMs(apiRetries, { random, retryAfterMs: error.retryAfterMs || 0 });
+        if (deadline - now() - reserveMs <= delayMs) break;
+        log({ event: 'company_report_backoff', model, attempt: attemptCount, status,
+          errorSource: lastSource, delayMs, retry: apiRetries + 1 });
+        await sleep(delayMs);
+        apiRetries++;
       }
-      if (!received && !isRetryable(error) && !['AbortError', 'TimeoutError'].includes(error.name)) throw error;
     }
   }
-  const error = new Error('公司報告未能完整生成，已自動重試。請稍後再試，本次不計入報告額度。');
+  const invalidOutput = ['json_parse', 'report_validation', 'generation_finish'].includes(lastSource);
+  const error = new Error(invalidOutput
+    ? 'AI 已回覆，但報告內容未通過完整性檢查。本次不計入報告額度，請稍後再試。'
+    : 'AI 服務暫時繁忙或回應逾時，已有限次重試。本次不計入報告額度，請稍後再試。');
   error.statusCode = 503;
+  error.code = invalidOutput ? 'REPORT_INVALID_OUTPUT' : 'REPORT_AI_UNAVAILABLE';
+  error.errorSource = lastSource;
+  error.upstreamStatus = httpStatus(lastError);
   error.cause = lastError;
   throw error;
 }
@@ -196,20 +226,41 @@ function collectSearchResults(responses, queries, limit) {
   };
 }
 
-function createReportCache({ now = Date.now, ttlMs = 6 * 3600000, maxEntries = 100 } = {}) {
+function createReportCache({ now = Date.now, ttlMs = 3 * 24 * 3600000, maxEntries = 100, store, log = () => {} } = {}) {
   const cached = new Map();
   const pending = new Map();
-  return async (key, produce) => {
+  const remember = (key, entry) => {
+    if (cached.size >= maxEntries) cached.delete(cached.keys().next().value);
+    cached.set(key, entry);
+  };
+  return async (key, produce, validate = () => {}) => {
     const existing = cached.get(key);
-    if (existing && existing.expires > now()) return { ...existing.value, cached: true };
+    if (existing && existing.expires > now()) return { ...existing.value, cached: true, cacheTier: 'memory' };
     cached.delete(key);
     if (pending.has(key)) return pending.get(key);
-    const task = Promise.resolve().then(produce).then(value => {
-      if (!value.sourceInfo.limited) {
-        if (cached.size >= maxEntries) cached.delete(cached.keys().next().value);
-        cached.set(key, { value, expires: now() + ttlMs });
+    const task = Promise.resolve().then(async () => {
+      try {
+        const saved = store ? await store.read(key) : null;
+        if (saved && saved.expires > now()) {
+          validate(saved.value);
+          if (!saved.value.sourceInfo.limited) {
+            remember(key, saved);
+            log({ event: 'report_cache_hit', cacheTier: 'database', key });
+            return { ...saved.value, cached: true, cacheTier: 'database' };
+          }
+        }
+      } catch (error) {
+        log({ event: 'report_cache_rejected', key, errorSource: 'report_cache', message: safeErrorMessage(error) });
       }
-      return { ...value, cached: false };
+      const value = await produce();
+      validate(value);
+      if (!value.sourceInfo.limited) {
+        const expires = now() + ttlMs;
+        remember(key, { value, expires });
+        try { await store?.write(key, value, expires); }
+        catch (error) { log({ event: 'report_cache_write_failed', key, errorSource: 'report_cache', message: safeErrorMessage(error) }); }
+      }
+      return { ...value, cached: false, cacheTier: 'generated' };
     }).finally(() => pending.delete(key));
     pending.set(key, task);
     return task;

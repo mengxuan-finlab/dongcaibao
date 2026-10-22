@@ -1209,7 +1209,7 @@
       
       const quickOverviewHtml = renderQuickOverview(coreSummary, dashboard, valueChain, symbol, productPortfolio);
       const sourceNotice = data.sourceInfo ? `<aside class="report-data-status" role="status">
-        ${data.cached ? "已載入近 6 小時內的完整報告" : "完整章節已驗證"}｜搜尋資料 ${Number(data.sourceInfo.count)} 筆
+        ${data.cached ? "已載入近 3 天內的完整報告" : "完整章節已驗證"}｜搜尋資料 ${Number(data.sourceInfo.count)} 筆
         ${data.generatedAt ? `｜生成時間：${escapeHtml(new Date(data.generatedAt).toLocaleString('zh-TW'))}` : ""}
         ${data.sourceInfo.limited ? "<p>部分搜尋來源暫時不足，缺乏依據的內容會標為未披露；本份報告不會存入共用快取。</p>" : ""}
       </aside>` : "";

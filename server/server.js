@@ -6,9 +6,10 @@ const axios = require('axios');
 const { GoogleGenAI } = require("@google/genai");
 const { createClient } = require('@supabase/supabase-js');
 const guestAccess = require('./guest-access');
-const { randomUUID } = require('crypto');
-const { generateValidatedReport, collectSearchResults, createReportCache, safeErrorMessage, reportErrorResponse } = require('./company-report');
-const getCompanyReport = createReportCache();
+const { randomUUID, createHash } = require('crypto');
+const { generateValidatedReport, collectSearchResults, createReportCache, buildContract, validateReport, reportErrorResponse } = require('./company-report');
+const { installedSdkVersion, createGeminiCaller, retryDelayMs, httpStatus, errorSource, safeErrorMessage } = require('./gemini-runtime');
+const { createSupabaseReportStore } = require('./report-store');
 const { ADOPTION_API, createAdoptionFeed } = require('./adoption');
 const getAdoptionCard = createAdoptionFeed({
   fetchRows: async () => {
@@ -35,12 +36,19 @@ const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
+const getCompanyReport = createReportCache({
+  store: createSupabaseReportStore({ client: supabase, log: info => console.warn('[報告資料庫快取]', info) }),
+  log: info => console.log('[報告快取]', info)
+});
 
 // 2. Gemini AI 設定
 const genAI = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY,
-  apiVersion: "v1beta"
+  apiVersion: "v1beta",
+  httpOptions: { retryOptions: { attempts: 1 } }
 });
+const callGemini = createGeminiCaller({ client: genAI, log: info => console.log('[Gemini 呼叫]', info) });
+console.log('[Gemini SDK]', { installedVersion: installedSdkVersion(), sdkAttempts: 1, retryOwner: 'application' });
 const GEMINI_PRIMARY_MODEL = process.env.GEMINI_MODEL?.trim() || "gemini-3.8-flash";
 const GEMINI_FALLBACK_MODEL = process.env.GEMINI_FALLBACK_MODEL?.trim() || "gemini-3.6-flash";
 console.log(`[AI 模型設定] 主要模型: ${GEMINI_PRIMARY_MODEL} | 備援模型: ${GEMINI_FALLBACK_MODEL}`);
@@ -88,14 +96,14 @@ async function runGeminiWithFallback(operation, label = "Gemini") {
   for (const modelName of modelNames) {
     for (let attempt = 1; attempt <= 2; attempt += 1) {
       try {
-        return await operation(modelName);
+        return await operation(modelName, attempt);
       } catch (error) {
         lastError = error;
         if (!isRetryableGeminiError(error)) throw error;
 
-        console.warn(`[${label}] ${modelName} 第 ${attempt} 次呼叫失敗: ${error.message}`);
+        console.warn(`[${label}]`, { model: modelName, attempt, status: httpStatus(error), errorSource: errorSource(error), message: safeErrorMessage(error) });
         if (attempt < 2) {
-          const delayMs = 800 * (2 ** (attempt - 1)) + Math.floor(Math.random() * 400);
+          const delayMs = retryDelayMs(attempt - 1, { retryAfterMs: error.retryAfterMs || 0 });
           await wait(delayMs);
         }
       }
@@ -109,16 +117,18 @@ async function runGeminiWithFallback(operation, label = "Gemini") {
 }
 
 function generateContentWithFallback(prompt, label) {
+  const requestId = randomUUID();
   return runGeminiWithFallback(
-    modelName => genAI.models.generateContent({ model: modelName, contents: prompt })
+    (modelName, attempt) => callGemini({ model: modelName, contents: prompt }, { requestId, label, attempt })
       .then(result => ({ result, modelName })),
     label
   );
 }
 
 function generateContentStreamWithFallback(prompt, label) {
+  const requestId = randomUUID();
   return runGeminiWithFallback(
-    modelName => genAI.models.generateContentStream({ model: modelName, contents: prompt })
+    (modelName, attempt) => callGemini({ model: modelName, contents: prompt }, { requestId, label, attempt }, true)
       .then(result => ({ result, modelName })),
     label
   );
@@ -523,9 +533,15 @@ app.post('/api/analyze-stock', async (req, res) => {
     const market = detectMarket(normalizedSymbol);
 
     // 診斷用：請在部署後的 Log 觀察這裡輸出什麼
-    console.log(`[系統診斷] 用戶方案: ${userPlan} | 主要模型: ${GEMINI_PRIMARY_MODEL} | 市場別: ${market} | 報告模式: 一般公司介紹`);
+    console.log(`[系統診斷] [${requestId}] 用戶方案: ${userPlan} | 主要模型: ${GEMINI_PRIMARY_MODEL} | 市場別: ${market} | 報告模式: 一般公司介紹`);
 
-    const reportResult = await getCompanyReport(`${market}:${normalizedSymbol}`, async () => {
+    const { schema: reportSchema } = buildContract(getBasePrompt(normalizedSymbol, '', market));
+    const reportVersion = createHash('sha256').update(JSON.stringify({
+      prompt: getBasePrompt(normalizedSymbol, '', market), schema: reportSchema,
+      models: [GEMINI_PRIMARY_MODEL, GEMINI_FALLBACK_MODEL], version: 1
+    })).digest('hex').slice(0, 24);
+    const cacheKey = `company:${market}:${normalizedSymbol}:${reportVersion}`;
+    const reportResult = await getCompanyReport(cacheKey, async () => {
       // Balance coverage across business model, competitors and official filings.
       const searchNum = 12;
       const searchQueries = buildSearchQueries(normalizedSymbol, market);
@@ -540,10 +556,11 @@ app.post('/api/analyze-stock', async (req, res) => {
       ).join("\n\n");
 
       const finalPrompt = getBasePrompt(normalizedSymbol, searchContext, market);
+      let attempt = 0;
       const generated = await generateValidatedReport({
         basePrompt: finalPrompt,
         models: [GEMINI_PRIMARY_MODEL, GEMINI_FALLBACK_MODEL],
-        generate: args => genAI.models.generateContent(args),
+        generate: args => callGemini(args, { requestId, label: '公司報告', attempt: ++attempt }),
         isRetryable: isRetryableGeminiError,
         log: info => console.warn('[公司分析重試]', { requestId, ...info })
       });
@@ -553,20 +570,32 @@ app.post('/api/analyze-stock', async (req, res) => {
         generatedAt: new Date().toISOString(),
         sourceInfo: { count: searchResults.length, successfulQueries, totalQueries: searchQueries.length, limited }
       };
+    }, value => {
+      validateReport(value.report, reportSchema);
+      if (!value.sourceInfo || typeof value.sourceInfo.limited !== 'boolean'
+          || !Number.isInteger(value.sourceInfo.count) || value.sourceInfo.count < 4
+          || typeof value.searchContext !== 'string' || !value.searchContext.trim()
+          || !Number.isFinite(Date.parse(value.generatedAt))) {
+        throw new Error('Cached report metadata is incomplete');
+      }
     });
 
+    console.log('[公司報告結果]', { requestId, cacheTier: reportResult.cacheTier, model: reportResult.modelName });
     if (user) await supabase.from('usage_logs').insert({ user_id: user.id, action: 'company_intro' });
     if (settleGuest) settleGuest(true);
 
     res.json({ 
       ...reportResult,
+      requestId,
       plan: userPlan,
       reportMode: 'base',
     });
 
   } catch (err) {
     const failure = reportErrorResponse(err);
-    console.error("公司報告錯誤:", { requestId, status: failure.status, upstreamStatus: err.status || err.response?.status, code: failure.code, message: safeErrorMessage(err) });
+    console.error("公司報告錯誤:", { requestId, status: failure.status, upstreamStatus: err.upstreamStatus || httpStatus(err),
+      errorSource: err.errorSource || errorSource(err), code: failure.code, message: safeErrorMessage(err),
+      cause: err.cause ? safeErrorMessage(err.cause) : undefined });
     res.status(failure.status).json({ error: failure.message, code: failure.code, requestId, loginRequired: !!err.loginRequired });
   } finally {
     if (settleGuest) settleGuest(false);

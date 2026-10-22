@@ -72,14 +72,14 @@ test('a primary 504 can fall back to a complete report with five product example
   const seen = [];
   const result = await generateValidatedReport({
     basePrompt, models: ['gemini-3.8-flash', 'gemini-3.6-flash'],
-    isRetryable: error => error.status === 504,
+    isRetryable: error => error.status === 504, sleep: async () => {},
     generate: async request => {
       seen.push(request.model);
-      if (seen.length === 1) throw Object.assign(new Error('DEADLINE_EXCEEDED'), { status: 504 });
+      if (request.model === 'gemini-3.8-flash') throw Object.assign(new Error('DEADLINE_EXCEEDED'), { status: 504 });
       return { text: JSON.stringify(report) };
     }
   });
-  assert.equal(seen.join(','), 'gemini-3.8-flash,gemini-3.6-flash');
+  assert.equal(seen.join(','), 'gemini-3.8-flash,gemini-3.8-flash,gemini-3.8-flash,gemini-3.6-flash');
   assert.equal(result.report.productPortfolio.items[0].examples.length, 5);
   assert.equal(frontendReader()({ text: result.text }).productPortfolio.items[0].examples.length, 5);
   assert.equal(frontendReader()({ report: result.report }).productPortfolio.items[0].examples.length, 5);
@@ -130,13 +130,90 @@ test('non-retryable configuration errors are not multiplied', async () => {
   assert.equal(calls, 1);
 });
 
+function timing() {
+  let clock = 0;
+  const delays = [];
+  return { now: () => clock, random: () => 0, delays,
+    advance: ms => { clock += ms; }, sleep: async ms => { clock += ms; delays.push(ms); } };
+}
+
+test('503 retries the same model with bounded exponential backoff before fallback', async () => {
+  const clock = timing();
+  const seen = [];
+  const events = [];
+  await assert.rejects(generateValidatedReport({
+    basePrompt, models: ['primary', 'fallback'], isRetryable: () => true,
+    ...clock, log: event => events.push(event),
+    generate: async request => {
+      seen.push(request.model);
+      clock.advance(10);
+      throw Object.assign(new Error('busy'), { status: 503 });
+    }
+  }), { code: 'REPORT_AI_UNAVAILABLE', errorSource: 'gemini_api', upstreamStatus: 503 });
+  assert.deepEqual(seen, ['primary', 'primary', 'primary', 'fallback']);
+  assert.deepEqual(clock.delays, [1000, 2000]);
+  const attempts = events.filter(event => event.event === 'company_report_attempt');
+  assert.equal(attempts.length, 4);
+  assert.equal(attempts.every(event => event.status === 503 && event.durationMs === 10), true);
+});
+
+test('slow 504 retries cannot consume the reserved fallback time or exceed 130 seconds', async () => {
+  const clock = timing();
+  const seen = [];
+  const result = await generateValidatedReport({
+    basePrompt, models: ['primary', 'fallback'], isRetryable: () => true, ...clock,
+    generate: async request => {
+      seen.push({ model: request.model, timeout: request.config.httpOptions.timeout });
+      assert.equal(request.config.httpOptions.retryOptions.attempts, 1);
+      if (request.model === 'fallback') return { text: JSON.stringify(sample(schema)) };
+      clock.advance(request.config.httpOptions.timeout);
+      throw Object.assign(new Error('deadline exceeded'), { status: 504 });
+    }
+  });
+  assert.equal(result.modelName, 'fallback');
+  assert.deepEqual(seen, [
+    { model: 'primary', timeout: 65000 }, { model: 'primary', timeout: 24000 },
+    { model: 'fallback', timeout: 40000 }
+  ]);
+  assert.equal(clock.now() <= 130000, true);
+});
+
+test('JSON and schema failures keep HTTP 200 and do not trigger API backoff', async () => {
+  for (const [text, source] of [['{', 'json_parse'], ['{}', 'report_validation']]) {
+    const clock = timing();
+    const events = [];
+    await assert.rejects(generateValidatedReport({
+      basePrompt, models: ['primary', 'fallback'], isRetryable: () => true,
+      ...clock, log: event => events.push(event), generate: async () => ({ text })
+    }), { code: 'REPORT_INVALID_OUTPUT', errorSource: source });
+    assert.deepEqual(clock.delays, []);
+    assert.equal(events.every(event => event.status === 200 && event.errorSource === source), true);
+  }
+});
+
+test('long Retry-After skips a retry that cannot fit the total budget', async () => {
+  const clock = timing();
+  const seen = [];
+  const result = await generateValidatedReport({
+    basePrompt, models: ['primary', 'fallback'], isRetryable: () => true, ...clock,
+    generate: async request => {
+      seen.push(request.model);
+      if (request.model === 'primary') throw Object.assign(new Error('busy'), { status: 503, retryAfterMs: 180000 });
+      return { text: JSON.stringify(sample(schema)) };
+    }
+  });
+  assert.equal(result.modelName, 'fallback');
+  assert.deepEqual(seen, ['primary', 'fallback']);
+  assert.deepEqual(clock.delays, []);
+});
+
 test('Gemini 3.8 reports use compatible parameters and fall back to 3.6', async () => {
   const seen = [];
   const result = await generateValidatedReport({
-    basePrompt, models: ['gemini-3.8-flash', 'gemini-3.6-flash'], isRetryable: () => true,
+    basePrompt, models: ['gemini-3.8-flash', 'gemini-3.6-flash'], isRetryable: () => true, sleep: async () => {},
     generate: async request => {
       seen.push(request);
-      if (seen.length === 1) throw Object.assign(new Error('temporarily unavailable'), { status: 503 });
+      if (request.model === 'gemini-3.8-flash') throw Object.assign(new Error('temporarily unavailable'), { status: 503 });
       return { text: JSON.stringify(sample(schema)) };
     }
   });
@@ -259,6 +336,26 @@ test('complete reports are cached and expired reports regenerate', async () => {
   assert.equal((await get('AAPL', produce)).version, 2);
 });
 
+test('default cache lifetime is three days and reads never extend it', async () => {
+  let clock = 0;
+  let calls = 0;
+  let savedExpiry;
+  const get = createReportCache({ now: () => clock, store: {
+    read: async () => null,
+    write: async (key, value, expires) => { savedExpiry = expires; }
+  } });
+  const produce = async () => ({ sourceInfo: { limited: false }, version: ++calls });
+  await get('AAPL', produce);
+  assert.equal(savedExpiry, 3 * 24 * 3600000);
+  clock = 2 * 24 * 3600000;
+  assert.equal((await get('AAPL', produce)).cached, true);
+  clock = 3 * 24 * 3600000 - 1;
+  assert.equal((await get('AAPL', produce)).cached, true);
+  assert.equal(calls, 1);
+  clock = 3 * 24 * 3600000;
+  assert.equal((await get('AAPL', produce)).version, 2);
+});
+
 test('concurrent requests coalesce; failures and limited reports are not cached', async () => {
   const get = createReportCache();
   let release;
@@ -277,6 +374,48 @@ test('concurrent requests coalesce; failures and limited reports are not cached'
   assert.equal(partialCalls, 2);
   await assert.rejects(get('failed', async () => { throw new Error('503'); }), /503/);
   assert.equal((await get('failed', async () => ({ sourceInfo: { limited: false } }))).cached, false);
+});
+
+test('persistent reports survive process-cache recreation without extending their TTL', async () => {
+  const rows = new Map();
+  let clock = 0;
+  let calls = 0;
+  const store = {
+    read: async key => rows.get(key),
+    write: async (key, value, expires) => rows.set(key, { value, expires })
+  };
+  const options = { store, now: () => clock, ttlMs: 100 };
+  const produce = async () => ({ report: sample(schema), sourceInfo: { limited: false }, version: ++calls });
+  const validate = value => validateReport(value.report, schema);
+  assert.equal((await createReportCache(options)('AAPL', produce, validate)).cacheTier, 'generated');
+  clock = 90;
+  const restarted = createReportCache(options);
+  assert.equal((await restarted('AAPL', produce, validate)).cacheTier, 'database');
+  assert.equal(calls, 1);
+  clock = 101;
+  assert.equal((await restarted('AAPL', produce, validate)).version, 2);
+  assert.equal(calls, 2);
+});
+
+test('persistent cache failures and malformed records do not hide a newly generated report', async () => {
+  for (const read of [async () => { throw new Error('database offline'); }, async () => ({ expires: 100, value: { report: {} } })]) {
+    let calls = 0;
+    const get = createReportCache({ now: () => 0, store: { read, write: async () => { throw new Error('write failed'); } } });
+    const produce = async () => { calls++; return { report: sample(schema), sourceInfo: { limited: false } }; };
+    const validate = value => validateReport(value.report, schema);
+    assert.equal((await get('AAPL', produce, validate)).cached, false);
+    assert.equal((await get('AAPL', produce, validate)).cacheTier, 'memory');
+    assert.equal(calls, 1);
+  }
+});
+
+test('incomplete or failed generation is never written to persistent storage', async () => {
+  let writes = 0;
+  const get = createReportCache({ store: { read: async () => null, write: async () => { writes++; } } });
+  await get('limited', async () => ({ report: sample(schema), sourceInfo: { limited: true } }));
+  await assert.rejects(get('failed', async () => { throw new Error('API failed'); }));
+  await assert.rejects(get('invalid', async () => ({ report: {}, sourceInfo: { limited: false } }), value => validateReport(value.report, schema)));
+  assert.equal(writes, 0);
 });
 
 function frontendReader() {
