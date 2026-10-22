@@ -2,6 +2,18 @@
 
 ## Deployment
 
+The production report is now `compact-v1`: company/revenue/customers, main
+products, growth and risks, and financial/operating watch items. The prompt no
+longer requests a timeline, value-chain diagram, governance, competitor tables,
+news tags or the full research dashboard. Output budget is 8192 tokens (formerly
+32768). This reduces generation work; it does not guarantee availability or
+eliminate provider 503 errors.
+
+Deploy the compatible frontend to **Vercel first**, then the backend to Render.
+The new frontend accepts compact and legacy full reports. Existing old frontends
+cannot render compact responses. The prompt/schema digest automatically gives
+compact reports a different cache key; old full cache rows need not be deleted.
+
 1. In the existing Supabase project's SQL Editor, run
    `server/sql/company-report-cache.sql`. It creates a new cache table only;
    existing member reports and financial tracking tables are not modified.
@@ -67,7 +79,8 @@ It uses the configured primary model only. Three bounded SerpApi searches build
 one shared source snapshot; that exact snapshot and the unchanged production
 report prompt are reused in two sequential Gemini calls. Only the provider-side
 `responseJsonSchema` differs. Both calls retain JSON MIME type, local completeness
-validation, 32768 output tokens, low thinking for Gemini 3, and a 65-second
+validation, the current production output budget (8192 tokens for compact
+reports), low thinking for Gemini 3, and a 65-second
 timeout. No retry, fallback, Supabase writes or site quota charges are involved.
 These calls still consume provider quota and can incur normal API charges.
 

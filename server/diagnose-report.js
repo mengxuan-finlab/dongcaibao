@@ -5,19 +5,19 @@ const { buildContract, providerSchema, validateReport, collectSearchResults } = 
 const { createGeminiCaller, installedSdkVersion, httpStatus, errorSource, safeErrorMessage } = require('./gemini-runtime');
 
 async function runReportComparison({ basePrompt, model, generate, log = () => {}, timeoutMs = 65000, now = () => performance.now() }) {
-  const { schema, prompt } = buildContract(basePrompt);
+  const { schema, prompt, reportFormat, maxOutputTokens } = buildContract(basePrompt);
   const results = [];
   for (const useSchema of [true, false]) {
     const started = now();
     const row = { event: 'gemini_report_diagnostic', model, probe: useSchema ? 'with_schema' : 'without_schema',
-      timeoutMs, promptChars: prompt.length, maxOutputTokens: 32768 };
+      timeoutMs, promptChars: prompt.length, reportFormat, maxOutputTokens };
     let received = false;
     let stage = 'api';
     try {
       const result = await generate({ model, contents: prompt, config: {
         responseMimeType: 'application/json',
         ...(useSchema ? { responseJsonSchema: providerSchema(schema) } : {}),
-        temperature: model.startsWith('gemini-3.') ? 1 : 0.3, maxOutputTokens: 32768,
+        temperature: model.startsWith('gemini-3.') ? 1 : 0.3, maxOutputTokens,
         ...(model.startsWith('gemini-3.') ? { thinkingConfig: { thinkingLevel: 'low' } } : {}),
         ...(model.startsWith('gemini-2.5') ? { thinkingConfig: { thinkingBudget: 1024 } } : {}),
         httpOptions: { apiVersion: 'v1beta', timeout: timeoutMs, retryOptions: { attempts: 1 } },

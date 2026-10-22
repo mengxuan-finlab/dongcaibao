@@ -176,6 +176,49 @@ body::before {
 #result .quick-topic__risks li { color: #8c4a5b; font-size: 14px; }
 #result .quick-topic__risks p { margin: 4px 0 0; color: #646477; font-size: 14px; }
 .quick-topic .quick-metrics { margin-top: 0; }
+
+.compact-business-route,
+.compact-outlook {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.compact-business-route > div::after { display: none; }
+
+.compact-products {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.compact-product,
+.compact-outlook > div {
+  min-width: 0;
+  padding: 18px;
+  border-radius: 12px;
+  background: #f3f1f8;
+  overflow-wrap: anywhere;
+}
+
+.compact-outlook > .compact-outlook__growth { background: #edf5f0; }
+.compact-outlook > .compact-outlook__risks { background: #fcf0f0; }
+#result .compact-report h4 { margin: 0 0 12px; color: #35445a; font-size: 16px; }
+#result .compact-product p,
+#result .compact-signals p { margin: 8px 0 0; color: #536176; font-size: 14px; line-height: 1.7; }
+#result .compact-signals { margin: 0; padding-left: 22px; }
+#result .compact-signals li { margin-bottom: 18px; color: #35445a; font-size: 14px; }
+#result .compact-signals li:last-child { margin-bottom: 0; }
+#result .compact-report .compact-watch { color: #687386; font-size: 13px; }
+
+@media (max-width: 720px) {
+  .compact-business-route,
+  .compact-products,
+  .compact-outlook {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .reading-chapter__body > .reading-chapter { margin-top: 10px; }
 
 .reading-chapter {

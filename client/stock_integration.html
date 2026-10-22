@@ -1093,7 +1093,101 @@
     return /^\d{4}(\.TW|\.TWO)?$/.test(value);
   }
 
+  function validateCompactReport(report) {
+    const text = value => typeof value === 'string' && value.trim().length > 0;
+    if (!report?.company || !['symbol', 'overview', 'revenue', 'customers'].every(key => text(report.company[key]))) {
+      throw new Error('公司報告格式不完整，請稍後再試。');
+    }
+    const fields = {
+      products: ['name', 'significance'], growth: ['driver', 'reason', 'watch'],
+      risks: ['risk', 'reason', 'watch'], financialWatch: ['metric', 'importance', 'watch']
+    };
+    for (const [key, required] of Object.entries(fields)) {
+      if (!Array.isArray(report[key]) || !report[key].length || !report[key].every(item =>
+        item && required.every(field => text(item[field])) && (key !== 'products' ||
+          (Array.isArray(item.examples) && item.examples.length && item.examples.every(text))))) {
+        throw new Error('公司報告部分章節未完整傳回，請稍後再試。');
+      }
+    }
+    return report;
+  }
+
+  function renderCompactReport(report, symbol) {
+    const { company, products, growth, risks, financialWatch } = report;
+    const signals = (items, titleKey) => `<ol class="compact-signals">${items.map(item => `<li>
+      <strong>${escapeHtml(item[titleKey])}</strong><p>${escapeHtml(item.reason)}</p>
+      <p class="compact-watch"><b>觀察：</b>${escapeHtml(item.watch)}</p>
+    </li>`).join('')}</ol>`;
+    return `<section class="quick-overview compact-report">
+      <span class="quick-overview__eyebrow">COMPANY BRIEF · 公司研究精簡版</span>
+      <h2>${escapeHtml(company.symbol || symbol)}，看懂四個重點</h2>
+      <article class="quick-topic">
+        <h3><span>01</span> 公司做什麼、如何賺錢</h3>
+        <p>${escapeHtml(company.overview)}</p>
+        <div class="business-route compact-business-route">
+          <div><strong>收入來源</strong><p>${escapeHtml(company.revenue)}</p></div>
+          <div><strong>主要客戶</strong><p>${escapeHtml(company.customers)}</p></div>
+        </div>
+        ${renderSectionAskButton('公司與收入', company)}
+      </article>
+      <article class="quick-topic">
+        <h3><span>02</span> 主要產品與服務</h3>
+        <div class="compact-products">${products.map(item => `<div class="compact-product">
+          <h4>${escapeHtml(item.name)}</h4>
+          <p><b>代表產品：</b>${item.examples.map(escapeHtml).join('、')}</p>
+          <p>${escapeHtml(item.significance)}</p>
+        </div>`).join('')}</div>
+        ${renderSectionAskButton('主要產品與服務', products)}
+      </article>
+      <article class="quick-topic">
+        <h3><span>03</span> 成長動能與風險</h3>
+        <div class="compact-outlook">
+          <div class="compact-outlook__growth"><h4>成長動能</h4>${signals(growth, 'driver')}</div>
+          <div class="compact-outlook__risks"><h4>主要風險</h4>${signals(risks, 'risk')}</div>
+        </div>
+        ${renderSectionAskButton('成長動能與風險', { growth, risks })}
+      </article>
+      <article class="quick-topic">
+        <h3><span>04</span> 財報與營運觀察</h3>
+        <div class="quick-metrics">${financialWatch.map(item => `<div>
+          <strong>${escapeHtml(item.metric)}</strong><p>${escapeHtml(item.importance)}</p>
+          <p class="compact-watch"><b>觀察：</b>${escapeHtml(item.watch)}</p>
+        </div>`).join('')}</div>
+        ${renderSectionAskButton('財報與營運觀察', financialWatch)}
+      </article>
+      <p class="quick-overview__hint">聚焦理解公司的必要資訊，不代表完整研究或投資排序；可用 AI 追問釐清細節。請留意報告生成時間。</p>
+    </section>`;
+  }
+
+  function renderCompanyReport(sections, symbol, chartHtml) {
+    if (sections.compactReport) {
+      return renderCompactReport(sections.compactReport, symbol) + renderReadingChapter('股價走勢', symbol, chartHtml);
+    }
+    const { valueChain, timeline, coreSummary, productPortfolio, dashboard, reportText } = sections;
+    const fullReportHtml = renderReadingChapter('股價走勢', symbol, chartHtml) +
+      renderReadingChapter('商業模式與產業價值鏈', valueChain?.position, renderValueChain(valueChain, symbol)) +
+      renderReadingChapter('公司發展時間線', timeline?.items?.[0]?.event, renderTimeline(timeline)) +
+      renderReadingChapter('完整核心摘要', coreSummary?.identity, renderCoreSummary(coreSummary, symbol)) +
+      renderReadingChapter('主要產品與服務', productPortfolio?.overview, renderProductPortfolio(productPortfolio)) +
+      renderResearchDashboard(dashboard, symbol) + marked.parse(reportText);
+    return renderQuickOverview(coreSummary, dashboard, valueChain, symbol, productPortfolio) +
+      renderReadingChapter('深入閱讀', '展開舊版完整分析', fullReportHtml);
+  }
+
   function readCompanySections(data) {
+    if (data.report && (data.reportFormat === 'compact-v1' || data.report.company)) {
+      return { compactReport: validateCompactReport(data.report), reportText: '' };
+    }
+    const compactStart = '<!-- COMPACT_REPORT_START -->';
+    if (!data.report && typeof data.text === 'string' && data.text.includes(compactStart)) {
+      const start = data.text.indexOf(compactStart) + compactStart.length;
+      const end = data.text.indexOf('<!-- COMPACT_REPORT_END -->', start);
+      if (end < 0) throw new Error('公司報告部分章節未完整傳回，請稍後再試。');
+      let parsed;
+      try { parsed = JSON.parse(data.text.slice(start, end).trim()); }
+      catch { throw new Error('公司報告格式不完整，請稍後再試。'); }
+      return { compactReport: validateCompactReport(parsed), reportText: '' };
+    }
     if (data.report) {
       const { valueChain, timeline, coreSummary, productPortfolio, dashboard } = data.report;
       if (!valueChain || !timeline || !coreSummary || !productPortfolio || !dashboard) {
@@ -1139,7 +1233,7 @@
     fetchBtn.disabled = true;
     fetchBtn.textContent = "正在分析數據...";
     debugEl.textContent = "查詢中…正在分析數據...";
-    resultEl.innerHTML = "<p>正在搜尋與驗證完整公司報告，首次生成可能需要 1–3 分鐘；相同股票若有近期報告會優先讀取。</p>";
+    resultEl.innerHTML = "<p>正在整理公司介紹、產品、成長風險與財報觀察。首次生成可能需要 1–3 分鐘；相同股票若有近期報告會優先讀取。</p>";
     let stopAdoptionCard = () => {};
     if (!session?.user || session.user.is_anonymous) {
       const adoptionContainer = document.createElement('div');
@@ -1187,13 +1281,7 @@
       resultElement.classList.remove("pro-report-style");
 
    
-      const { valueChain, timeline, coreSummary, productPortfolio, dashboard, reportText } = readCompanySections(data);
-      const valueChainHtml = renderValueChain(valueChain, symbol);
-      const timelineHtml = renderTimeline(timeline);
-      const coreSummaryHtml = renderCoreSummary(coreSummary, symbol);
-      const productPortfolioHtml = renderProductPortfolio(productPortfolio);
-      const dashboardHtml = renderResearchDashboard(dashboard, symbol);
-      const htmlContent = marked.parse(reportText);
+      const sections = readCompanySections(data);
       const chartHtml = isTaiwanStock(symbol)
         ? `
         <div style="margin-bottom:25px; padding:18px 20px; border-radius:12px; background:rgba(15,23,42,0.72); border:1px solid rgba(148,163,184,0.25); color:#cbd5e1;">
@@ -1207,20 +1295,12 @@
           </iframe>
         </div>`;
       
-      const quickOverviewHtml = renderQuickOverview(coreSummary, dashboard, valueChain, symbol, productPortfolio);
       const sourceNotice = data.sourceInfo ? `<aside class="report-data-status" role="status">
-        ${data.cached ? "已載入近 3 天內的完整報告" : "完整章節已驗證"}｜搜尋資料 ${Number(data.sourceInfo.count)} 筆
+        ${data.cached ? "已載入近 3 天內的公司報告" : "報告欄位已驗證"}｜搜尋資料 ${Number(data.sourceInfo.count)} 筆
         ${data.generatedAt ? `｜生成時間：${escapeHtml(new Date(data.generatedAt).toLocaleString('zh-TW'))}` : ""}
         ${data.sourceInfo.limited ? "<p>部分搜尋來源暫時不足，缺乏依據的內容會標為未披露；本份報告不會存入共用快取。</p>" : ""}
       </aside>` : "";
-      const fullReportHtml = renderReadingChapter("股價走勢", symbol, chartHtml) +
-        renderReadingChapter("商業模式與產業價值鏈", valueChain?.position, valueChainHtml) +
-        renderReadingChapter("公司發展時間線", timeline?.items?.[0]?.event, timelineHtml) +
-        renderReadingChapter("完整核心摘要", coreSummary?.identity, coreSummaryHtml) +
-        renderReadingChapter("主要產品與服務", productPortfolio?.overview, productPortfolioHtml) +
-        dashboardHtml + htmlContent;
-      resultElement.innerHTML = sourceNotice + quickOverviewHtml +
-        renderReadingChapter("深入閱讀", "展開時間軸、產品、營運、競爭比較、治理及完整分析", fullReportHtml);
+      resultElement.innerHTML = sourceNotice + renderCompanyReport(sections, symbol, chartHtml);
 
      
       currentSearchContext = data.searchContext; 

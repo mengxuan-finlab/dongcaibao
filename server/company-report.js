@@ -18,10 +18,10 @@ const ARRAY_LIMITS = {
   'dashboard.newsTags': [5, 5], 'dashboard.newsTags.items': [2, 4]
 };
 
-function schemaFor(value, path = '') {
+function schemaFor(value, path = '', compact = false) {
   if (Array.isArray(value)) {
-    const limits = ARRAY_LIMITS[path] || [1, path.startsWith('valueChain.') || path.endsWith('.examples') ? undefined : 8];
-    const items = schemaFor(value[0], path);
+    const limits = compact ? [1, undefined] : ARRAY_LIMITS[path] || [1, path.startsWith('valueChain.') || path.endsWith('.examples') ? undefined : 8];
+    const items = schemaFor(value[0], path, compact);
     if (path === 'dashboard.newsTags') items.properties.category.enum = value.map(item => item.category);
     if (path === 'dashboard.financials') items.properties.area.description = '財務或營運觀察面向，五項不可重複';
     return { type: 'array', minItems: limits[0], ...(limits[1] === undefined ? {} : { maxItems: limits[1] }), items };
@@ -29,15 +29,27 @@ function schemaFor(value, path = '') {
   if (value && typeof value === 'object') {
     return {
       type: 'object', additionalProperties: false,
-      properties: Object.fromEntries(Object.entries(value).map(([key, item]) => [key, schemaFor(item, path ? `${path}.${key}` : key)])),
+      properties: Object.fromEntries(Object.entries(value).map(([key, item]) => [key, schemaFor(item, path ? `${path}.${key}` : key, compact)])),
       required: Object.keys(value)
     };
   }
   return { type: 'string', description: String(value),
-    ...(['valueChain.company', 'coreSummary.company'].includes(path) ? { enum: [value] } : {}) };
+    ...(['valueChain.company', 'coreSummary.company', 'company.symbol'].includes(path) ? { enum: [value] } : {}) };
 }
 
 function buildContract(basePrompt) {
+  const compactStart = '<!-- COMPACT_REPORT_START -->';
+  const compactEnd = '<!-- COMPACT_REPORT_END -->';
+  if (basePrompt.includes(compactStart)) {
+    const start = basePrompt.indexOf(compactStart);
+    const end = basePrompt.indexOf(compactEnd, start);
+    if (end < 0) throw new Error('Missing prompt template: COMPACT_REPORT');
+    const template = JSON.parse(basePrompt.slice(start + compactStart.length, end).trim());
+    return {
+      schema: schemaFor(template, '', true), reportFormat: 'compact-v1', maxOutputTokens: 8192,
+      prompt: basePrompt.slice(0, start) + '輸出單一完整 JSON 物件，不要 HTML 標記、Markdown 或程式碼圍欄。欄位格式：\n' + JSON.stringify(template)
+    };
+  }
   const template = {};
   for (const [key, marker] of SECTIONS) {
     const start = `<!-- ${marker}_START -->`;
@@ -61,7 +73,8 @@ ${requirements}`;
   const schema = schemaFor(template);
   const shape = JSON.stringify(template);
   const counts = Object.entries(ARRAY_LIMITS).map(([path, [min, max]]) => `${path}: ${min}-${max} 項`).join('\n');
-  return { schema, prompt: `${prompt}\n【完整欄位格式範例，請以真實分析替換示意文字】\n${shape}\n【陣列項目數量】\n${counts}` };
+  return { schema, reportFormat: 'full-v1', maxOutputTokens: 32768,
+    prompt: `${prompt}\n【完整欄位格式範例，請以真實分析替換示意文字】\n${shape}\n【陣列項目數量】\n${counts}` };
 }
 
 // Keep strict count checks locally; nested array bounds can exceed Gemini's decoder complexity limit.
@@ -106,6 +119,9 @@ function validateReport(value, schema, path = 'report') {
 }
 
 function serializeReport(report) {
+  if (report.company && Array.isArray(report.products)) {
+    return `<!-- COMPACT_REPORT_START -->\n${JSON.stringify(report)}\n<!-- COMPACT_REPORT_END -->`;
+  }
   return SECTIONS.map(([key, marker]) => `<!-- ${marker}_START -->\n${JSON.stringify(report[key])}\n<!-- ${marker}_END -->`).join('\n\n');
 }
 
@@ -114,7 +130,7 @@ async function generateValidatedReport({
   totalTimeoutMs = timeoutMs * 2, now = () => performance.now(),
   sleep = ms => new Promise(resolve => setTimeout(resolve, ms)), random = Math.random
 }) {
-  const { schema, prompt } = buildContract(basePrompt);
+  const { schema, prompt, reportFormat, maxOutputTokens } = buildContract(basePrompt);
   const uniqueModels = [...new Set(models.filter(Boolean))].slice(0, 2);
   let lastError;
   let lastSource = 'sdk';
@@ -138,7 +154,7 @@ async function generateValidatedReport({
           config: {
             responseMimeType: 'application/json',
             ...(!jsonOnly ? { responseJsonSchema: providerSchema(schema) } : {}),
-            temperature: model.startsWith('gemini-3.') ? 1 : 0.3, maxOutputTokens: 32768,
+            temperature: model.startsWith('gemini-3.') ? 1 : 0.3, maxOutputTokens,
             ...(model.startsWith('gemini-3.') ? { thinkingConfig: { thinkingLevel: 'low' } } : {}),
             ...(model.startsWith('gemini-2.5') ? { thinkingConfig: { thinkingBudget: 1024 } } : {}),
             httpOptions: { apiVersion: 'v1beta', timeout: remainingMs, retryOptions: { attempts: 1 } },
@@ -156,7 +172,7 @@ async function generateValidatedReport({
         log({ event: 'company_report_attempt', attempt: attemptCount, model, status: 200,
           durationMs: Math.round(now() - started), timeoutMs: remainingMs, errorSource: null,
           mode: jsonOnly ? 'json' : 'schema', outcome: 'success', validation: true });
-        return { report, modelName: model, text: serializeReport(report) };
+        return { report, reportFormat, modelName: model, text: serializeReport(report) };
       } catch (error) {
         lastError = error;
         const status = received ? 200 : httpStatus(error);

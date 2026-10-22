@@ -4,7 +4,7 @@ const { readFileSync } = require('node:fs');
 const { buildContract, providerSchema, safeErrorMessage, reportErrorResponse, validateReport, generateValidatedReport, collectSearchResults, createReportCache } = require('./company-report');
 
 const server = readFileSync(`${__dirname}/server.js`, 'utf8');
-const { getBasePrompt } = require('./company-prompt');
+const { getBasePrompt } = require('./fixtures/legacy-company-prompt');
 const basePrompt = getBasePrompt('AAPL', 'facts', 'US');
 const { schema } = buildContract(basePrompt);
 
