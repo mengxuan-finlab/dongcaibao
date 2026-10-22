@@ -101,6 +101,48 @@ test('non-retryable configuration errors are not multiplied', async () => {
   assert.equal(calls, 1);
 });
 
+test('Gemini 3.8 reports use compatible parameters and fall back to 3.6', async () => {
+  const seen = [];
+  const result = await generateValidatedReport({
+    basePrompt, models: ['gemini-3.8-flash', 'gemini-3.6-flash'], isRetryable: () => true,
+    generate: async request => {
+      seen.push(request);
+      if (seen.length === 1) throw Object.assign(new Error('temporarily unavailable'), { status: 503 });
+      return { text: JSON.stringify(sample(schema)) };
+    }
+  });
+  assert.equal(seen[0].model, 'gemini-3.8-flash');
+  assert.equal(result.modelName, 'gemini-3.6-flash');
+  for (const request of seen) {
+    assert.equal(request.config.temperature, 1);
+    assert.equal(request.config.thinkingConfig.thinkingLevel, 'low');
+    assert.equal(request.config.thinkingConfig.thinkingBudget, undefined);
+    assert.equal(request.config.httpOptions.apiVersion, 'v1beta');
+    assert.equal(request.config.maxOutputTokens, 32768);
+  }
+  assert.equal(result.report.dashboard.research.metrics.length, 6);
+});
+
+test('explicit Gemini 2.5 overrides retain their existing generation settings', async () => {
+  let request;
+  await generateValidatedReport({
+    basePrompt, models: ['gemini-2.5-flash'], isRetryable: () => false,
+    generate: async args => { request = args; return { text: JSON.stringify(sample(schema)) }; }
+  });
+  assert.equal(request.config.temperature, 0.3);
+  assert.equal(request.config.thinkingConfig.thinkingBudget, 1024);
+  assert.equal(request.config.thinkingConfig.thinkingLevel, undefined);
+});
+
+test('server defaults to Gemini 3.8 and 3.6 while preserving deployment overrides', () => {
+  const start = server.indexOf('const GEMINI_PRIMARY_MODEL =');
+  const end = server.indexOf('console.log(`[AI 模型設定]', start);
+  const settings = new Function('process', server.slice(start, end) + '\nreturn [GEMINI_PRIMARY_MODEL, GEMINI_FALLBACK_MODEL];');
+  assert.equal(settings({ env: {} }).join(','), 'gemini-3.8-flash,gemini-3.6-flash');
+  assert.equal(settings({ env: { GEMINI_MODEL: ' gemini-2.5-flash ', GEMINI_FALLBACK_MODEL: 'custom' } }).join(','), 'gemini-2.5-flash,custom');
+  assert.equal(settings({ env: { GEMINI_MODEL: ' ', GEMINI_FALLBACK_MODEL: '' } }).join(','), 'gemini-3.8-flash,gemini-3.6-flash');
+});
+
 test('provider schema is simpler while local completeness checks remain strict', () => {
   const remote = providerSchema(schema);
   assert.equal(remote.properties.timeline.properties.items.minItems, undefined);

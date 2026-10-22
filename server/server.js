@@ -39,10 +39,11 @@ const supabase = createClient(
 // 2. Gemini AI 設定
 const genAI = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY,
-  apiVersion: "v1"
+  apiVersion: "v1beta"
 });
-const GEMINI_PRIMARY_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
-const GEMINI_FALLBACK_MODEL = process.env.GEMINI_FALLBACK_MODEL || "gemini-2.5-flash-lite";
+const GEMINI_PRIMARY_MODEL = process.env.GEMINI_MODEL?.trim() || "gemini-3.8-flash";
+const GEMINI_FALLBACK_MODEL = process.env.GEMINI_FALLBACK_MODEL?.trim() || "gemini-3.6-flash";
+console.log(`[AI 模型設定] 主要模型: ${GEMINI_PRIMARY_MODEL} | 備援模型: ${GEMINI_FALLBACK_MODEL}`);
 const GEMINI_RETRYABLE_STATUS = new Set([408, 429, 500, 502, 503, 504]);
 
 function isRetryableGeminiError(error) {

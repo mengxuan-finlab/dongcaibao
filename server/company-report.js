@@ -134,7 +134,8 @@ async function generateValidatedReport({ basePrompt, models, generate, isRetryab
         config: {
           responseMimeType: 'application/json',
           ...(!jsonOnly ? { responseJsonSchema: providerSchema(schema) } : {}),
-          temperature: 0.3, maxOutputTokens: 32768,
+          temperature: model.startsWith('gemini-3.') ? 1 : 0.3, maxOutputTokens: 32768,
+          ...(model.startsWith('gemini-3.') ? { thinkingConfig: { thinkingLevel: 'low' } } : {}),
           ...(model.startsWith('gemini-2.5') ? { thinkingConfig: { thinkingBudget: 1024 } } : {}),
           httpOptions: { apiVersion: 'v1beta', timeout: remainingMs },
           abortSignal: AbortSignal.timeout(remainingMs)
