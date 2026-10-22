@@ -41,6 +41,23 @@ into the real SDK and makes no paid API requests:
 Run tests after dependency installation with `cd server` followed by `npm test`.
 Mock tests verify control flow and error handling, not live Gemini reliability.
 
+## Small Live Probes
+
+Run `npm run diagnose:gemini` from `server/` in an environment that already has
+the backend's `GEMINI_API_KEY` (for example, Render Shell if available). It uses
+the configured primary and fallback models and makes one plain-text OK request
+and one small JSON request for each: at most four sequential requests, no SDK or
+application retries, and a 65-second timeout per request. These calls still use
+Gemini API quota/billing; they do not consume site report quota, call SerpApi,
+access Supabase or populate report caches. No diagnostic HTTP endpoint is added.
+
+Share the `gemini_diagnostic` lines, not keys or environment variable dumps.
+If both small probes return 503, the full report's length/JSON validation is not
+required to reproduce the failure. If only the JSON probe fails, investigate
+structured-output handling. If both pass while full reports fail, investigate
+report complexity, timeout and output validation; one successful probe does not
+establish overall reliability or prove a Free/Paid tier is the cause.
+
 ## Retry Budget and Diagnostics
 
 Company reports have a 65-second per-call ceiling and a 130-second total AI
