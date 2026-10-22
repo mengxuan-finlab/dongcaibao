@@ -58,6 +58,24 @@ structured-output handling. If both pass while full reports fail, investigate
 report complexity, timeout and output validation; one successful probe does not
 establish overall reliability or prove a Free/Paid tier is the cause.
 
+### Full Report Schema Comparison
+
+After deploying the diagnostic command, run `npm run diagnose:report -- AAPL`
+from the backend directory. It needs the existing `GEMINI_API_KEY` and
+`SERPAPI_KEY`; never pass them as command arguments or paste them into chat.
+It uses the configured primary model only. Three bounded SerpApi searches build
+one shared source snapshot; that exact snapshot and the unchanged production
+report prompt are reused in two sequential Gemini calls. Only the provider-side
+`responseJsonSchema` differs. Both calls retain JSON MIME type, local completeness
+validation, 32768 output tokens, low thinking for Gemini 3, and a 65-second
+timeout. No retry, fallback, Supabase writes or site quota charges are involved.
+These calls still consume provider quota and can incur normal API charges.
+
+Share the two `gemini_report_diagnostic` results. A 200 response with invalid JSON
+is distinct from a 503 rejection. One pair cannot prove causation: provider load
+can change between the two calls. This diagnostic deliberately does not replace
+or automatically change the site's production generation behavior.
+
 ## Retry Budget and Diagnostics
 
 Company reports have a 65-second per-call ceiling and a 130-second total AI

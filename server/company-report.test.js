@@ -4,8 +4,8 @@ const { readFileSync } = require('node:fs');
 const { buildContract, providerSchema, safeErrorMessage, reportErrorResponse, validateReport, generateValidatedReport, collectSearchResults, createReportCache } = require('./company-report');
 
 const server = readFileSync(`${__dirname}/server.js`, 'utf8');
-const promptCode = server.slice(server.indexOf('const getBasePrompt ='), server.indexOf('const getProPrompt ='));
-const basePrompt = new Function(promptCode + '\nreturn getBasePrompt("AAPL", "facts", "US");')();
+const { getBasePrompt } = require('./company-prompt');
+const basePrompt = getBasePrompt('AAPL', 'facts', 'US');
 const { schema } = buildContract(basePrompt);
 
 function sample(node, path = 'report', index = 0) {
