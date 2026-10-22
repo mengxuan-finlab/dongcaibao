@@ -33,5 +33,3 @@ SQL 不修改或刪除既有報告。它增加所有 authenticated 使用者的�
 啟用匿名登入後，其他資料表既有的 authenticated RLS 規則也需確認是否應排除 is_anonymous。
 此限制是每個匿名身分一次，不能辨識同一個人在清除瀏覽器資料後再次建立的新身分。
 對外大量開放時，請依官方文件設定 CAPTCHA／匿名登入速率限制。
-
-本機測試：`node --test guest-access.test.js financial-trial.test.js`。
