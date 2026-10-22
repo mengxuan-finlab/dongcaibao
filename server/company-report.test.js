@@ -66,6 +66,35 @@ test('empty value-chain lists, wrong types and blank entries remain invalid', ()
   assert.throws(() => validateReport(report, schema), /non-empty text/);
 });
 
+test('a primary 504 can fall back to a complete report with five product examples', async () => {
+  const report = sample(schema);
+  report.productPortfolio.items[0].examples = ['product 1', 'product 2', 'product 3', 'product 4', 'product 5'];
+  const seen = [];
+  const result = await generateValidatedReport({
+    basePrompt, models: ['gemini-3.8-flash', 'gemini-3.6-flash'],
+    isRetryable: error => error.status === 504,
+    generate: async request => {
+      seen.push(request.model);
+      if (seen.length === 1) throw Object.assign(new Error('DEADLINE_EXCEEDED'), { status: 504 });
+      return { text: JSON.stringify(report) };
+    }
+  });
+  assert.equal(seen.join(','), 'gemini-3.8-flash,gemini-3.6-flash');
+  assert.equal(result.report.productPortfolio.items[0].examples.length, 5);
+  assert.equal(frontendReader()({ text: result.text }).productPortfolio.items[0].examples.length, 5);
+  assert.equal(frontendReader()({ report: result.report }).productPortfolio.items[0].examples.length, 5);
+});
+
+test('product examples still reject empty lists, wrong types and blank entries', () => {
+  const report = sample(schema);
+  report.productPortfolio.items[0].examples = [];
+  assert.throws(() => validateReport(report, schema), /examples: expected at least 1 items, received 0/);
+  report.productPortfolio.items[0].examples = 'not a list';
+  assert.throws(() => validateReport(report, schema), /received string/);
+  report.productPortfolio.items[0].examples = [' '];
+  assert.throws(() => validateReport(report, schema), /non-empty text/);
+});
+
 test('truncated output retries on fallback and retains legacy markers', async () => {
   const seen = [];
   const result = await generateValidatedReport({

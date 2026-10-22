@@ -334,7 +334,7 @@
               area: normalizeText(item?.area),
               type: normalizeText(item?.type),
               examples: Array.isArray(item?.examples)
-                ? item.examples.map(normalizeText).slice(0, 3)
+                ? item.examples.map(normalizeText)
                 : ["未披露"],
               significance: normalizeText(item?.significance)
             }))

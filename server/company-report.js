@@ -17,7 +17,7 @@ const ARRAY_LIMITS = {
 
 function schemaFor(value, path = '') {
   if (Array.isArray(value)) {
-    const limits = ARRAY_LIMITS[path] || [1, path.startsWith('valueChain.') ? undefined : path.endsWith('.examples') ? 3 : 8];
+    const limits = ARRAY_LIMITS[path] || [1, path.startsWith('valueChain.') || path.endsWith('.examples') ? undefined : 8];
     const items = schemaFor(value[0], path);
     if (path === 'dashboard.newsTags') items.properties.category.enum = value.map(item => item.category);
     if (path === 'dashboard.financials') items.properties.area.description = '財務或營運觀察面向，五項不可重複';
@@ -53,6 +53,7 @@ function buildContract(basePrompt) {
 原始資料不足時明確寫「未披露」或「目前資料不足以判斷」，不要編造公司、事件、年份或數據。
 timeline 整理 4-6 個發展節點，productPortfolio 整理 3-6 個主要領域；核心摘要說明公司定位、痛點、收入、特色、成長與壓力。
 valueChain 的 upstream、offerings、customers、revenue 都必須是非空陣列，依資料列出相關項目，不必為了三項上限刪除內容；未披露時以文字明確註明。
+productPortfolio.items 的 examples 也必須是非空陣列，依資料列出相關產品或服務，不設三項上限；未披露時以文字明確註明。
 ${requirements}`;
   const schema = schemaFor(template);
   const shape = JSON.stringify(template);
