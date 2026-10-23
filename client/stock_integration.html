@@ -52,7 +52,7 @@
 
   <script>
 (() => {
-  const COLORS = ['#6d5dd3', '#249b91', '#df9b38', '#d66b85', '#528bc5', '#8caa4e', '#a16ac0', '#877266'];
+  const COLORS = ['#103f66', '#ee8c78', '#6cadd3', '#edbd68', '#9bb4b9', '#687f9b', '#b9a78d', '#7e9c89'];
   const escape = value => String(value ?? '').replace(/[&<>"']/g, char =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
   const percent = share => `${(share * 100).toLocaleString('zh-TW', { maximumFractionDigits: 1 })}%`;
@@ -78,14 +78,7 @@
   function card(data, kind) {
     const product = kind === 'product';
     const title = product ? '產品營收組成' : '地區營收分布';
-    const messages = {
-      restricted: '目前 FMP 金鑰或方案無權存取這項資料。',
-      unsupported_values: '資料包含負值調整或無效金額，為避免誤導，暫不繪製組成圖。',
-      busy: '圖表資料服務繁忙，請稍後再查詢。',
-      empty: '目前沒有可繪製的分項營收資料。'
-    };
-    if (data?.status !== 'ok') return `<article class="revenue-card"><h4>${title}</h4>
-      <p>${messages[data?.status] || '目前無法取得年度分項資料，可能尚未披露、未收錄或服務暫時無法使用。'}</p></article>`;
+    if (data?.status !== 'ok' || !Array.isArray(data.items) || !data.items.length) return '';
     const rows = data.items.map((item, index) => `<tr><th scope="row">
       <span class="revenue-swatch" style="background:${COLORS[index % COLORS.length]}"></span>${escape(item.name)}</th>
       <td title="${escape(item.value.toLocaleString('zh-TW'))} ${escape(data.currency)}">${amount(item.value, data.currency)}</td>
@@ -102,8 +95,9 @@
 
   window.loadRevenueCharts = async (container, backendUrl, symbol) => {
     if (!container) return;
+    const section = container.closest('.revenue-section');
+    section.hidden = true;
     if (/^\d{4}(\.TW|\.TWO)?$/i.test(symbol)) {
-      container.innerHTML = '<p>此營收圖表目前提供美股資料；台股公司介紹不受影響。</p>';
       return;
     }
     const controller = new AbortController();
@@ -115,12 +109,20 @@
       if (!response.ok) throw new Error('Revenue data unavailable');
       const data = await response.json();
       if (!container.isConnected) return;
-      container.innerHTML = `<div class="revenue-grid">${card(data.product, 'product')}${card(data.geographic, 'geographic')}</div>
+      const cards = [card(data.product, 'product'), card(data.geographic, 'geographic')].filter(Boolean);
+      if (!cards.length) return;
+      container.innerHTML = `<div class="revenue-grid${cards.length === 1 ? ' revenue-grid--single' : ''}">${cards.join('')}</div>
         <p class="revenue-note">來源：<a href="https://financialmodelingprep.com/" target="_blank" rel="noopener noreferrer">Financial Modeling Prep</a>。
-        各圖採最新可取得年度，兩圖財年可能不同；占比以該圖已披露分項合計計算，不代表已與公司總營收核對。
-        保留來源分類原名，分類可能包含重疊項；資料由 API 提供，非 AI 推估。</p>`;
+        各圖年度見標示；占比依已披露分項合計計算，未與總營收核對，分類可能重疊。</p>`;
+      section.hidden = false;
+      const chapter = section.closest('[data-segment-chapter]');
+      if (chapter) {
+        chapter.hidden = false;
+        const link = document.querySelector('[data-report-link="segments"]');
+        if (link) link.hidden = false;
+      }
     } catch {
-      if (container.isConnected) container.innerHTML = '<p>營收圖表暫時無法載入，公司介紹與 AI 追問仍可使用。</p>';
+      // Optional charts fail silently; the generated report remains readable.
     } finally {
       clearTimeout(timeout);
     }
@@ -1198,41 +1200,49 @@
   }
 
   function renderRevenuePlaceholder() {
-    return `<section class="revenue-section" aria-label="實際營收結構">
-      <h3>實際營收結構</h3><div id="revenueCharts" aria-live="polite">
-        <p>正在載入產品與地區營收圖表，不影響公司報告閱讀…</p>
-      </div></section>`;
+    return `<section class="revenue-section" aria-label="實際營收結構" hidden>
+      <div id="revenueCharts" aria-live="polite"></div></section>`;
   }
 
   function renderCompactReport(report, symbol) {
     if (!report.history) return renderLegacyCompactReport(report, symbol);
     const { company, products, history, management, industry, thesis, risks } = report;
-    const pair = (label, value) => `<p><b>${escapeHtml(label)}：</b>${escapeHtml(value)}</p>`;
-    const chapter = (number, english, title, body, context) => `<article class="quick-topic brief-chapter">
-      <h3><span>${number}</span> ${title}<small class="brief-section-label">${english}</small></h3>
-      ${body}${renderSectionAskButton(title, context)}</article>`;
-    return `<section class="quick-overview compact-report brief-report">
-      <span class="quick-overview__eyebrow">COMPANY BRIEF · 公司研究短報</span>
-      <h2>${escapeHtml(company.symbol || symbol)}，七個重點看懂公司</h2>
-      ${chapter('01', 'Business', '公司業務與商業模式', `<p>${escapeHtml(company.overview)}</p>
-        ${pair('如何賺錢', company.revenue)}${pair('主要客戶', company.customers)}`, company)}
-      ${chapter('02', 'Segments', '業務分部', `<div class="compact-products">${products.map(item =>
-        `<div class="compact-product"><h4>${escapeHtml(item.name)}</h4>
-        <p>${item.examples.map(escapeHtml).join('、')}</p><p>${escapeHtml(item.significance)}</p></div>`).join('')}</div>
-        ${renderRevenuePlaceholder()}`, products)}
-      ${chapter('03', 'History &amp; Footprint', '發展歷程與營運布局',
-        pair('發展轉折', history.milestones) + pair('營運布局', history.footprint), history)}
-      ${chapter('04', 'Management &amp; Strategy', '經營團隊與策略',
-        pair('經營團隊', management.team) + pair('策略方向', management.strategy), management)}
-      ${chapter('05', 'Industry &amp; Competition', '產業與競爭',
-        pair('產業與對手', industry.competition) + pair('差異與限制', industry.advantage), industry)}
-      ${chapter('06', 'Thesis', '核心研究論點', `<div class="brief-thesis">${pair('關注理由', thesis.opportunity)}
-        ${pair('成立條件／反證', thesis.condition)}</div>`, thesis)}
-      ${chapter('07', 'Risks', '主要風險', `<ol class="compact-signals">${risks.map(item =>
-        `<li><strong>${escapeHtml(item.risk)}</strong><p>${escapeHtml(item.reason)}</p>
-        <p class="compact-watch"><b>觀察：</b>${escapeHtml(item.watch)}</p></li>`).join('')}</ol>`, risks)}
-      <p class="quick-overview__hint">研究論點包含推論，不是買賣建議。來源不足會明確註明；可用各節的 AI 追問深入了解。</p>
-    </section>`;
+    const available = value => typeof value === 'string' && value.trim()
+      && !/^(未披露|未提供|未公開|不適用|無資料|資料不足|目前資料不足|目前無法|暫無|無法確認|尚未披露)/.test(value.trim());
+    const paragraph = value => available(value) ? `<p class="brief-prose">${escapeHtml(value)}</p>` : '';
+    const table = (headings, rows) => rows.length ? `<div class="brief-table-wrap"><table class="brief-table">
+      <thead><tr>${headings.map(h => `<th scope="col">${escapeHtml(h)}</th>`).join('')}</tr></thead>
+      <tbody>${rows.map(row => `<tr>${row.map((cell, i) => `<${i ? 'td' : 'th scope="row"'}>${escapeHtml(available(cell) ? cell : '')}</${i ? 'td' : 'th'}>`).join('')}</tr>`).join('')}</tbody></table></div>` : '';
+    const flow = [ ['付費客戶', company.customers], ['產品與服務', products.filter(p => available(p.name)).map(p => p.name).join('、')],
+      ['收入來源', company.revenue] ].filter(([, value]) => available(value));
+    const business = paragraph(company.overview) + (flow.length ? `<figure class="brief-flow"><figcaption>從客戶到收入</figcaption>
+      <div style="--flow-count:${flow.length}">${flow.map(([label, value], i) => `<div class="brief-flow-step"><span>0${i + 1}</span><h4>${label}</h4><p>${escapeHtml(value)}</p></div>`).join('')}</div></figure>` : '');
+    const productRows = products.filter(p => available(p.name) && (available(p.significance) || p.examples.some(available)))
+      .map(p => [p.name, p.examples.filter(available).join('、'), p.significance]);
+    const historyRows = [['發展轉折', history.milestones], ['營運布局', history.footprint]].filter(([, v]) => available(v));
+    const managementRows = [['經營團隊', management.team], ['策略方向', management.strategy]].filter(([, v]) => available(v));
+    const comparison = [['產業與競爭者', industry.competition], ['差異與限制', industry.advantage]].filter(([, v]) => available(v));
+    const thesisRows = [['研究論點', thesis.opportunity], ['驗證條件與反證', thesis.condition]].filter(([, v]) => available(v));
+    const riskRows = risks.filter(r => available(r.risk) && available(r.reason)).map(r => [r.risk, r.reason, r.watch]);
+    const sections = [
+      ['business', 'Business', '公司如何運作', business, company],
+      ['segments', 'Segments', '業務與營收結構', table(['業務分部', '代表產品／服務', '對公司的意義'], productRows) + renderRevenuePlaceholder(), products, !productRows.length],
+      ['history', 'History & Footprint', '發展歷程與布局', table(['面向', '關鍵事實'], historyRows), history],
+      ['management', 'Management & Strategy', '團隊與策略方向', table(['策略面向', '重點'], managementRows), management],
+      ['industry', 'Industry & Competition', '產業與競爭位置', comparison.length ? `<div class="brief-comparison">${comparison.map(([label,v]) => `<div><h4>${label}</h4><p>${escapeHtml(v)}</p></div>`).join('')}</div>` : '', industry],
+      ['thesis', 'Thesis', '值得關注的理由', thesisRows.length ? `<div class="brief-argument">${thesisRows.map(([label,v]) => `<div><span>${label}</span><p>${escapeHtml(v)}</p></div>`).join('')}</div>` : '', thesis],
+      ['risks', 'Risks', '什麼可能改變判斷', table(['風險', '可能影響', '觀察訊號'], riskRows), risks]
+    ].filter(([, , , body]) => body);
+    return `<div class="brief-layout"><nav class="brief-toc" aria-label="報告章節"><span>CONTENTS</span>
+      ${sections.map(([id, english, title, , , hidden], i) => `<a href="#brief-${id}" data-report-link="${id}"${hidden ? ' hidden' : ''}><b>${String(i + 1).padStart(2, '0')}</b>${escapeHtml(title)}</a>`).join('')}</nav>
+      <section class="quick-overview compact-report brief-report"><header class="brief-cover">
+        <span class="quick-overview__eyebrow">COMPANY RESEARCH / 公司研究</span>
+        <h2>${escapeHtml(company.symbol || symbol)}</h2><p>看懂生意，理解機會與風險。</p></header>
+      ${sections.map(([id, english, title, body, context, hidden], i) => `<article id="brief-${id}" class="quick-topic brief-chapter"${id === 'segments' ? ' data-segment-chapter' : ''}${hidden ? ' hidden' : ''}>
+        <header><span>${String(i + 1).padStart(2, '0')} / ${escapeHtml(english)}</span><h3>${escapeHtml(title)}</h3></header>
+        ${body}${renderSectionAskButton(title, context)}</article>`).join('')}
+      <p class="quick-overview__hint">研究論點含推論，非買賣建議。營收圖表來自 FMP，文字分析可透過各節追問深入了解。</p>
+      </section></div>`;
   }
 
   function renderLegacyCompactReport(report, symbol) {
@@ -1430,7 +1440,7 @@
       if (typeof window.loadRevenueCharts === 'function') {
         window.loadRevenueCharts(revenueContainer, BACKEND_URL, symbol);
       } else {
-        revenueContainer.textContent = '圖表元件尚未載入，請重新整理；公司報告不受影響。';
+        revenueContainer.closest('.revenue-section').hidden = true;
       }
 
      
