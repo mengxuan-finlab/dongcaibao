@@ -2,16 +2,16 @@
 
 ## Deployment
 
-The production report is now `compact-v1`: company/revenue/customers, main
-products, growth and risks, and financial/operating watch items. The prompt no
-longer requests a timeline, value-chain diagram, governance, competitor tables,
-news tags or the full research dashboard. Output budget is 8192 tokens (formerly
-32768). This reduces generation work; it does not guarantee availability or
-eliminate provider 503 errors.
+The production report is now `compact-v2`: Business, Segments, History &
+Footprint, Management & Strategy, Industry & Competition, Thesis, and Risks.
+The writing target is 450-650 Chinese characters, with short statements rather
+than a full dashboard. FMP product/geographic charts load separately inside
+Segments and do not add Gemini calls. Output budget remains 8192 tokens.
+This does not guarantee availability or eliminate provider 503 errors.
 
 Deploy the compatible frontend to **Vercel first**, then the backend to Render.
-The new frontend accepts compact and legacy full reports. Existing old frontends
-cannot render compact responses. The prompt/schema digest automatically gives
+The new frontend accepts both compact versions and legacy full reports. Deploy
+it before a backend that returns compact-v2 fields. The prompt/schema digest gives
 compact reports a different cache key; old full cache rows need not be deleted.
 
 1. In the existing Supabase project's SQL Editor, run

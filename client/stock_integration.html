@@ -1168,15 +1168,25 @@
     return /^\d{4}(\.TW|\.TWO)?$/.test(value);
   }
 
-  function validateCompactReport(report) {
+  function validateCompactReport(report, format) {
     const text = value => typeof value === 'string' && value.trim().length > 0;
     if (!report?.company || !['symbol', 'overview', 'revenue', 'customers'].every(key => text(report.company[key]))) {
       throw new Error('公司報告格式不完整，請稍後再試。');
     }
-    const fields = {
-      products: ['name', 'significance'], growth: ['driver', 'reason', 'watch'],
-      risks: ['risk', 'reason', 'watch'], financialWatch: ['metric', 'importance', 'watch']
-    };
+    const sevenSections = format === 'compact-v2' || ['history', 'management', 'industry', 'thesis'].some(key => key in report);
+    const fields = { products: ['name', 'significance'], risks: ['risk', 'reason', 'watch'] };
+    if (sevenSections) {
+      const sections = { history: ['milestones', 'footprint'], management: ['team', 'strategy'],
+        industry: ['competition', 'advantage'], thesis: ['opportunity', 'condition'] };
+      for (const [key, required] of Object.entries(sections)) {
+        if (!report[key] || !required.every(field => text(report[key][field]))) {
+          throw new Error('公司報告部分章節未完整傳回，請稍後再試。');
+        }
+      }
+    } else {
+      fields.growth = ['driver', 'reason', 'watch'];
+      fields.financialWatch = ['metric', 'importance', 'watch'];
+    }
     for (const [key, required] of Object.entries(fields)) {
       if (!Array.isArray(report[key]) || !report[key].length || !report[key].every(item =>
         item && required.every(field => text(item[field])) && (key !== 'products' ||
@@ -1195,6 +1205,37 @@
   }
 
   function renderCompactReport(report, symbol) {
+    if (!report.history) return renderLegacyCompactReport(report, symbol);
+    const { company, products, history, management, industry, thesis, risks } = report;
+    const pair = (label, value) => `<p><b>${escapeHtml(label)}：</b>${escapeHtml(value)}</p>`;
+    const chapter = (number, english, title, body, context) => `<article class="quick-topic brief-chapter">
+      <h3><span>${number}</span> ${title}<small class="brief-section-label">${english}</small></h3>
+      ${body}${renderSectionAskButton(title, context)}</article>`;
+    return `<section class="quick-overview compact-report brief-report">
+      <span class="quick-overview__eyebrow">COMPANY BRIEF · 公司研究短報</span>
+      <h2>${escapeHtml(company.symbol || symbol)}，七個重點看懂公司</h2>
+      ${chapter('01', 'Business', '公司業務與商業模式', `<p>${escapeHtml(company.overview)}</p>
+        ${pair('如何賺錢', company.revenue)}${pair('主要客戶', company.customers)}`, company)}
+      ${chapter('02', 'Segments', '業務分部', `<div class="compact-products">${products.map(item =>
+        `<div class="compact-product"><h4>${escapeHtml(item.name)}</h4>
+        <p>${item.examples.map(escapeHtml).join('、')}</p><p>${escapeHtml(item.significance)}</p></div>`).join('')}</div>
+        ${renderRevenuePlaceholder()}`, products)}
+      ${chapter('03', 'History &amp; Footprint', '發展歷程與營運布局',
+        pair('發展轉折', history.milestones) + pair('營運布局', history.footprint), history)}
+      ${chapter('04', 'Management &amp; Strategy', '經營團隊與策略',
+        pair('經營團隊', management.team) + pair('策略方向', management.strategy), management)}
+      ${chapter('05', 'Industry &amp; Competition', '產業與競爭',
+        pair('產業與對手', industry.competition) + pair('差異與限制', industry.advantage), industry)}
+      ${chapter('06', 'Thesis', '核心研究論點', `<div class="brief-thesis">${pair('關注理由', thesis.opportunity)}
+        ${pair('成立條件／反證', thesis.condition)}</div>`, thesis)}
+      ${chapter('07', 'Risks', '主要風險', `<ol class="compact-signals">${risks.map(item =>
+        `<li><strong>${escapeHtml(item.risk)}</strong><p>${escapeHtml(item.reason)}</p>
+        <p class="compact-watch"><b>觀察：</b>${escapeHtml(item.watch)}</p></li>`).join('')}</ol>`, risks)}
+      <p class="quick-overview__hint">研究論點包含推論，不是買賣建議。來源不足會明確註明；可用各節的 AI 追問深入了解。</p>
+    </section>`;
+  }
+
+  function renderLegacyCompactReport(report, symbol) {
     const { company, products, growth, risks, financialWatch } = report;
     const signals = (items, titleKey) => `<ol class="compact-signals">${items.map(item => `<li>
       <strong>${escapeHtml(item[titleKey])}</strong><p>${escapeHtml(item.reason)}</p>
@@ -1259,8 +1300,8 @@
   }
 
   function readCompanySections(data) {
-    if (data.report && (data.reportFormat === 'compact-v1' || data.report.company)) {
-      return { compactReport: validateCompactReport(data.report), reportText: '' };
+    if (data.report && (['compact-v1', 'compact-v2'].includes(data.reportFormat) || data.report.company)) {
+      return { compactReport: validateCompactReport(data.report, data.reportFormat), reportText: '' };
     }
     const compactStart = '<!-- COMPACT_REPORT_START -->';
     if (!data.report && typeof data.text === 'string' && data.text.includes(compactStart)) {
@@ -1317,7 +1358,7 @@
     fetchBtn.disabled = true;
     fetchBtn.textContent = "正在分析數據...";
     debugEl.textContent = "查詢中…正在分析數據...";
-    resultEl.innerHTML = "<p>正在整理公司介紹、產品、成長風險與財報觀察。首次生成可能需要 1–3 分鐘；相同股票若有近期報告會優先讀取。</p>";
+    resultEl.innerHTML = "<p>正在整理業務、分部、歷程、團隊策略、產業競爭、研究論點與風險七個短章節。首次生成可能需要 1–3 分鐘；相同股票若有近期報告會優先讀取。</p>";
     let stopAdoptionCard = () => {};
     if (!session?.user || session.user.is_anonymous) {
       const adoptionContainer = document.createElement('div');

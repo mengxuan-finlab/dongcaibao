@@ -214,6 +214,17 @@ body::before {
 #result .quick-topic__risks p { margin: 4px 0 0; color: #646477; font-size: 14px; }
 .quick-topic .quick-metrics { margin-top: 0; }
 
+.brief-report .compact-products { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+#result .brief-chapter > p { margin: 8px 0; font-size: 14px; line-height: 1.8; }
+.brief-section-label { margin-left: auto; color: #7a8395; font-size: 11px; font-weight: 500; letter-spacing: .03em; }
+.brief-thesis { padding: 16px 20px; border-left: 3px solid #6d5dd3; background: #f3f1fb; border-radius: 0 10px 10px 0; }
+#result .brief-thesis p { margin: 6px 0; color: #536176; font-size: 14px; line-height: 1.8; }
+@media (max-width: 720px) {
+  .brief-report .compact-products { grid-template-columns: minmax(0, 1fr); }
+  .brief-section-label { flex-basis: 100%; margin-left: 0; }
+  .brief-chapter > h3 { flex-wrap: wrap; }
+}
+
 .compact-business-route,
 .compact-outlook {
   display: grid;

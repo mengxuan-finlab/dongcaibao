@@ -46,7 +46,7 @@ function buildContract(basePrompt) {
     if (end < 0) throw new Error('Missing prompt template: COMPACT_REPORT');
     const template = JSON.parse(basePrompt.slice(start + compactStart.length, end).trim());
     return {
-      schema: schemaFor(template, '', true), reportFormat: 'compact-v1', maxOutputTokens: 8192,
+      schema: schemaFor(template, '', true), reportFormat: template.history ? 'compact-v2' : 'compact-v1', maxOutputTokens: 8192,
       prompt: basePrompt.slice(0, start) + '輸出單一完整 JSON 物件，不要 HTML 標記、Markdown 或程式碼圍欄。欄位格式：\n' + JSON.stringify(template)
     };
   }
