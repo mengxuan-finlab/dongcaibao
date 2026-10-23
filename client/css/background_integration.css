@@ -58,6 +58,43 @@ body::before {
 }
 
 
+.revenue-section {
+  margin: 28px 0;
+  padding: 24px;
+  background: #f4f6fb;
+  border: 1px solid #e1e5ef;
+  border-radius: 16px;
+  color: #35445a;
+}
+
+#result .revenue-section h3 { margin: 0 0 18px; color: #35445a; font-size: 20px; }
+#result .revenue-section h4 { margin: 0 0 10px; color: #35445a; font-size: 17px; }
+#result .revenue-section p { color: #637086; font-size: 13px; line-height: 1.8; }
+.revenue-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.revenue-card { min-width: 0; padding: 20px; border-radius: 12px; background: white; }
+.revenue-pie { display: block; width: min(100%, 240px); height: auto; margin: 16px auto; }
+.revenue-table-scroll { overflow-x: auto; }
+.revenue-card table { width: 100%; border-collapse: collapse; font-size: 12px; color: #35445a; }
+.revenue-card caption { text-align: left; margin: 12px 0; color: #637086; }
+.revenue-card th, .revenue-card td { padding: 10px 6px; border-bottom: 1px solid #e9edf4; text-align: right; }
+.revenue-card th:first-child { text-align: left; overflow-wrap: anywhere; }
+.revenue-card tbody th { font-weight: 500; }
+.revenue-card td { white-space: nowrap; }
+.revenue-swatch { display: inline-block; width: 9px; height: 9px; margin-right: 7px; border-radius: 3px; }
+.revenue-bars { display: grid; gap: 16px; margin: 24px 0; }
+.revenue-bar-row > div:first-child { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; }
+.revenue-bar-row span { overflow-wrap: anywhere; }
+.revenue-bar-track { margin-top: 7px; height: 12px; border-radius: 6px; background: #eef1f7; overflow: hidden; }
+.revenue-bar-track > span { display: block; height: 100%; border-radius: inherit; }
+#result .revenue-section .revenue-note { margin: 18px 0 0; font-size: 12px; }
+.revenue-note a { color: #5a4db1; }
+
+@media (max-width: 800px) {
+  .revenue-grid { grid-template-columns: minmax(0, 1fr); }
+  .revenue-section { padding: 16px 10px; }
+  .revenue-card { padding: 16px 12px; }
+}
+
 .quick-overview {
   margin: 28px 0;
   padding: clamp(20px, 4vw, 42px);

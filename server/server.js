@@ -12,6 +12,73 @@ const { installedSdkVersion, createGeminiCaller, retryDelayMs, httpStatus, error
 const { createSupabaseReportStore } = require('./report-store');
 const { getBasePrompt, normalizeSymbol, detectMarket, buildSearchQueries } = require('./company-prompt');
 const { ADOPTION_API, createAdoptionFeed } = require('./adoption');
+const KINDS = {
+  product: 'revenue-product-segmentation',
+  geographic: 'revenue-geographic-segmentation'
+};
+
+function normalizeSegments(rows, symbol) {
+  if (!Array.isArray(rows)) return { status: 'unavailable' };
+  const annual = rows.filter(row => row && row.symbol === symbol && row.period === 'FY'
+    && /^\d{4}-\d{2}-\d{2}$/.test(row.date) && Number.isFinite(Date.parse(row.date)));
+  annual.sort((a, b) => b.date.localeCompare(a.date));
+  const row = annual[0];
+  if (!row || !row.data || typeof row.data !== 'object' || Array.isArray(row.data)
+      || !/^[A-Z]{3}$/.test(row.reportedCurrency || '')) return { status: 'unavailable' };
+  const values = Object.entries(row.data).filter(([name]) =>
+    !/^(total|totalrevenue|totalrevenues|totalnet sales|net sales|revenue|revenues)$/i.test(name.trim()));
+  if (!values.length) return { status: 'empty' };
+  // Negative adjustments and malformed amounts cannot form a faithful pie chart.
+  if (values.some(([, value]) => typeof value !== 'number' || !Number.isFinite(value) || value < 0)) {
+    return { status: 'unsupported_values' };
+  }
+  const items = values.filter(([name, value]) => name.trim() && value > 0)
+    .map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
+  const total = items.reduce((sum, item) => sum + item.value, 0);
+  if (!items.length || !Number.isFinite(total) || total <= 0) return { status: 'empty' };
+  return {
+    status: 'ok', date: row.date, fiscalYear: row.fiscalYear || row.date.slice(0, 4),
+    period: 'FY', currency: row.reportedCurrency, total,
+    items: items.map(item => ({ ...item, share: item.value / total }))
+  };
+}
+
+function createRevenueFeed({ fetchRows, now = Date.now }) {
+  const cache = new Map();
+  const pending = new Map();
+  return async symbol => {
+    const saved = cache.get(symbol);
+    if (saved && saved.expires > now()) return saved.value;
+    if (pending.has(symbol)) return pending.get(symbol);
+    if (pending.size >= 4) return { product: { status: 'busy' }, geographic: { status: 'busy' } };
+    const task = (async () => {
+      const pairs = await Promise.all(Object.entries(KINDS).map(async ([kind, endpoint]) => {
+        try { return [kind, normalizeSegments(await fetchRows(endpoint, symbol), symbol)]; }
+        catch (error) {
+          const status = error?.response?.status;
+          return [kind, { status: status === 401 || status === 403 ? 'restricted' : 'unavailable' }];
+        }
+      }));
+      const value = Object.fromEntries(pairs);
+      const complete = pairs.every(([, result]) => result.status === 'ok');
+      if (cache.size >= 128) cache.delete(cache.keys().next().value);
+      cache.set(symbol, { value, expires: now() + (complete ? 86400000 : 300000) });
+      return value;
+    })();
+    pending.set(symbol, task);
+    try { return await task; } finally { pending.delete(symbol); }
+  };
+}
+const getRevenueSegments = createRevenueFeed({
+  fetchRows: async (endpoint, symbol) => {
+    const response = await axios.get(`https://financialmodelingprep.com/stable/${endpoint}`, {
+      params: { symbol, period: 'annual', apikey: process.env.FMP_API_KEY },
+      timeout: 10000, maxContentLength: 2 * 1024 * 1024, maxRedirects: 0
+    });
+    return response.data;
+  }
+});
+const revenueRequests = new Map();
 const getAdoptionCard = createAdoptionFeed({
   fetchRows: async () => {
     const response = await axios.get(ADOPTION_API, {
@@ -655,6 +722,33 @@ app.get('/api/pro-metrics', async (req, res) => {
   } catch (e) {
     console.error("[Pro API Error]", e.message);
     res.status(500).json({ error: "抓取數據失敗，請確認 API Key 有效性" });
+  }
+});
+
+app.get('/api/fmp/revenue-segmentation', async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  const symbol = normalizeSymbol(req.query.symbol);
+  if (!/^[A-Z][A-Z0-9.\-]{0,19}$/.test(symbol)) {
+    return res.status(400).json({ error: '此圖表目前僅支援有效美股代碼。' });
+  }
+  const now = Date.now();
+  for (const [ip, entry] of revenueRequests) {
+    if (entry.until <= now) revenueRequests.delete(ip);
+  }
+  const entry = revenueRequests.get(req.ip) || { count: 0, until: now + 60000 };
+  if (entry.count >= 20 || (!revenueRequests.has(req.ip) && revenueRequests.size >= 10000)) {
+    res.set('Retry-After', '60');
+    return res.status(429).json({ error: '圖表查詢過於頻繁，請稍後再試。' });
+  }
+  entry.count += 1;
+  revenueRequests.set(req.ip, entry);
+  if (!process.env.FMP_API_KEY) {
+    return res.status(503).json({ error: '營收圖表資料服務尚未設定。' });
+  }
+  try {
+    res.json({ symbol, source: 'Financial Modeling Prep', ...await getRevenueSegments(symbol) });
+  } catch {
+    res.status(502).json({ error: '營收圖表暫時無法載入，公司報告不受影響。' });
   }
 });
 

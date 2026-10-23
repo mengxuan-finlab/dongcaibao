@@ -51,6 +51,81 @@
   </div>
 
   <script>
+(() => {
+  const COLORS = ['#6d5dd3', '#249b91', '#df9b38', '#d66b85', '#528bc5', '#8caa4e', '#a16ac0', '#877266'];
+  const escape = value => String(value ?? '').replace(/[&<>"']/g, char =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
+  const percent = share => `${(share * 100).toLocaleString('zh-TW', { maximumFractionDigits: 1 })}%`;
+  const amount = (value, currency) => `${new Intl.NumberFormat('zh-TW', {
+    notation: 'compact', maximumFractionDigits: 2
+  }).format(value)} ${escape(currency)}`;
+
+  function pie(items) {
+    let angle = -Math.PI / 2;
+    const slices = items.map((item, index) => {
+      const color = COLORS[index % COLORS.length];
+      const title = `<title>${escape(item.name)}：${percent(item.share)}</title>`;
+      if (items.length === 1) return `<circle cx="120" cy="120" r="108" fill="${color}">${title}</circle>`;
+      const start = [120 + 108 * Math.cos(angle), 120 + 108 * Math.sin(angle)];
+      angle += item.share * Math.PI * 2;
+      const end = [120 + 108 * Math.cos(angle), 120 + 108 * Math.sin(angle)];
+      return `<path d="M120 120 L${start.join(' ')} A108 108 0 ${item.share > 0.5 ? 1 : 0} 1 ${end.join(' ')} Z"
+        fill="${color}" stroke="white" stroke-width="1.5">${title}</path>`;
+    }).join('');
+    return `<svg class="revenue-pie" viewBox="0 0 240 240" role="img" aria-label="產品營收圓餅圖，詳細數字見下方表格">${slices}</svg>`;
+  }
+
+  function card(data, kind) {
+    const product = kind === 'product';
+    const title = product ? '產品營收組成' : '地區營收分布';
+    const messages = {
+      restricted: '目前 FMP 金鑰或方案無權存取這項資料。',
+      unsupported_values: '資料包含負值調整或無效金額，為避免誤導，暫不繪製組成圖。',
+      busy: '圖表資料服務繁忙，請稍後再查詢。',
+      empty: '目前沒有可繪製的分項營收資料。'
+    };
+    if (data?.status !== 'ok') return `<article class="revenue-card"><h4>${title}</h4>
+      <p>${messages[data?.status] || '目前無法取得年度分項資料，可能尚未披露、未收錄或服務暫時無法使用。'}</p></article>`;
+    const rows = data.items.map((item, index) => `<tr><th scope="row">
+      <span class="revenue-swatch" style="background:${COLORS[index % COLORS.length]}"></span>${escape(item.name)}</th>
+      <td title="${escape(item.value.toLocaleString('zh-TW'))} ${escape(data.currency)}">${amount(item.value, data.currency)}</td>
+      <td>${percent(item.share)}</td></tr>`).join('');
+    const graphic = product ? pie(data.items) : `<div class="revenue-bars" aria-hidden="true">${data.items.map((item, index) =>
+      `<div class="revenue-bar-row"><div><span>${escape(item.name)}</span><b>${percent(item.share)}</b></div>
+      <div class="revenue-bar-track"><span style="width:${item.share * 100}%;background:${COLORS[index % COLORS.length]}"></span></div></div>`).join('')}</div>`;
+    return `<article class="revenue-card"><h4>${title}</h4>
+      <p class="revenue-period">FY ${escape(data.fiscalYear)}｜年度截至 ${escape(data.date)}｜${escape(data.currency)}</p>
+      ${graphic}<div class="revenue-table-scroll"><table><caption>${title}明細</caption>
+      <thead><tr><th scope="col">${product ? '產品／業務' : '地區'}</th><th scope="col">營收</th><th scope="col">占比</th></tr></thead>
+      <tbody>${rows}</tbody></table></div></article>`;
+  }
+
+  window.loadRevenueCharts = async (container, backendUrl, symbol) => {
+    if (!container) return;
+    if (/^\d{4}(\.TW|\.TWO)?$/i.test(symbol)) {
+      container.innerHTML = '<p>此營收圖表目前提供美股資料；台股公司介紹不受影響。</p>';
+      return;
+    }
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    try {
+      const url = new URL('/api/fmp/revenue-segmentation', backendUrl);
+      url.searchParams.set('symbol', symbol);
+      const response = await fetch(url, { signal: controller.signal });
+      if (!response.ok) throw new Error('Revenue data unavailable');
+      const data = await response.json();
+      if (!container.isConnected) return;
+      container.innerHTML = `<div class="revenue-grid">${card(data.product, 'product')}${card(data.geographic, 'geographic')}</div>
+        <p class="revenue-note">來源：<a href="https://financialmodelingprep.com/" target="_blank" rel="noopener noreferrer">Financial Modeling Prep</a>。
+        各圖採最新可取得年度，兩圖財年可能不同；占比以該圖已披露分項合計計算，不代表已與公司總營收核對。
+        保留來源分類原名，分類可能包含重疊項；資料由 API 提供，非 AI 推估。</p>`;
+    } catch {
+      if (container.isConnected) container.innerHTML = '<p>營收圖表暫時無法載入，公司介紹與 AI 追問仍可使用。</p>';
+    } finally {
+      clearTimeout(timeout);
+    }
+  };
+})();
   const BACKEND_URL = "https://dongcaibao.onrender.com/api/analyze-stock";
 
   const supabaseUrl = "https://zlkexplsleznuebighte.supabase.co";
@@ -1112,6 +1187,13 @@
     return report;
   }
 
+  function renderRevenuePlaceholder() {
+    return `<section class="revenue-section" aria-label="實際營收結構">
+      <h3>實際營收結構</h3><div id="revenueCharts" aria-live="polite">
+        <p>正在載入產品與地區營收圖表，不影響公司報告閱讀…</p>
+      </div></section>`;
+  }
+
   function renderCompactReport(report, symbol) {
     const { company, products, growth, risks, financialWatch } = report;
     const signals = (items, titleKey) => `<ol class="compact-signals">${items.map(item => `<li>
@@ -1139,6 +1221,7 @@
         </div>`).join('')}</div>
         ${renderSectionAskButton('主要產品與服務', products)}
       </article>
+      ${renderRevenuePlaceholder()}
       <article class="quick-topic">
         <h3><span>03</span> 成長動能與風險</h3>
         <div class="compact-outlook">
@@ -1171,6 +1254,7 @@
       renderReadingChapter('主要產品與服務', productPortfolio?.overview, renderProductPortfolio(productPortfolio)) +
       renderResearchDashboard(dashboard, symbol) + marked.parse(reportText);
     return renderQuickOverview(coreSummary, dashboard, valueChain, symbol, productPortfolio) +
+      renderRevenuePlaceholder() +
       renderReadingChapter('深入閱讀', '展開舊版完整分析', fullReportHtml);
   }
 
@@ -1301,6 +1385,12 @@
         ${data.sourceInfo.limited ? "<p>部分搜尋來源暫時不足，缺乏依據的內容會標為未披露；本份報告不會存入共用快取。</p>" : ""}
       </aside>` : "";
       resultElement.innerHTML = sourceNotice + renderCompanyReport(sections, symbol, chartHtml);
+      const revenueContainer = document.getElementById('revenueCharts');
+      if (typeof window.loadRevenueCharts === 'function') {
+        window.loadRevenueCharts(revenueContainer, BACKEND_URL, symbol);
+      } else {
+        revenueContainer.textContent = '圖表元件尚未載入，請重新整理；公司報告不受影響。';
+      }
 
      
       currentSearchContext = data.searchContext; 
