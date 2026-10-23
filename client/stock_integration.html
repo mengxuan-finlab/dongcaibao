@@ -1165,7 +1165,6 @@
       ${sections.map(([id, english, title, body, context, hidden], i) => `<article id="brief-${id}" class="quick-topic brief-chapter"${id === 'segments' ? ' data-segment-chapter' : ''}${hidden ? ' hidden' : ''}>
         <header><span>${String(i + 1).padStart(2, '0')} / ${escapeHtml(english)}</span><h3>${escapeHtml(title)}</h3></header>
         ${body}</article>`).join('')}
-      <p class="quick-overview__hint">研究論點含推論，非買賣建議。營收圖表來自 FMP。</p>
       </section></div>`;
   }
 
@@ -1288,7 +1287,7 @@
     fetchBtn.disabled = true;
     fetchBtn.textContent = "正在分析數據...";
     debugEl.textContent = "查詢中…正在分析數據...";
-    resultEl.innerHTML = "<p>正在整理業務、分部、歷程、團隊策略、產業競爭、研究論點與風險七個短章節。首次生成可能需要 1–3 分鐘；相同股票若有近期報告會優先讀取。</p>";
+    resultEl.innerHTML = "<p>正在整理業務、分部、歷程、團隊策略、產業競爭、研究論點與風險七個短章節。首次生成可能需要 1–3 分鐘。</p>";
     let stopAdoptionCard = () => {};
     if (!session?.user || session.user.is_anonymous) {
       const adoptionContainer = document.createElement('div');
