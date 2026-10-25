@@ -2,16 +2,62 @@
 
 ## Deployment
 
-The production report is now `compact-v2`: Business, Segments, History &
+The production report is now `compact-v3`: Business, Segments, History &
 Footprint, Management & Strategy, Industry & Competition, Thesis, and Risks.
 The writing target is 450-650 Chinese characters, with short statements rather
 than a full dashboard. FMP product/geographic charts load separately inside
-Segments and do not add Gemini calls. Output budget remains 8192 tokens.
+Segments and do not add Gemini calls. Segments has no AI-authored fields in v3;
+the backend drops any extra `products` field a JSON-only retry might return.
+Missing FMP data hides the section rather than producing guessed numbers.
+Each available FMP chart includes a short deterministic reading of its largest
+two disclosed segments. This text uses the same amounts/shares as the chart,
+not another AI call; a single disclosed segment is not treated as evidence of
+only one company-wide revenue source.
+Output budget remains 8192 tokens.
 This does not guarantee availability or eliminate provider 503 errors.
 
+Company reports now enable `{ googleSearch: {} }` and `{ urlContext: {} }` in
+the existing `generateContent` call, alongside the JSON schema. Gemini 3's
+tool/structured-output combination is preview functionality; keep a compatible
+Gemini 3 primary/fallback model. SDK 2.24.0 already exposes both tools.
+There is no separate SerpApi call in `/api/analyze-stock`. News radar still uses
+SerpApi, so do not remove `SERPAPI_KEY` just because company reports changed.
+No new environment variables or SQL migrations are needed for this change.
+
+The prompt asks Search to find primary sources and URL Context to read relevant
+pages according to chapter-specific source priorities:
+
+- Business: latest filed 10-K Item 1, with official IR Overview as fallback.
+- Segments: FMP JSON only, with no search or AI-generated revenue allocation.
+- History & Footprint: official About/History, then grounded public event history.
+- Management & Strategy: latest available earnings-call transcript; official
+  same-quarter results/deck as an explicitly named fallback. Verify current
+  leaders separately using official leadership pages.
+- Industry & Competition: grounded multi-source competitor/industry analysis.
+- Thesis: a supplied public research URL if present; otherwise grounded,
+  dated market arguments and counterarguments, checked against official facts.
+- Risks: 10-K Item 1A and newer 10-Q risk updates. Reuse the annual report URL.
+
+These are model instructions, not a deterministic per-chapter fetch pipeline.
+No per-company URLs were supplied, so Search discovers them. The app does not
+invent section anchors, bypass paywalls, or claim a blocked transcript was read.
+For foreign issuers or Taiwan stocks, equivalent official filings replace 10-K.
+Tool execution is model-driven: enabling URL Context is not proof that
+every linked page was read. Only successful `urlContextMetadata` retrievals
+get a read-page label. Search chunks and successful retrievals are deduplicated
+into the source list; a response with no usable tool sources fails validation.
+Source lists are not a claim of sentence-level verification or full coverage.
+Google's returned Search Suggestions HTML is displayed in a script-disabled
+sandboxed iframe; citation links accept only HTTPS URLs without credentials.
+See the official Search, URL Context, and structured-output documentation:
+https://ai.google.dev/gemini-api/docs/generate-content/google-search
+https://ai.google.dev/gemini-api/docs/generate-content/url-context
+https://ai.google.dev/gemini-api/docs/generate-content/structured-output
+Search tool calls and retrieved content can incur additional provider charges.
+
 Deploy the compatible frontend to **Vercel first**, then the backend to Render.
-The new frontend accepts both compact versions and legacy full reports. Deploy
-it before a backend that returns compact-v2 fields. The prompt/schema digest gives
+The new frontend accepts all three compact versions and legacy full reports. Deploy
+it before a backend that returns compact-v3 fields. The prompt/schema digest gives
 compact reports a different cache key; old full cache rows need not be deleted.
 
 1. In the existing Supabase project's SQL Editor, run
@@ -35,8 +81,9 @@ abort signal. After applying SQL, retry after the cooldown or restart the servic
 ## Retry Budget and Diagnostics
 
 Company reports have a 65-second per-call ceiling and a 130-second total AI
-budget measured with a monotonic clock. Search, authentication and cache I/O are
-outside that AI budget. The browser retains its separate 210-second deadline.
+budget measured with a monotonic clock. Google Search and URL Context are inside
+the model call and therefore inside this budget; authentication and cache I/O
+remain outside it. The browser retains its separate 210-second deadline.
 
 The application allows at most four SDK calls overall. Retryable API failures
 (including 503/504) retry the same model at most twice, with approximately
@@ -50,7 +97,9 @@ JSON parsing, incomplete generation and local schema validation failures are
 separate from API failures. They do not trigger API backoff. One alternative
 output attempt is allowed; partial reports are never returned as successful.
 A provider schema rejection (HTTP 400) still gets one JSON-only compatibility
-attempt, within the same global call and time limits.
+attempt, within the same global call and time limits. Both retrieval tools stay
+enabled during this retry; the application does not silently fall back to an
+ungrounded report. Local JSON validation is unchanged.
 
 - `gemini_http`: actual HTTP status and time until response headers.
 - `gemini_call`: complete SDK call duration, including response decoding or the
@@ -58,10 +107,12 @@ attempt, within the same global call and time limits.
 - `company_report_attempt`: report generation and validation outcome, attempt,
   timeout, elapsed time, and an explicit error source (`gemini_api`,
   `client_timeout`, `network`, `sdk`, `json_parse`, `generation_finish`, or
-  `report_validation`). Output validation failures keep HTTP status **200**;
+  `report_validation` or `report_grounding`). Output validation failures keep HTTP status **200**;
   no-response errors use **null**, never `NaN` or a fabricated status code.
 - The request ID, model, attempt and label correlate these events. API keys,
   authorization headers, full prompts and generated reports are not logged.
+- `company_report_sources`: source count, actual search query count and successful
+  URL retrieval count, without logging full source text.
 
 ## Persistent Cache
 
@@ -71,8 +122,10 @@ Only public company-report content/search context is stored, never user IDs,
 sessions or authentication headers.
 
 Cache keys include market, normalized symbol, and a digest of the prompt, local
-schema and configured models. Complete reports with sufficient search coverage
-are saved for three days (72 hours); incomplete output, failed calls and source-limited
+schema, configured models and retrieval provider/version. Switching away from
+SerpApi invalidates old cache keys without deleting the old rows. Structurally
+complete reports with tool-provided sources are saved for three days (72 hours);
+incomplete output, failed calls and source-limited
 reports are never saved. Database hits are revalidated against the current
 schema, and loading an existing row does not extend its expiry. DB failures do
 not turn a successfully generated report into an API failure.

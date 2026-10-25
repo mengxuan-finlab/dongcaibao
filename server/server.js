@@ -7,10 +7,10 @@ const { GoogleGenAI } = require("@google/genai");
 const { createClient } = require('@supabase/supabase-js');
 const guestAccess = require('./guest-access');
 const { randomUUID, createHash } = require('crypto');
-const { generateValidatedReport, collectSearchResults, createReportCache, buildContract, validateReport, reportErrorResponse } = require('./company-report');
+const { generateValidatedReport, createReportCache, buildContract, validateReport, reportErrorResponse } = require('./company-report');
 const { installedSdkVersion, createGeminiCaller, retryDelayMs, httpStatus, errorSource, safeErrorMessage } = require('./gemini-runtime');
 const { createSupabaseReportStore } = require('./report-store');
-const { getBasePrompt, normalizeSymbol, detectMarket, buildSearchQueries } = require('./company-prompt');
+const { getBasePrompt, normalizeSymbol, detectMarket } = require('./company-prompt');
 const { ADOPTION_API, createAdoptionFeed } = require('./adoption');
 const KINDS = {
   product: 'revenue-product-segmentation',
@@ -131,30 +131,6 @@ function isRetryableGeminiError(error) {
 
 function wait(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-async function searchCompany(query, num) {
-  for (let attempt = 1; attempt <= 2; attempt += 1) {
-    try {
-      const response = await axios.get("https://serpapi.com/search.json", {
-        params: { engine: "google", q: query, api_key: process.env.SERPAPI_KEY, num, hl: "zh-tw", gl: "tw" },
-        timeout: 20000
-      });
-      if (response.data.error || !response.data.organic_results?.length) {
-        const error = new Error('搜尋服務未提供有效結果。');
-        error.status = 502;
-        throw error;
-      }
-      return response;
-    } catch (error) {
-      const status = Number(error.response?.status || error.status);
-      const retryable = [429, 500, 502, 503, 504].includes(status)
-        || ["ECONNABORTED", "ECONNRESET", "ETIMEDOUT"].includes(error.code);
-      console.warn(`[公司搜尋] 第 ${attempt} 次失敗，狀態: ${status || error.code || "unknown"}`);
-      if (!retryable || attempt === 2) throw error;
-      await wait(800);
-    }
-  }
 }
 
 async function runGeminiWithFallback(operation, label = "Gemini") {
@@ -462,42 +438,37 @@ app.post('/api/analyze-stock', async (req, res) => {
     const { schema: reportSchema } = buildContract(getBasePrompt(normalizedSymbol, '', market));
     const reportVersion = createHash('sha256').update(JSON.stringify({
       prompt: getBasePrompt(normalizedSymbol, '', market), schema: reportSchema,
-      models: [GEMINI_PRIMARY_MODEL, GEMINI_FALLBACK_MODEL], version: 1
+      models: [GEMINI_PRIMARY_MODEL, GEMINI_FALLBACK_MODEL], provider: 'google_search_url_context', version: 2
     })).digest('hex').slice(0, 24);
     const cacheKey = `company:${market}:${normalizedSymbol}:${reportVersion}`;
     const reportResult = await getCompanyReport(cacheKey, async () => {
-      // Balance coverage across business model, competitors and official filings.
-      const searchNum = 12;
-      const searchQueries = buildSearchQueries(normalizedSymbol, market);
-      const perQueryNum = Math.max(3, Math.ceil(searchNum / searchQueries.length));
-      const searchResponses = await Promise.allSettled(
-        searchQueries.map(query => searchCompany(query, perQueryNum))
-      );
-      const { results: searchResults, successfulQueries, limited } = collectSearchResults(searchResponses, searchQueries, searchNum);
-
-      const searchContext = searchResults.map((item, index) =>
-        `[資料 ${index + 1}] 搜尋主題「${item.query}」｜${item.title}: ${item.snippet}\n網址：${item.link || '未提供'}`
-      ).join("\n\n");
-
-      const finalPrompt = getBasePrompt(normalizedSymbol, searchContext, market);
+      const finalPrompt = getBasePrompt(normalizedSymbol, `查證日期：${new Date().toISOString().slice(0, 10)}。請使用已啟用的 Google Search 與 URL Context 工具查證。`, market);
       let attempt = 0;
       const generated = await generateValidatedReport({
         basePrompt: finalPrompt,
+        grounded: true,
         models: [GEMINI_PRIMARY_MODEL, GEMINI_FALLBACK_MODEL],
         generate: args => callGemini(args, { requestId, label: '公司報告', attempt: ++attempt }),
         isRetryable: isRetryableGeminiError,
         log: info => console.warn('[公司分析重試]', { requestId, ...info })
       });
-      console.log(`[公司分析] 完整報告驗證成功，模型: ${generated.modelName}, 資料筆數: ${searchResults.length}`);
+      const { sources, searchQueries } = generated.grounding;
+      const retrievedCount = sources.filter(source => source.retrieved).length;
+      const searchContext = sources.map((source, index) => `[來源 ${index + 1}] ${source.title}\n${source.url}`).join('\n\n');
+      console.log('[公司分析]', { requestId, model: generated.modelName, provider: 'google_search_url_context',
+        sourceCount: sources.length, searchQueryCount: searchQueries.length, retrievedCount });
       return {
         ...generated, searchContext,
         generatedAt: new Date().toISOString(),
-        sourceInfo: { count: searchResults.length, successfulQueries, totalQueries: searchQueries.length, limited }
+        sourceInfo: { provider: 'google_search_url_context', count: sources.length,
+          searchQueryCount: searchQueries.length, retrievedCount, limited: false }
       };
     }, value => {
       validateReport(value.report, reportSchema);
       if (!value.sourceInfo || typeof value.sourceInfo.limited !== 'boolean'
-          || !Number.isInteger(value.sourceInfo.count) || value.sourceInfo.count < 4
+          || value.sourceInfo.provider !== 'google_search_url_context'
+          || !Number.isInteger(value.sourceInfo.count) || value.sourceInfo.count < 1
+          || !Array.isArray(value.grounding?.sources) || value.grounding.sources.length !== value.sourceInfo.count
           || typeof value.searchContext !== 'string' || !value.searchContext.trim()
           || !Number.isFinite(Date.parse(value.generatedAt))) {
         throw new Error('Cached report metadata is incomplete');

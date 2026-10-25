@@ -66,8 +66,13 @@
 
   function card(data, kind) {
     const product = kind === 'product';
-    const title = product ? '產品營收組成' : '地區營收分布';
+    const title = product ? '業務／產品營收組成' : '地區營收分布';
     if (data?.status !== 'ok' || !Array.isArray(data.items) || !data.items.length) return '';
+    const ranked = [...data.items].sort((a, b) => b.value - a.value);
+    const [largest, second] = ranked;
+    const reading = ranked.length === 1
+      ? `這份資料僅列出「${escape(largest.name)}」一個${product ? '業務／產品' : '地區'}分項，不能據此認定公司沒有其他收入來源。`
+      : `在已披露的${product ? '業務／產品' : '地區'}分項中，「${escape(largest.name)}」占比最高，為 ${percent(largest.share)}；其次是「${escape(second.name)}」，占 ${percent(second.share)}。`;
     const rows = data.items.map((item, index) => `<tr><th scope="row">
       <span class="revenue-swatch" style="background:${COLORS[index % COLORS.length]}"></span>${escape(item.name)}</th>
       <td title="${escape(item.value.toLocaleString('zh-TW'))} ${escape(data.currency)}">${amount(item.value, data.currency)}</td>
@@ -79,7 +84,8 @@
       <p class="revenue-period">FY ${escape(data.fiscalYear)}｜年度截至 ${escape(data.date)}｜${escape(data.currency)}</p>
       ${graphic}<div class="revenue-table-scroll"><table><caption>${title}明細</caption>
       <thead><tr><th scope="col">${product ? '產品／業務' : '地區'}</th><th scope="col">營收</th><th scope="col">占比</th></tr></thead>
-      <tbody>${rows}</tbody></table></div></article>`;
+      <tbody>${rows}</tbody></table></div>
+      <div class="revenue-reading"><strong>圖表解讀</strong><p>${reading}</p></div></article>`;
   }
 
   window.loadRevenueCharts = async (container, backendUrl, symbol) => {
@@ -1099,8 +1105,10 @@
     if (!report?.company || !['symbol', 'overview', 'revenue', 'customers'].every(key => text(report.company[key]))) {
       throw new Error('公司報告格式不完整，請稍後再試。');
     }
-    const sevenSections = format === 'compact-v2' || ['history', 'management', 'industry', 'thesis'].some(key => key in report);
-    const fields = { products: ['name', 'significance'], risks: ['risk', 'reason', 'watch'] };
+    const sevenSections = ['compact-v2', 'compact-v3'].includes(format) || ['history', 'management', 'industry', 'thesis'].some(key => key in report);
+    const fmpOnlySegments = format === 'compact-v3' || (sevenSections && !Object.hasOwn(report, 'products'));
+    const fields = { risks: ['risk', 'reason', 'watch'] };
+    if (!fmpOnlySegments) fields.products = ['name', 'significance'];
     if (sevenSections) {
       const sections = { history: ['milestones', 'footprint'], management: ['team', 'strategy'],
         industry: ['competition', 'advantage'], thesis: ['opportunity', 'condition'] };
@@ -1123,6 +1131,24 @@
     return report;
   }
 
+  function renderReportSources(data) {
+    if (!Array.isArray(data.grounding?.sources)) return '';
+    const sources = data.grounding.sources.filter(source => {
+      try {
+        const url = new URL(source.url);
+        return url.protocol === 'https:' && !url.username && !url.password;
+      } catch { return false; }
+    });
+    const widget = typeof data.grounding.searchEntryPointHtml === 'string' ? data.grounding.searchEntryPointHtml : '';
+    return `<aside class="report-sources" aria-label="搜尋與參考來源">
+      ${sources.length ? `<details><summary>參考來源 · ${sources.length} 筆</summary><ol>${sources.map(source =>
+        `<li><a href="${escapeHtml(source.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(source.title || new URL(source.url).hostname)}</a>
+        ${source.retrieved ? '<small>已由 URL Context 讀取</small>' : ''}</li>`).join('')}</ol>
+        <p>來源清單不代表每個敘述均已逐句核對；網頁讀取標記僅依 API 回傳紀錄顯示。</p></details>` : ''}
+      ${widget ? `<iframe title="Google 搜尋建議" sandbox="allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" srcdoc="${escapeHtml(widget)}"></iframe>` : ''}
+    </aside>`;
+  }
+
   function renderRevenuePlaceholder() {
     return `<section class="revenue-section" aria-label="實際營收結構" hidden>
       <div id="revenueCharts" aria-live="polite"></div></section>`;
@@ -1130,7 +1156,7 @@
 
   function renderCompactReport(report, symbol) {
     if (!report.history) return renderLegacyCompactReport(report, symbol);
-    const { company, products, history, management, industry, thesis, risks } = report;
+    const { company, products = [], history, management, industry, thesis, risks } = report;
     const available = value => typeof value === 'string' && value.trim()
       && !/^(未披露|未提供|未公開|不適用|無資料|資料不足|目前資料不足|目前無法|暫無|無法確認|尚未披露)/.test(value.trim());
     const paragraph = value => available(value) ? `<p class="brief-prose">${escapeHtml(value)}</p>` : '';
@@ -1150,7 +1176,7 @@
     const riskRows = risks.filter(r => available(r.risk) && available(r.reason)).map(r => [r.risk, r.reason, r.watch]);
     const sections = [
       ['business', 'Business', '公司如何運作', business, company],
-      ['segments', 'Segments', '業務與營收結構', table(['業務分部', '代表產品／服務', '對公司的意義'], productRows) + renderRevenuePlaceholder(), products, !productRows.length],
+      ['segments', 'Segments', '業務與地區營收占比', table(['業務分部', '代表產品／服務', '對公司的意義'], productRows) + renderRevenuePlaceholder(), products, !productRows.length],
       ['history', 'History & Footprint', '發展歷程與布局', table(['面向', '關鍵事實'], historyRows), history],
       ['management', 'Management & Strategy', '團隊與策略方向', table(['策略面向', '重點'], managementRows), management],
       ['industry', 'Industry & Competition', '產業與競爭位置', comparison.length ? `<div class="brief-comparison">${comparison.map(([label,v]) => `<div><h4>${label}</h4><p>${escapeHtml(v)}</p></div>`).join('')}</div>` : '', industry],
@@ -1229,7 +1255,7 @@
   }
 
   function readCompanySections(data) {
-    if (data.report && (['compact-v1', 'compact-v2'].includes(data.reportFormat) || data.report.company)) {
+    if (data.report && (['compact-v1', 'compact-v2', 'compact-v3'].includes(data.reportFormat) || data.report.company)) {
       return { compactReport: validateCompactReport(data.report, data.reportFormat), reportText: '' };
     }
     const compactStart = '<!-- COMPACT_REPORT_START -->';
@@ -1346,11 +1372,10 @@
         </div>`;
       
       const sourceNotice = data.sourceInfo ? `<aside class="report-data-status" role="status">
-        ${data.cached ? "已載入近 3 天內的公司報告" : "報告欄位已驗證"}｜搜尋資料 ${Number(data.sourceInfo.count)} 筆
+        ${data.cached ? "已載入近 3 天內的公司報告" : "公司報告已生成"}｜${data.sourceInfo.provider === 'google_search_url_context' ? 'Google 搜尋參考來源' : '搜尋資料'} ${Number(data.sourceInfo.count)} 筆
         ${data.generatedAt ? `｜生成時間：${escapeHtml(new Date(data.generatedAt).toLocaleString('zh-TW'))}` : ""}
-        ${data.sourceInfo.limited ? "<p>部分搜尋來源暫時不足，缺乏依據的內容會標為未披露；本份報告不會存入共用快取。</p>" : ""}
       </aside>` : "";
-      resultElement.innerHTML = sourceNotice + renderCompanyReport(sections, symbol, chartHtml);
+      resultElement.innerHTML = sourceNotice + renderCompanyReport(sections, symbol, chartHtml) + renderReportSources(data);
       const revenueContainer = document.getElementById('revenueCharts');
       if (typeof window.loadRevenueCharts === 'function') {
         window.loadRevenueCharts(revenueContainer, BACKEND_URL, symbol);

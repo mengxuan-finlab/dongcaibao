@@ -46,7 +46,8 @@ function buildContract(basePrompt) {
     if (end < 0) throw new Error('Missing prompt template: COMPACT_REPORT');
     const template = JSON.parse(basePrompt.slice(start + compactStart.length, end).trim());
     return {
-      schema: schemaFor(template, '', true), reportFormat: template.history ? 'compact-v2' : 'compact-v1', maxOutputTokens: 8192,
+      schema: schemaFor(template, '', true), reportFormat: template.history
+        ? (template.products ? 'compact-v2' : 'compact-v3') : 'compact-v1', maxOutputTokens: 8192,
       prompt: basePrompt.slice(0, start) + '輸出單一完整 JSON 物件，不要 HTML 標記、Markdown 或程式碼圍欄。欄位格式：\n' + JSON.stringify(template)
     };
   }
@@ -119,14 +120,42 @@ function validateReport(value, schema, path = 'report') {
 }
 
 function serializeReport(report) {
-  if (report.company && Array.isArray(report.products)) {
+  if (report.company) {
     return `<!-- COMPACT_REPORT_START -->\n${JSON.stringify(report)}\n<!-- COMPACT_REPORT_END -->`;
   }
   return SECTIONS.map(([key, marker]) => `<!-- ${marker}_START -->\n${JSON.stringify(report[key])}\n<!-- ${marker}_END -->`).join('\n\n');
 }
 
+function extractReportGrounding(result) {
+  const candidate = result.candidates?.[0];
+  const metadata = candidate?.groundingMetadata || {};
+  const sources = new Map();
+  const add = (uri, title, retrieved) => {
+    try {
+      const url = new URL(uri);
+      if (url.protocol !== 'https:' || url.username || url.password) return;
+      const previous = sources.get(url.href);
+      sources.set(url.href, { url: url.href, title: String(title || previous?.title || url.hostname),
+        retrieved: retrieved || !!previous?.retrieved });
+    } catch { /* Invalid source URLs must never become clickable citations. */ }
+  };
+  for (const chunk of metadata.groundingChunks || []) {
+    if (chunk.web) add(chunk.web.uri, chunk.web.title, false);
+  }
+  for (const item of candidate?.urlContextMetadata?.urlMetadata || []) {
+    if (item.urlRetrievalStatus === 'URL_RETRIEVAL_STATUS_SUCCESS') add(item.retrievedUrl, null, true);
+  }
+  return {
+    sources: [...sources.values()],
+    searchQueries: (metadata.webSearchQueries || []).filter(query => typeof query === 'string' && query.trim()),
+    searchEntryPointHtml: typeof metadata.searchEntryPoint?.renderedContent === 'string'
+      ? metadata.searchEntryPoint.renderedContent : ''
+  };
+}
+
 async function generateValidatedReport({
   basePrompt, models, generate, isRetryable, log = () => {}, timeoutMs = 65000,
+  grounded = false,
   totalTimeoutMs = timeoutMs * 2, now = () => performance.now(),
   sleep = ms => new Promise(resolve => setTimeout(resolve, ms)), random = Math.random
 }) {
@@ -152,6 +181,7 @@ async function generateValidatedReport({
         const result = await generate({
           model, contents: prompt,
           config: {
+            ...(grounded ? { tools: [{ googleSearch: {} }, { urlContext: {} }] } : {}),
             responseMimeType: 'application/json',
             ...(!jsonOnly ? { responseJsonSchema: providerSchema(schema) } : {}),
             temperature: model.startsWith('gemini-3.') ? 1 : 0.3, maxOutputTokens,
@@ -169,10 +199,20 @@ async function generateValidatedReport({
         const report = JSON.parse(String(result.text || '').replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim());
         stage = 'report_validation';
         validateReport(report, schema);
+        // Segments in v3 must come from FMP, even if a JSON-only retry adds extra fields.
+        if (reportFormat === 'compact-v3') delete report.products;
+        const grounding = grounded ? extractReportGrounding(result) : undefined;
+        if (grounded) {
+          stage = 'report_grounding';
+          if (!grounding.sources.length) throw new Error('Grounded report has no verifiable tool sources');
+          log({ event: 'company_report_sources', model, count: grounding.sources.length,
+            searchQueryCount: grounding.searchQueries.length,
+            retrievedCount: grounding.sources.filter(source => source.retrieved).length });
+        }
         log({ event: 'company_report_attempt', attempt: attemptCount, model, status: 200,
           durationMs: Math.round(now() - started), timeoutMs: remainingMs, errorSource: null,
           mode: jsonOnly ? 'json' : 'schema', outcome: 'success', validation: true });
-        return { report, reportFormat, modelName: model, text: serializeReport(report) };
+        return { report, reportFormat, modelName: model, text: serializeReport(report), ...(grounding ? { grounding } : {}) };
       } catch (error) {
         lastError = error;
         const status = received ? 200 : httpStatus(error);
@@ -202,7 +242,7 @@ async function generateValidatedReport({
       }
     }
   }
-  const invalidOutput = ['json_parse', 'report_validation', 'generation_finish'].includes(lastSource);
+  const invalidOutput = ['json_parse', 'report_validation', 'generation_finish', 'report_grounding'].includes(lastSource);
   const error = new Error(invalidOutput
     ? 'AI 已回覆，但報告內容未通過完整性檢查。本次不計入報告額度，請稍後再試。'
     : 'AI 服務暫時繁忙或回應逾時，已有限次重試。本次不計入報告額度，請稍後再試。');
@@ -212,34 +252,6 @@ async function generateValidatedReport({
   error.upstreamStatus = httpStatus(lastError);
   error.cause = lastError;
   throw error;
-}
-
-function collectSearchResults(responses, queries, limit) {
-  const buckets = responses.map((response, index) => response.status === 'fulfilled'
-    ? (response.value.data.organic_results || []).filter(item => item.title && item.snippet).map(item => ({ ...item, query: queries[index] }))
-    : []);
-  const results = [];
-  const seen = new Set();
-  for (let round = 0; buckets.some(bucket => round < bucket.length) && results.length < limit; round++) {
-    for (const bucket of buckets) {
-      const item = bucket[round];
-      if (!item || results.length >= limit) continue;
-      const key = item.link || `${item.title}-${item.snippet}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      results.push(item);
-    }
-  }
-  const successfulQueries = buckets.filter(bucket => bucket.length).length;
-  if (results.length < 4) {
-    const error = new Error('目前取得的公司資料不足，請稍後再試。本次不計入報告額度。');
-    error.statusCode = 503;
-    throw error;
-  }
-  return {
-    results, successfulQueries,
-    limited: successfulQueries < queries.length || results.length < 8
-  };
 }
 
 function createReportCache({ now = Date.now, ttlMs = 3 * 24 * 3600000, maxEntries = 100, store, log = () => {} } = {}) {
@@ -283,4 +295,4 @@ function createReportCache({ now = Date.now, ttlMs = 3 * 24 * 3600000, maxEntrie
   };
 }
 
-module.exports = { SECTIONS, buildContract, providerSchema, safeErrorMessage, reportErrorResponse, validateReport, generateValidatedReport, collectSearchResults, createReportCache };
+module.exports = { SECTIONS, buildContract, providerSchema, safeErrorMessage, reportErrorResponse, validateReport, generateValidatedReport, extractReportGrounding, createReportCache };
