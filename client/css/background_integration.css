@@ -1834,6 +1834,12 @@ button {
 #result .brief-report .brief-prose { margin: 0 0 24px; font-size: 16px; color: #364653; line-height: 1.9; }
 .brief-flow { padding: 22px; margin: 0; border: 1px solid #dfe6ed; border-radius: 8px; }
 .brief-flow figcaption { margin-bottom: 20px; font-size: 13px; font-weight: 700; color: #253c4e; }
+#result .brief-report .brief-business-label { margin: 0 0 12px; color: #193e5b; font-size: 13px; }
+.brief-business-detail { margin-top: 24px; }
+#result .brief-report .brief-business-detail > h4 { color: #193e5b; font-size: 14px; margin-bottom: 14px; }
+.brief-business-insight { margin-top: 16px; padding: 16px 20px; background: #f3f6f9; border-left: 3px solid #103f66; }
+#result .brief-report .brief-business-insight h4 { color: #193e5b; font-size: 12px; margin: 0 0 8px; }
+#result .brief-report .brief-business-insight .brief-prose { margin: 0; color: #536176; font-size: 14px; }
 .brief-flow > div { display: grid; grid-template-columns: repeat(var(--flow-count, 3), minmax(0, 1fr)); gap: 24px; }
 .brief-flow-step { position: relative; padding: 16px 12px; border: 1px solid #e0e6ed; border-top: 3px solid #103f66; }
 .brief-flow-step:nth-child(2) { border-top-color: #ee8c78; }

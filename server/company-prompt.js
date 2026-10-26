@@ -8,12 +8,15 @@ function detectMarket(symbol) {
   return 'US';
 }
 
-const getBasePrompt = (symbol, searchContext, market = 'US') => `
+const getBasePrompt = (symbol, searchContext, market = 'US', revenueData = null) => `
 請用以下資料整理一份繁體中文「公司研究短報」，只有七節：Business、Segments、History & Footprint、Management & Strategy、Industry & Competition、Thesis、Risks。
 【股票代碼】${symbol}
 【市場別】${market}
 【輸入資料】
 ${searchContext}
+
+【FMP 營收資料快照】
+${revenueData ? JSON.stringify(revenueData) : '本次尚未提供 FMP 資料；缺少的分項解讀填「未披露」。'}
 
 【查證方式】
 - 必須使用 Google Search 查證股票代碼所對應的公司，不要只靠模型記憶；優先搜尋公司官網、投資人關係、年報與監管申報。
@@ -24,8 +27,8 @@ ${searchContext}
 - 不要在 JSON 欄位中插入 HTML、搜尋小工具或引用網址；來源會由 API 的工具 metadata 另行顯示。
 
 【逐章來源規則】
-1. Business：先搜尋最新已提交的官方 10-K，使用 URL Context 讀取 Item 1（Business）。Item 1 不一定有獨立 URL，使用 SEC 或公司 IR 的年報文件 URL 並指定章節即可，不可猜造錨點網址。若無法取得，改讀官方 IR Overview；不要用新聞猜測拆帳、客戶或收入模式。
-2. Segments：不搜尋、不讀網址、不產生文字或營收數字。本章由前端直接呼叫 FMP revenue-product-segmentation 與 revenue-geographic-segmentation 的 JSON 畫圖。不要在其他章補寫營收占比、替代數據或模擬分部。
+1. Business：先搜尋最新已提交的官方 10-K，使用 URL Context 讀取 Item 1（Business）。Item 1 不一定有獨立 URL，使用 SEC 或公司 IR 的年報文件 URL 並指定章節即可，不可猜造錨點網址。若無法取得，改讀官方 IR Overview。收費、營收認列及直銷／合作通路占比，必要時讀同份年報 Item 7 或 Item 8 的 Revenue Recognition／營收附註；不要用新聞猜測拆帳、客戶或收入模式。
+2. Segments：所有業務／地區營收金額、占比及跨年變化只使用上方 FMP 快照，不從網頁重抄或替代數字；圖表由程式繪製。對應的品牌角色、成長原因、市場成熟度或通路資訊，可重用其他章已查證的最新官方年報／法說資料，不必另開一輪搜尋。不得假裝快照沒有提供的歷年數字已知。
 3. History & Footprint：優先使用 URL Context 讀取公司官方 About / History；缺少時用 Google Search 查重大事件、Wikipedia 與營運布局，核對公司身分及事件年份。不要將舊營運布局當成現況。
 4. Management & Strategy：優先搜尋並讀取最近已舉行季度的 Earnings Call Transcript，擷取管理層對策略、資本配置的說法。策略是管理層主張，不是已實現成果；現任人名與職務另以官方 Leadership 或 IR 查證。沒有可讀逐字稿時，可改用同季度官方業績公告或簡報，明確寫「依官方業績公告／簡報」而非冒稱逐字稿。
 5. Industry & Competition：使用 Google Search 比較競品與多方獨立產業分析，不指定單一 URL；區分競爭事實與評論，不能只引用公司自述就認定有護城河。來源有分歧時保留限制，不編市占或風險分數。
@@ -34,15 +37,24 @@ ${searchContext}
 - 若公司以 20-F 等其他表格申報，使用對應的 Business 與 Risk Factors 章節，不冒稱有 10-K Item 1／1A；台股改用官方年報、公開資訊觀測站及法說會資料，沿用相同章節分工。
 
 【寫作要求】
-- 全文說明以約 450-650 個繁體中文字為目標（不含欄位名），每個說明欄位只用一句、約 15-35 字；名稱、產品例子保持短詞。避免重複，不要長篇背景。
+- 全文說明以約 850-1100 個繁體中文字為目標（不含欄位名）；第一章約 250-350 字，第二章產品與地區解讀各約 70-110 字、各 2-3 句，其餘章節保持精簡。一般說明欄位只用一句、約 15-35 字；核心定位可用 40-70 字的一句話。避免重複，不要長篇背景。
 - 只使用可確認的事實；資訊不足明確填「未披露」或「目前資料不足以判斷」，不要捏造數據、產品或事件。
 - 推論需標示「可能」並簡述依據；不要給目標價或買賣建議。
 - 不要額外產生財務分析、估值、預測、長時間軸、競爭比較表、研究問題或新聞標籤。
-- 產品及地區營收數據另由 FMP 圖表提供，不要估算營收占比或重複輸出數字。
+- 產品及地區營收數據由 FMP 圖表提供，解讀不估算營收占比，也不復述圖表數字。
 
 【欄位要求】
-- company（Business）：symbol 保留股票代碼；overview 說明做什麼，revenue 說明如何賺錢，customers 說明誰付錢。
-- Segments 不在 AI JSON 中輸出，由 FMP 圖表獨立提供。
+- company（Business）需包含以下四個面向，symbol 保留股票代碼，revenue 與 customers 另用短句保留收入來源與付費客群，供舊版相容，不重複展開。
+  1. 核心商業定位（overview）：用一句話連結價值主張、目標客群與有來源的規模。規模可以是已披露客戶／據點／市場覆蓋等，不必硬塞數字；若用數字需保留對應期間，缺乏依據就省略規模，不寫「全球最大」等未查證排名。
+  2. 商業流程（process）：以四個階段為目標，每項 stage 為短標題、description 一句說明公司自己做什麼及合作方負責什麼。流程依產業實際調整，例如製造業的設計／採購／銷售／變現，不可讓銀行、SaaS 或平台硬套工廠流程，也不要把四個部門或產品名稱冒充商業流程。資料不足可註明，不為湊四項編造活動。
+     利潤沉澱（profitCapture）：一句解釋哪個環節可能捕捉較多價值與依據。只有官方披露的分部利潤、毛利或明確資料才能判斷利潤集中處；高營收占比不代表高利潤。沒有定量依據只能標示「推論」與理由，不能斷言利潤最高。
+  3. 收費與營收確認（pricing）：model 說明買斷、訂閱、用量計費、佣金等實際組合；recognition 依官方政策說明履約時點或期間，區分收款時間與收入認列，資料不足填「未披露」；channels 說明直接銷售與合作通路，只有官方有披露才寫占比，保留年度與統計口徑，不能用產品／地區營收占比替代或自行補足到 100%。
+  4. 商業模式可複製性（defensibility）：從供應關係、網絡效應、規模、分銷、生態或客戶流程的組合，解釋競爭者複製整套模式的障礙及限制。不是商品防偽；不預設必有護城河，證據薄弱就說門檻有限或目前不足以判斷，推論需標示。不要與第五章重複列競品名單。
+- segmentInsights（Segments）：product 與 geographic 各輸出一段高資訊密度解讀，語氣為專業、克制的買方研究筆記，不是投資建議。每段 2-3 句，直接切入論點；禁止單純復述「A 占 XX%、B 占 XX%」，禁止以「如圖所示」「在已披露的數據中」等機械句開頭。
+  - product：從實際業務類別判斷雙主力／單一核心依賴，不能把非品牌的事業分部硬稱為雙品牌。有可比的前期同名項目時，結合 change、growthRate 及官方說明，辨別可能的邊際成長主力；沒有前期不能捏造增速。高營收不代表成熟現金流，營收成長也不等於估值由此驅動；這些結論需額外證據，否則改寫成待驗證的角色分工或依賴風險。
+  - geographic：區分目前收入基本盤與潛在海外擴張，結合當地消費循環、通路依賴或地緣曝險，但必須有來源或明確標示條件。營收占比不能證明市場滲透已成熟、海外空間很大或零售通路集中；沒有官方佐證就說需要驗證，不虛構市場規模、滲透率、通路占比，也不能將 Americas 誤稱 US、Europe 誤稱 EU。
+  - 兩圖可能分屬不同財年，不能當成同期間交叉比較；previous 只代表前一財年同幣別，分部定義是否改變仍需注意，沒有同名項目就不推算。占比分母是圖表分項合計，不保證等於合併營收，分類可能重疊。只有單一披露項目時不能斷言公司只有一個業務／市場。
+  - 只有 status 為 ok 的分項才分析，缺資料的段落填「未披露」，不另搜尋數字補齊。不要照抄 UGG／Hoka 等範例；所有品牌名、地區與判斷都必須屬於本次股票。
 - history（History & Footprint）：milestones 用一句整理最多兩個有來源的發展轉折；footprint 一句說明主要市場或營運布局。沒有可靠年份就不寫年份。
 - management（Management & Strategy）：team 一句說明經營團隊與職務，只使用來源可確認的人名；strategy 一句說明目前的策略方向。無法確認現任者請註明資料不足。
 - industry（Industry & Competition）：competition 一句說明產業與主要競爭者；advantage 一句說明差異及限制，不可把公司宣傳直接當作已證實優勢。
@@ -52,7 +64,7 @@ ${searchContext}
 
 【輸出結構】
 <!-- COMPACT_REPORT_START -->
-{"company":{"symbol":"${symbol}","overview":"公司做什麼","revenue":"主要收入來源與收費方式","customers":"主要客戶或付費者"},"history":{"milestones":"主要發展轉折","footprint":"主要市場或營運布局"},"management":{"team":"經營團隊與職務","strategy":"目前策略方向"},"industry":{"competition":"產業與主要競爭者","advantage":"差異與競爭限制"},"thesis":{"opportunity":"有依據的研究推論","condition":"成立條件或反證訊號"},"risks":[{"risk":"具體風險","reason":"對公司的影響","watch":"追蹤訊號"}]}
+{"company":{"symbol":"${symbol}","overview":"一句話核心商業定位、客群與可確認規模","revenue":"收入來源短句","customers":"付費客群短句","process":[{"stage":"實際商業流程階段","description":"公司及合作方在此階段的活動"}],"profitCapture":"價值捕捉環節、依據與推論限制","pricing":{"model":"實際收費模式組合","recognition":"官方收入認列政策","channels":"直銷與合作通路；占比僅限官方披露"},"defensibility":"整套商業模式的複製障礙及限制"},"segmentInsights":{"product":"產品結構、可驗證成長角色與依賴風險的短段落","geographic":"收入基本盤、待驗證擴張條件與地區風險的短段落"},"history":{"milestones":"主要發展轉折","footprint":"主要市場或營運布局"},"management":{"team":"經營團隊與職務","strategy":"目前策略方向"},"industry":{"competition":"產業與主要競爭者","advantage":"差異與競爭限制"},"thesis":{"opportunity":"有依據的研究推論","condition":"成立條件或反證訊號"},"risks":[{"risk":"具體風險","reason":"對公司的影響","watch":"追蹤訊號"}]}
 <!-- COMPACT_REPORT_END -->
 `;
 

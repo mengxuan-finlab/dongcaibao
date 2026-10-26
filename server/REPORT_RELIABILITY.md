@@ -2,17 +2,34 @@
 
 ## Deployment
 
-The production report is now `compact-v3`: Business, Segments, History &
+The production report is now `compact-v5`: Business, Segments, History &
 Footprint, Management & Strategy, Industry & Competition, Thesis, and Risks.
-The writing target is 450-650 Chinese characters, with short statements rather
-than a full dashboard. FMP product/geographic charts load separately inside
-Segments and do not add Gemini calls. Segments has no AI-authored fields in v3;
-the backend drops any extra `products` field a JSON-only retry might return.
-Missing FMP data hides the section rather than producing guessed numbers.
-Each available FMP chart includes a short deterministic reading of its largest
-two disclosed segments. This text uses the same amounts/shares as the chart,
-not another AI call; a single disclosed segment is not treated as evidence of
-only one company-wide revenue source.
+The writing target is 850-1100 Chinese characters, with about 250-350 for the
+expanded Business chapter and short statements elsewhere. Business includes a
+one-sentence positioning statement, an industry-specific four-stage process,
+evidence-qualified profit capture, pricing/revenue recognition/channel mix,
+and replication barriers with limitations. Four stages are a writing target,
+not a brittle count check that rejects otherwise useful sourced output.
+Revenue recognition comes from official accounting notes; channel percentages
+and stage-level profitability must not be invented or inferred from revenue mix.
+Before a new report is generated, the backend obtains its FMP snapshot using the
+existing bounded/cached feed. The same snapshot is included in the Gemini prompt,
+stored with the report, and returned for charts. Cached interpretations must not
+be paired with newly fetched numbers. Legacy reports without a snapshot still
+load charts separately, without synthesized interpretation text.
+Segments retains FMP-only chart numbers. `segmentInsights.product` and
+`segmentInsights.geographic` each contain 2-3 sentences (70-110 Chinese characters)
+from the existing report-generation call, not an additional AI request.
+The backend drops any extra `products` field a JSON-only retry might return.
+Missing FMP data masks the corresponding insight and hides the chart.
+Previous FY data is included only for a consecutive fiscal year in the same
+currency; growth/change are calculated only for identical segment names with
+positive prior amounts. Classification comparability still requires caution.
+The prompt forbids numerical chart recitation or mechanical opening phrases.
+Revenue shares alone do not prove cash generation, valuation drivers, market
+maturity, retail-channel concentration, or overseas market headroom. Such claims
+need supporting disclosures or explicit conditional language. Region labels must
+not be conflated (e.g. Americas is not necessarily US).
 Output budget remains 8192 tokens.
 This does not guarantee availability or eliminate provider 503 errors.
 
@@ -28,7 +45,8 @@ The prompt asks Search to find primary sources and URL Context to read relevant
 pages according to chapter-specific source priorities:
 
 - Business: latest filed 10-K Item 1, with official IR Overview as fallback.
-- Segments: FMP JSON only, with no search or AI-generated revenue allocation.
+- Segments: FMP JSON for chart numbers and history, with grounded qualitative
+  context reused from official sources for the two short interpretation paragraphs.
 - History & Footprint: official About/History, then grounded public event history.
 - Management & Strategy: latest available earnings-call transcript; official
   same-quarter results/deck as an explicitly named fallback. Verify current
@@ -56,8 +74,8 @@ https://ai.google.dev/gemini-api/docs/generate-content/structured-output
 Search tool calls and retrieved content can incur additional provider charges.
 
 Deploy the compatible frontend to **Vercel first**, then the backend to Render.
-The new frontend accepts all three compact versions and legacy full reports. Deploy
-it before a backend that returns compact-v3 fields. The prompt/schema digest gives
+The new frontend accepts all five compact versions and legacy full reports. Deploy
+it before a backend that returns compact-v5 fields. The prompt/schema digest gives
 compact reports a different cache key; old full cache rows need not be deleted.
 
 1. In the existing Supabase project's SQL Editor, run

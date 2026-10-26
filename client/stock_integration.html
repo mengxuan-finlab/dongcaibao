@@ -64,15 +64,12 @@
     return `<svg class="revenue-pie" viewBox="0 0 240 240" role="img" aria-label="產品營收圓餅圖，詳細數字見下方表格">${slices}</svg>`;
   }
 
-  function card(data, kind) {
+  function card(data, kind, insight) {
     const product = kind === 'product';
     const title = product ? '業務／產品營收組成' : '地區營收分布';
     if (data?.status !== 'ok' || !Array.isArray(data.items) || !data.items.length) return '';
-    const ranked = [...data.items].sort((a, b) => b.value - a.value);
-    const [largest, second] = ranked;
-    const reading = ranked.length === 1
-      ? `這份資料僅列出「${escape(largest.name)}」一個${product ? '業務／產品' : '地區'}分項，不能據此認定公司沒有其他收入來源。`
-      : `在已披露的${product ? '業務／產品' : '地區'}分項中，「${escape(largest.name)}」占比最高，為 ${percent(largest.share)}；其次是「${escape(second.name)}」，占 ${percent(second.share)}。`;
+    const reading = typeof insight === 'string' && insight.trim()
+      && !/^(未披露|未提供|資料不足|目前資料不足|目前無法)/.test(insight.trim()) ? insight : '';
     const rows = data.items.map((item, index) => `<tr><th scope="row">
       <span class="revenue-swatch" style="background:${COLORS[index % COLORS.length]}"></span>${escape(item.name)}</th>
       <td title="${escape(item.value.toLocaleString('zh-TW'))} ${escape(data.currency)}">${amount(item.value, data.currency)}</td>
@@ -85,10 +82,10 @@
       ${graphic}<div class="revenue-table-scroll"><table><caption>${title}明細</caption>
       <thead><tr><th scope="col">${product ? '產品／業務' : '地區'}</th><th scope="col">營收</th><th scope="col">占比</th></tr></thead>
       <tbody>${rows}</tbody></table></div>
-      <div class="revenue-reading"><strong>圖表解讀</strong><p>${reading}</p></div></article>`;
+      ${reading ? `<div class="revenue-reading"><strong>${product ? '產品組合解讀' : '地區分布解讀'}</strong><p>${escape(reading)}</p></div>` : ''}</article>`;
   }
 
-  window.loadRevenueCharts = async (container, backendUrl, symbol) => {
+  window.loadRevenueCharts = async (container, backendUrl, symbol, snapshot, insights = {}) => {
     if (!container) return;
     const section = container.closest('.revenue-section');
     section.hidden = true;
@@ -98,13 +95,16 @@
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000);
     try {
-      const url = new URL('/api/fmp/revenue-segmentation', backendUrl);
-      url.searchParams.set('symbol', symbol);
-      const response = await fetch(url, { signal: controller.signal });
-      if (!response.ok) throw new Error('Revenue data unavailable');
-      const data = await response.json();
+      let data = snapshot;
+      if (!data) {
+        const url = new URL('/api/fmp/revenue-segmentation', backendUrl);
+        url.searchParams.set('symbol', symbol);
+        const response = await fetch(url, { signal: controller.signal });
+        if (!response.ok) throw new Error('Revenue data unavailable');
+        data = await response.json();
+      }
       if (!container.isConnected) return;
-      const cards = [card(data.product, 'product'), card(data.geographic, 'geographic')].filter(Boolean);
+      const cards = [card(data.product, 'product', insights.product), card(data.geographic, 'geographic', insights.geographic)].filter(Boolean);
       if (!cards.length) return;
       container.innerHTML = `<div class="revenue-grid${cards.length === 1 ? ' revenue-grid--single' : ''}">${cards.join('')}</div>
         <p class="revenue-note">來源：<a href="https://financialmodelingprep.com/" target="_blank" rel="noopener noreferrer">Financial Modeling Prep</a>。
@@ -1105,8 +1105,19 @@
     if (!report?.company || !['symbol', 'overview', 'revenue', 'customers'].every(key => text(report.company[key]))) {
       throw new Error('公司報告格式不完整，請稍後再試。');
     }
-    const sevenSections = ['compact-v2', 'compact-v3'].includes(format) || ['history', 'management', 'industry', 'thesis'].some(key => key in report);
-    const fmpOnlySegments = format === 'compact-v3' || (sevenSections && !Object.hasOwn(report, 'products'));
+    const expandedBusiness = ['compact-v4', 'compact-v5'].includes(format) || Object.hasOwn(report.company, 'process');
+    if ((format === 'compact-v5' || Object.hasOwn(report, 'segmentInsights'))
+        && (!report.segmentInsights || !['product', 'geographic'].every(key => text(report.segmentInsights[key])))) {
+      throw new Error('營收結構解讀未完整傳回，請稍後再試。');
+    }
+    if (expandedBusiness && (!Array.isArray(report.company.process) || !report.company.process.length
+        || !report.company.process.every(step => step && text(step.stage) && text(step.description))
+        || !text(report.company.profitCapture) || !text(report.company.defensibility)
+        || !report.company.pricing || !['model', 'recognition', 'channels'].every(key => text(report.company.pricing[key])))) {
+      throw new Error('公司運作章節未完整傳回，請稍後再試。');
+    }
+    const sevenSections = ['compact-v2', 'compact-v3', 'compact-v4', 'compact-v5'].includes(format) || ['history', 'management', 'industry', 'thesis'].some(key => key in report);
+    const fmpOnlySegments = ['compact-v3', 'compact-v4', 'compact-v5'].includes(format) || (sevenSections && !Object.hasOwn(report, 'products'));
     const fields = { risks: ['risk', 'reason', 'watch'] };
     if (!fmpOnlySegments) fields.products = ['name', 'significance'];
     if (sevenSections) {
@@ -1163,10 +1174,19 @@
     const table = (headings, rows) => rows.length ? `<div class="brief-table-wrap"><table class="brief-table">
       <thead><tr>${headings.map(h => `<th scope="col">${escapeHtml(h)}</th>`).join('')}</tr></thead>
       <tbody>${rows.map(row => `<tr>${row.map((cell, i) => `<${i ? 'td' : 'th scope="row"'}>${escapeHtml(available(cell) ? cell : '')}</${i ? 'td' : 'th'}>`).join('')}</tr>`).join('')}</tbody></table></div>` : '';
-    const flow = [ ['付費客戶', company.customers], ['產品與服務', products.filter(p => available(p.name)).map(p => p.name).join('、')],
-      ['收入來源', company.revenue] ].filter(([, value]) => available(value));
-    const business = paragraph(company.overview) + (flow.length ? `<figure class="brief-flow"><figcaption>從客戶到收入</figcaption>
-      <div style="--flow-count:${flow.length}">${flow.map(([label, value], i) => `<div class="brief-flow-step"><span>0${i + 1}</span><h4>${label}</h4><p>${escapeHtml(value)}</p></div>`).join('')}</div></figure>` : '');
+    const expandedBusiness = Array.isArray(company.process);
+    const flow = (expandedBusiness ? company.process.map(step => [step.stage, step.description])
+      : [ ['付費客戶', company.customers], ['產品與服務', products.filter(p => available(p.name)).map(p => p.name).join('、')],
+        ['收入來源', company.revenue] ]).filter(([label, value]) => available(label) && available(value));
+    const pricingRows = company.pricing ? [['收費模式', company.pricing.model], ['營收認列', company.pricing.recognition],
+      ['直銷與合作通路', company.pricing.channels]].filter(([, value]) => available(value)) : [];
+    const business = (expandedBusiness && available(company.overview) ? '<h4 class="brief-business-label">核心商業定位</h4>' : '')
+      + paragraph(company.overview) + (flow.length ? `<figure class="brief-flow"><figcaption>${expandedBusiness ? '商業流程與賺錢路徑' : '從客戶到收入'}</figcaption>
+      <div style="--flow-count:${flow.length}">${flow.map(([label, value], i) => `<div class="brief-flow-step"><span>0${i + 1}</span><h4>${escapeHtml(label)}</h4><p>${escapeHtml(value)}</p></div>`).join('')}</div></figure>` : '');
+    const expandedBusinessBody = business
+      + (expandedBusiness && available(company.profitCapture) ? `<div class="brief-business-insight"><h4>利潤與價值捕捉</h4>${paragraph(company.profitCapture)}</div>` : '')
+      + (pricingRows.length ? `<div class="brief-business-detail"><h4>收費模式與營收確認</h4>${table(['面向', '運作方式'], pricingRows)}</div>` : '')
+      + (expandedBusiness && available(company.defensibility) ? `<div class="brief-business-detail"><h4>商業模式的可複製性</h4>${paragraph(company.defensibility)}</div>` : '');
     const productRows = products.filter(p => available(p.name) && (available(p.significance) || p.examples.some(available)))
       .map(p => [p.name, p.examples.filter(available).join('、'), p.significance]);
     const historyRows = [['發展轉折', history.milestones], ['營運布局', history.footprint]].filter(([, v]) => available(v));
@@ -1175,7 +1195,7 @@
     const thesisRows = [['研究論點', thesis.opportunity], ['驗證條件與反證', thesis.condition]].filter(([, v]) => available(v));
     const riskRows = risks.filter(r => available(r.risk) && available(r.reason)).map(r => [r.risk, r.reason, r.watch]);
     const sections = [
-      ['business', 'Business', '公司如何運作', business, company],
+      ['business', 'Business', '公司如何運作', expandedBusinessBody, company],
       ['segments', 'Segments', '業務與地區營收占比', table(['業務分部', '代表產品／服務', '對公司的意義'], productRows) + renderRevenuePlaceholder(), products, !productRows.length],
       ['history', 'History & Footprint', '發展歷程與布局', table(['面向', '關鍵事實'], historyRows), history],
       ['management', 'Management & Strategy', '團隊與策略方向', table(['策略面向', '重點'], managementRows), management],
@@ -1255,7 +1275,7 @@
   }
 
   function readCompanySections(data) {
-    if (data.report && (['compact-v1', 'compact-v2', 'compact-v3'].includes(data.reportFormat) || data.report.company)) {
+    if (data.report && (['compact-v1', 'compact-v2', 'compact-v3', 'compact-v4', 'compact-v5'].includes(data.reportFormat) || data.report.company)) {
       return { compactReport: validateCompactReport(data.report, data.reportFormat), reportText: '' };
     }
     const compactStart = '<!-- COMPACT_REPORT_START -->';
@@ -1378,7 +1398,7 @@
       resultElement.innerHTML = sourceNotice + renderCompanyReport(sections, symbol, chartHtml) + renderReportSources(data);
       const revenueContainer = document.getElementById('revenueCharts');
       if (typeof window.loadRevenueCharts === 'function') {
-        window.loadRevenueCharts(revenueContainer, BACKEND_URL, symbol);
+        window.loadRevenueCharts(revenueContainer, BACKEND_URL, symbol, data.revenueData, sections.compactReport?.segmentInsights);
       } else {
         revenueContainer.closest('.revenue-section').hidden = true;
       }

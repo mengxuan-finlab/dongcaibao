@@ -36,11 +36,26 @@ function normalizeSegments(rows, symbol) {
     .map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
   const total = items.reduce((sum, item) => sum + item.value, 0);
   if (!items.length || !Number.isFinite(total) || total <= 0) return { status: 'empty' };
-  return {
+  const normalized = {
     status: 'ok', date: row.date, fiscalYear: row.fiscalYear || row.date.slice(0, 4),
     period: 'FY', currency: row.reportedCurrency, total,
     items: items.map(item => ({ ...item, share: item.value / total }))
   };
+  const priorRow = annual.find(candidate => candidate.date < row.date
+    && Number(candidate.fiscalYear) === Number(row.fiscalYear) - 1
+    && candidate.reportedCurrency === row.reportedCurrency);
+  if (priorRow) {
+    const prior = normalizeSegments([priorRow], symbol);
+    if (prior.status === 'ok') {
+      normalized.previous = prior;
+      normalized.items = normalized.items.map(item => {
+        const previous = prior.items.find(other => other.name === item.name);
+        return previous ? { ...item, change: item.value - previous.value,
+          growthRate: item.value / previous.value - 1 } : item;
+      });
+    }
+  }
+  return normalized;
 }
 
 function createRevenueFeed({ fetchRows, now = Date.now }) {
@@ -442,11 +457,15 @@ app.post('/api/analyze-stock', async (req, res) => {
     })).digest('hex').slice(0, 24);
     const cacheKey = `company:${market}:${normalizedSymbol}:${reportVersion}`;
     const reportResult = await getCompanyReport(cacheKey, async () => {
-      const finalPrompt = getBasePrompt(normalizedSymbol, `查證日期：${new Date().toISOString().slice(0, 10)}。請使用已啟用的 Google Search 與 URL Context 工具查證。`, market);
+      const revenueData = market === 'US' && process.env.FMP_API_KEY
+        ? await getRevenueSegments(normalizedSymbol)
+        : { product: { status: 'unavailable' }, geographic: { status: 'unavailable' } };
+      const finalPrompt = getBasePrompt(normalizedSymbol, `查證日期：${new Date().toISOString().slice(0, 10)}。請使用已啟用的 Google Search 與 URL Context 工具查證。`, market, revenueData);
       let attempt = 0;
       const generated = await generateValidatedReport({
         basePrompt: finalPrompt,
         grounded: true,
+        segmentData: revenueData,
         models: [GEMINI_PRIMARY_MODEL, GEMINI_FALLBACK_MODEL],
         generate: args => callGemini(args, { requestId, label: '公司報告', attempt: ++attempt }),
         isRetryable: isRetryableGeminiError,
@@ -458,13 +477,14 @@ app.post('/api/analyze-stock', async (req, res) => {
       console.log('[公司分析]', { requestId, model: generated.modelName, provider: 'google_search_url_context',
         sourceCount: sources.length, searchQueryCount: searchQueries.length, retrievedCount });
       return {
-        ...generated, searchContext,
+        ...generated, searchContext, revenueData,
         generatedAt: new Date().toISOString(),
         sourceInfo: { provider: 'google_search_url_context', count: sources.length,
           searchQueryCount: searchQueries.length, retrievedCount, limited: false }
       };
     }, value => {
       validateReport(value.report, reportSchema);
+      if (value.reportFormat === 'compact-v5' && !value.revenueData) throw new Error('Report revenue snapshot is missing');
       if (!value.sourceInfo || typeof value.sourceInfo.limited !== 'boolean'
           || value.sourceInfo.provider !== 'google_search_url_context'
           || !Number.isInteger(value.sourceInfo.count) || value.sourceInfo.count < 1

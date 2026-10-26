@@ -46,8 +46,8 @@ function buildContract(basePrompt) {
     if (end < 0) throw new Error('Missing prompt template: COMPACT_REPORT');
     const template = JSON.parse(basePrompt.slice(start + compactStart.length, end).trim());
     return {
-      schema: schemaFor(template, '', true), reportFormat: template.history
-        ? (template.products ? 'compact-v2' : 'compact-v3') : 'compact-v1', maxOutputTokens: 8192,
+      schema: schemaFor(template, '', true), reportFormat: template.segmentInsights ? 'compact-v5' : template.company?.process ? 'compact-v4'
+        : template.history ? (template.products ? 'compact-v2' : 'compact-v3') : 'compact-v1', maxOutputTokens: 8192,
       prompt: basePrompt.slice(0, start) + '輸出單一完整 JSON 物件，不要 HTML 標記、Markdown 或程式碼圍欄。欄位格式：\n' + JSON.stringify(template)
     };
   }
@@ -155,7 +155,7 @@ function extractReportGrounding(result) {
 
 async function generateValidatedReport({
   basePrompt, models, generate, isRetryable, log = () => {}, timeoutMs = 65000,
-  grounded = false,
+  grounded = false, segmentData = null,
   totalTimeoutMs = timeoutMs * 2, now = () => performance.now(),
   sleep = ms => new Promise(resolve => setTimeout(resolve, ms)), random = Math.random
 }) {
@@ -199,8 +199,13 @@ async function generateValidatedReport({
         const report = JSON.parse(String(result.text || '').replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim());
         stage = 'report_validation';
         validateReport(report, schema);
-        // Segments in v3 must come from FMP, even if a JSON-only retry adds extra fields.
-        if (reportFormat === 'compact-v3') delete report.products;
+        // FMP owns Segments, even if a JSON-only retry adds AI-authored products.
+        if (['compact-v3', 'compact-v4', 'compact-v5'].includes(reportFormat)) delete report.products;
+        if (reportFormat === 'compact-v5') {
+          for (const kind of ['product', 'geographic']) {
+            if (segmentData?.[kind]?.status !== 'ok') report.segmentInsights[kind] = '未披露';
+          }
+        }
         const grounding = grounded ? extractReportGrounding(result) : undefined;
         if (grounded) {
           stage = 'report_grounding';
