@@ -63,8 +63,22 @@ For foreign issuers or Taiwan stocks, equivalent official filings replace 10-K.
 Tool execution is model-driven: enabling URL Context is not proof that
 every linked page was read. Only successful `urlContextMetadata` retrievals
 get a read-page label. Search chunks and successful retrievals are deduplicated
-into the source list; a response with no usable tool sources fails validation.
+into the source list. Missing source metadata is advisory, not a report failure.
 Source lists are not a claim of sentence-level verification or full coverage.
+If JSON, required fields and generation completion pass, the report is returned
+even with zero source URLs. Missing metadata triggers neither a research recovery
+call nor a fallback-model retry. API errors and invalid JSON/content retain the
+existing bounded retries, schema compatibility fallback and validation.
+`sourceValidation` is logged and persisted in the service-role-only report cache,
+but removed from HTTP responses. Search/URL tools enabled, observed query counts,
+URL attempts/successes and source counts are recorded; absent execution evidence
+is marked `not_reported`, not treated as proof that no tool ran. The frontend
+shows no missing-source label or empty citation card; real links and Google's
+returned Search Suggestions are preserved when available. No URLs are invented.
+The prompt requires supported, qualified legal-risk statements. When tool URLs
+are absent, compact-report litigation/enforcement risk entries are conservatively
+replaced with a conditional generic risk, dropping unsupported names, amounts,
+dates or claims that an event has already been verified.
 Google's returned Search Suggestions HTML is displayed in a script-disabled
 sandboxed iframe; citation links accept only HTTPS URLs without credentials.
 See the official Search, URL Context, and structured-output documentation:
@@ -125,7 +139,7 @@ ungrounded report. Local JSON validation is unchanged.
 - `company_report_attempt`: report generation and validation outcome, attempt,
   timeout, elapsed time, and an explicit error source (`gemini_api`,
   `client_timeout`, `network`, `sdk`, `json_parse`, `generation_finish`, or
-  `report_validation` or `report_grounding`). Output validation failures keep HTTP status **200**;
+  `report_validation`). Output validation failures keep HTTP status **200**;
   no-response errors use **null**, never `NaN` or a fabricated status code.
 - The request ID, model, attempt and label correlate these events. API keys,
   authorization headers, full prompts and generated reports are not logged.
@@ -142,7 +156,7 @@ sessions or authentication headers.
 Cache keys include market, normalized symbol, and a digest of the prompt, local
 schema, configured models and retrieval provider/version. Switching away from
 SerpApi invalidates old cache keys without deleting the old rows. Structurally
-complete reports with tool-provided sources are saved for three days (72 hours);
+complete reports, including those without source metadata, are saved for three days (72 hours);
 incomplete output, failed calls and source-limited
 reports are never saved. Database hits are revalidated against the current
 schema, and loading an existing row does not extend its expiry. DB failures do

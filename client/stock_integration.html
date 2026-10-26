@@ -1151,6 +1151,7 @@
       } catch { return false; }
     });
     const widget = typeof data.grounding.searchEntryPointHtml === 'string' ? data.grounding.searchEntryPointHtml : '';
+    if (!sources.length && !widget) return '';
     return `<aside class="report-sources" aria-label="搜尋與參考來源">
       ${sources.length ? `<details><summary>參考來源 · ${sources.length} 筆</summary><ol>${sources.map(source =>
         `<li><a href="${escapeHtml(source.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(source.title || new URL(source.url).hostname)}</a>
@@ -1392,7 +1393,7 @@
         </div>`;
       
       const sourceNotice = data.sourceInfo ? `<aside class="report-data-status" role="status">
-        ${data.cached ? "已載入近 3 天內的公司報告" : "公司報告已生成"}｜${data.sourceInfo.provider === 'google_search_url_context' ? 'Google 搜尋參考來源' : '搜尋資料'} ${Number(data.sourceInfo.count)} 筆
+        ${data.cached ? "已載入近 3 天內的公司報告" : "公司報告已生成"}${Number(data.sourceInfo.count) > 0 ? `｜${data.sourceInfo.provider === 'google_search_url_context' ? 'Google 搜尋參考來源' : '搜尋資料'} ${Number(data.sourceInfo.count)} 筆` : ''}
         ${data.generatedAt ? `｜生成時間：${escapeHtml(new Date(data.generatedAt).toLocaleString('zh-TW'))}` : ""}
       </aside>` : "";
       resultElement.innerHTML = sourceNotice + renderCompanyReport(sections, symbol, chartHtml) + renderReportSources(data);

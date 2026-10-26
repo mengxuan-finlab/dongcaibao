@@ -487,20 +487,22 @@ app.post('/api/analyze-stock', async (req, res) => {
       if (value.reportFormat === 'compact-v5' && !value.revenueData) throw new Error('Report revenue snapshot is missing');
       if (!value.sourceInfo || typeof value.sourceInfo.limited !== 'boolean'
           || value.sourceInfo.provider !== 'google_search_url_context'
-          || !Number.isInteger(value.sourceInfo.count) || value.sourceInfo.count < 1
+          || !Number.isInteger(value.sourceInfo.count) || value.sourceInfo.count < 0
           || !Array.isArray(value.grounding?.sources) || value.grounding.sources.length !== value.sourceInfo.count
-          || typeof value.searchContext !== 'string' || !value.searchContext.trim()
+          || typeof value.searchContext !== 'string'
           || !Number.isFinite(Date.parse(value.generatedAt))) {
         throw new Error('Cached report metadata is incomplete');
       }
     });
 
-    console.log('[公司報告結果]', { requestId, cacheTier: reportResult.cacheTier, model: reportResult.modelName });
+    console.log('[公司報告結果]', { requestId, cacheTier: reportResult.cacheTier, model: reportResult.modelName,
+      sourceValidation: reportResult.sourceValidation });
     if (user) await supabase.from('usage_logs').insert({ user_id: user.id, action: 'company_intro' });
     if (settleGuest) settleGuest(true);
 
+    const { sourceValidation, ...publicReport } = reportResult;
     res.json({ 
-      ...reportResult,
+      ...publicReport,
       requestId,
       plan: userPlan,
       reportMode: 'base',

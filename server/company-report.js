@@ -128,7 +128,7 @@ function serializeReport(report) {
 
 function extractReportGrounding(result) {
   const candidate = result.candidates?.[0];
-  const metadata = candidate?.groundingMetadata || {};
+  const metadata = candidate?.groundingMetadata || candidate?.grounding_metadata || result.groundingMetadata || {};
   const sources = new Map();
   const add = (uri, title, retrieved) => {
     try {
@@ -139,17 +139,26 @@ function extractReportGrounding(result) {
         retrieved: retrieved || !!previous?.retrieved });
     } catch { /* Invalid source URLs must never become clickable citations. */ }
   };
-  for (const chunk of metadata.groundingChunks || []) {
-    if (chunk.web) add(chunk.web.uri, chunk.web.title, false);
+  const chunks = metadata.groundingChunks || metadata.grounding_chunks;
+  for (const chunk of Array.isArray(chunks) ? chunks : []) {
+    if (chunk?.web) add(chunk.web.uri, chunk.web.title, false);
   }
-  for (const item of candidate?.urlContextMetadata?.urlMetadata || []) {
-    if (item.urlRetrievalStatus === 'URL_RETRIEVAL_STATUS_SUCCESS') add(item.retrievedUrl, null, true);
+  const urlMetadata = candidate?.urlContextMetadata || candidate?.url_context_metadata || result.urlContextMetadata || {};
+  const urlItems = urlMetadata.urlMetadata || urlMetadata.url_metadata;
+  const retrievals = Array.isArray(urlItems) ? urlItems : [];
+  for (const item of retrievals) {
+    if (item && (item.urlRetrievalStatus || item.url_retrieval_status) === 'URL_RETRIEVAL_STATUS_SUCCESS') {
+      add(item.retrievedUrl || item.retrieved_url, null, true);
+    }
   }
+  const queries = metadata.webSearchQueries || metadata.web_search_queries;
+  const entryPoint = metadata.searchEntryPoint?.renderedContent || metadata.search_entry_point?.rendered_content;
   return {
     sources: [...sources.values()],
-    searchQueries: (metadata.webSearchQueries || []).filter(query => typeof query === 'string' && query.trim()),
-    searchEntryPointHtml: typeof metadata.searchEntryPoint?.renderedContent === 'string'
-      ? metadata.searchEntryPoint.renderedContent : ''
+    searchQueries: (Array.isArray(queries) ? queries : []).filter(query => typeof query === 'string' && query.trim()),
+    searchEntryPointHtml: typeof entryPoint === 'string' ? entryPoint : '',
+    telemetry: { urlAttemptCount: retrievals.length,
+      urlSuccessCount: retrievals.filter(item => item && (item.urlRetrievalStatus || item.url_retrieval_status) === 'URL_RETRIEVAL_STATUS_SUCCESS').length }
   };
 }
 
@@ -175,6 +184,7 @@ async function generateValidatedReport({
       if (remainingMs < 1) break;
       attemptCount++;
       const started = now();
+      const mode = jsonOnly ? 'json' : 'schema';
       let received = false;
       let stage = 'api';
       try {
@@ -184,7 +194,8 @@ async function generateValidatedReport({
             ...(grounded ? { tools: [{ googleSearch: {} }, { urlContext: {} }] } : {}),
             responseMimeType: 'application/json',
             ...(!jsonOnly ? { responseJsonSchema: providerSchema(schema) } : {}),
-            temperature: model.startsWith('gemini-3.') ? 1 : 0.3, maxOutputTokens,
+            temperature: model.startsWith('gemini-3.') ? 1 : 0.3,
+            maxOutputTokens,
             ...(model.startsWith('gemini-3.') ? { thinkingConfig: { thinkingLevel: 'low' } } : {}),
             ...(model.startsWith('gemini-2.5') ? { thinkingConfig: { thinkingBudget: 1024 } } : {}),
             httpOptions: { apiVersion: 'v1beta', timeout: remainingMs, retryOptions: { attempts: 1 } },
@@ -206,25 +217,40 @@ async function generateValidatedReport({
             if (segmentData?.[kind]?.status !== 'ok') report.segmentInsights[kind] = '未披露';
           }
         }
-        const grounding = grounded ? extractReportGrounding(result) : undefined;
+        let grounding, sourceValidation;
         if (grounded) {
-          stage = 'report_grounding';
-          if (!grounding.sources.length) throw new Error('Grounded report has no verifiable tool sources');
-          log({ event: 'company_report_sources', model, count: grounding.sources.length,
-            searchQueryCount: grounding.searchQueries.length,
-            retrievedCount: grounding.sources.filter(source => source.retrieved).length });
+          const { telemetry, ...links } = extractReportGrounding(result);
+          grounding = links;
+          sourceValidation = { status: links.sources.length ? 'sources_returned' : 'metadata_without_sources',
+            sourceCount: links.sources.length, searchQueryCount: links.searchQueries.length,
+            searchEvidence: links.searchQueries.length ? 'reported' : 'not_reported',
+            urlEvidence: telemetry.urlAttemptCount ? 'reported' : 'not_reported',
+            toolsEnabled: ['googleSearch', 'urlContext'], ...telemetry };
+          let cautiousRiskCount = 0;
+          if (!links.sources.length && Array.isArray(report.risks)) {
+            const legalEvent = /訴訟|起訴|判決|罰款|裁罰|處罰|調查|違法|指控|和解|禁令|\b(lawsuit|litigation|penalty|penalties|fine|fined|sanction|settlement|investigation)\b/i;
+            report.risks = report.risks.map(risk => {
+              if (!legalEvent.test([risk.risk, risk.reason, risk.watch].join(' '))) return risk;
+              cautiousRiskCount++;
+              return { risk: '法律與監管風險', reason: '若發生訴訟或監管執法，可能增加合規成本或影響營運。',
+                watch: '可觀察官方公告、監管文件與法院紀錄。' };
+            });
+          }
+          sourceValidation.cautiousRiskCount = cautiousRiskCount;
+          log({ event: 'company_report_sources', attempt: attemptCount, model, mode, ...sourceValidation });
         }
         log({ event: 'company_report_attempt', attempt: attemptCount, model, status: 200,
           durationMs: Math.round(now() - started), timeoutMs: remainingMs, errorSource: null,
-          mode: jsonOnly ? 'json' : 'schema', outcome: 'success', validation: true });
-        return { report, reportFormat, modelName: model, text: serializeReport(report), ...(grounding ? { grounding } : {}) };
+          mode, outcome: 'success', validation: true });
+        return { report, reportFormat, modelName: model, text: serializeReport(report),
+          ...(grounding ? { grounding, sourceValidation } : {}) };
       } catch (error) {
         lastError = error;
         const status = received ? 200 : httpStatus(error);
         lastSource = received ? stage : errorSource(error);
         log({ event: 'company_report_attempt', attempt: attemptCount, model, status,
           durationMs: Math.round(now() - started), timeoutMs: remainingMs, errorSource: lastSource,
-          mode: jsonOnly ? 'json' : 'schema', validation: received, outcome: 'failed', message: safeErrorMessage(error) });
+          mode, validation: received, outcome: 'failed', message: safeErrorMessage(error) });
         // Retry one rejected request without provider-side schema constraints.
         // Local validation remains identical in both modes.
         if (!received && status === 400 && !jsonOnly) {
@@ -247,7 +273,7 @@ async function generateValidatedReport({
       }
     }
   }
-  const invalidOutput = ['json_parse', 'report_validation', 'generation_finish', 'report_grounding'].includes(lastSource);
+  const invalidOutput = ['json_parse', 'report_validation', 'generation_finish'].includes(lastSource);
   const error = new Error(invalidOutput
     ? 'AI 已回覆，但報告內容未通過完整性檢查。本次不計入報告額度，請稍後再試。'
     : 'AI 服務暫時繁忙或回應逾時，已有限次重試。本次不計入報告額度，請稍後再試。');
