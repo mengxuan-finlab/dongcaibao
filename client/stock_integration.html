@@ -1121,7 +1121,23 @@
     const fields = { risks: ['risk', 'reason', 'watch'] };
     if (!fmpOnlySegments) fields.products = ['name', 'significance'];
     if (sevenSections) {
-      const sections = { history: ['milestones', 'footprint'], management: ['team', 'strategy'],
+      const structuredHistory = report.history && Object.hasOwn(report.history, 'summary');
+      if (structuredHistory && (!text(report.history.summary)
+          || !Array.isArray(report.history.milestones) || !report.history.milestones.length
+          || !report.history.milestones.every(item => item && ['year', 'event', 'significance'].every(key => text(item[key])))
+          || !report.history.footprint || !['research', 'manufacturing', 'sales'].every(key => text(report.history.footprint[key])))) {
+        throw new Error('歷史與足跡章節未完整傳回，請稍後再試。');
+      }
+      const structuredManagement = report.management && Object.hasOwn(report.management, 'leadership');
+      if (structuredManagement && (!text(report.management.leadership)
+          || !Array.isArray(report.management.pillars) || !report.management.pillars.length
+          || !report.management.pillars.every(item => item && ['pillar', 'objective', 'initiatives'].every(key => text(item[key])))
+          || !Array.isArray(report.management.capitalAllocation) || !report.management.capitalAllocation.length
+          || !report.management.capitalAllocation.every(text))) {
+        throw new Error('團隊與策略章節未完整傳回，請稍後再試。');
+      }
+      const sections = { history: structuredHistory ? ['summary'] : ['milestones', 'footprint'],
+        management: structuredManagement ? ['leadership'] : ['team', 'strategy'],
         industry: ['competition', 'advantage'], thesis: ['opportunity', 'condition'] };
       for (const [key, required] of Object.entries(sections)) {
         if (!report[key] || !required.every(field => text(report[key][field]))) {
@@ -1190,16 +1206,39 @@
       + (expandedBusiness && available(company.defensibility) ? `<div class="brief-business-detail"><h4>商業模式的可複製性</h4>${paragraph(company.defensibility)}</div>` : '');
     const productRows = products.filter(p => available(p.name) && (available(p.significance) || p.examples.some(available)))
       .map(p => [p.name, p.examples.filter(available).join('、'), p.significance]);
-    const historyRows = [['發展轉折', history.milestones], ['營運布局', history.footprint]].filter(([, v]) => available(v));
-    const managementRows = [['經營團隊', management.team], ['策略方向', management.strategy]].filter(([, v]) => available(v));
+    const structuredHistory = Array.isArray(history.milestones);
+    const historyRows = structuredHistory
+      ? history.milestones.filter(item => available(item.year) && available(item.event))
+        .map(item => [item.year, item.event, item.significance])
+      : [['發展轉折', history.milestones], ['營運布局', history.footprint]].filter(([, v]) => available(v));
+    const footprintRows = structuredHistory ? [['研發中心', history.footprint.research],
+      ['製造與組裝', history.footprint.manufacturing], ['銷售通路與覆蓋', history.footprint.sales]]
+      .filter(([, value]) => available(value)) : [];
+    const historyBody = structuredHistory
+      ? (available(history.summary) ? '<h4>戰略進化核心總結</h4>' + paragraph(history.summary) : '')
+        + (historyRows.length ? '<h4>重大轉折點</h4>' + table(['年份', '關鍵事件', '商業與戰略意義'], historyRows) : '')
+        + (footprintRows.length ? `<h4>全球營運與製造足跡</h4><ul>${footprintRows.map(([label, value]) =>
+          `<li><strong>${escapeHtml(label)}：</strong>${escapeHtml(value)}</li>`).join('')}</ul>` : '')
+      : table(['面向', '關鍵事實'], historyRows);
+    const structuredManagement = Array.isArray(management.pillars);
+    const managementRows = structuredManagement
+      ? management.pillars.filter(item => available(item.pillar) && (available(item.objective) || available(item.initiatives)))
+        .map(item => [item.pillar, item.objective, item.initiatives])
+      : [['經營團隊', management.team], ['策略方向', management.strategy]].filter(([, v]) => available(v));
+    const capitalPoints = structuredManagement ? management.capitalAllocation.filter(available) : [];
+    const managementBody = structuredManagement
+      ? (available(management.leadership) ? '<h4>領導層核心動態</h4>' + paragraph(management.leadership) : '')
+        + (managementRows.length ? '<h4>策略支柱</h4>' + table(['核心支柱', '戰略目標', '具體推動項目或關鍵觀察指標'], managementRows) : '')
+        + (capitalPoints.length ? `<h4>資本配置哲學</h4><ul>${capitalPoints.map(value => `<li>${escapeHtml(value)}</li>`).join('')}</ul>` : '')
+      : table(['策略面向', '重點'], managementRows);
     const comparison = [['產業與競爭者', industry.competition], ['差異與限制', industry.advantage]].filter(([, v]) => available(v));
     const thesisRows = [['研究論點', thesis.opportunity], ['驗證條件與反證', thesis.condition]].filter(([, v]) => available(v));
     const riskRows = risks.filter(r => available(r.risk) && available(r.reason)).map(r => [r.risk, r.reason, r.watch]);
     const sections = [
       ['business', 'Business', '公司如何運作', expandedBusinessBody, company],
       ['segments', 'Segments', '業務與地區營收占比', table(['業務分部', '代表產品／服務', '對公司的意義'], productRows) + renderRevenuePlaceholder(), products, !productRows.length],
-      ['history', 'History & Footprint', '發展歷程與布局', table(['面向', '關鍵事實'], historyRows), history],
-      ['management', 'Management & Strategy', '團隊與策略方向', table(['策略面向', '重點'], managementRows), management],
+      ['history', 'History & Footprint', '發展歷程與布局', historyBody, history],
+      ['management', 'Management & Strategy', '團隊與策略方向', managementBody, management],
       ['industry', 'Industry & Competition', '產業與競爭位置', comparison.length ? `<div class="brief-comparison">${comparison.map(([label,v]) => `<div><h4>${label}</h4><p>${escapeHtml(v)}</p></div>`).join('')}</div>` : '', industry],
       ['thesis', 'Thesis', '值得關注的理由', thesisRows.length ? `<div class="brief-argument">${thesisRows.map(([label,v]) => `<div><span>${label}</span><p>${escapeHtml(v)}</p></div>`).join('')}</div>` : '', thesis],
       ['risks', 'Risks', '什麼可能改變判斷', table(['風險', '可能影響', '觀察訊號'], riskRows), risks]
