@@ -127,9 +127,7 @@
       .filter(Boolean).join(' ').replace(/\s+/g, ' ').trim() : '';
     return `<div class="peer-comparison">${cards.length ? `<div class="revenue-grid${cards.length === 1 ? ' revenue-grid--single' : ''}">${cards.join('')}</div>` : ''}
       ${cards.length && reading ? `<div class="revenue-reading"><p>${escape(reading)}</p></div>` : ''}
-      ${qualitativeBody ? `<div class="peer-qualitative"><h4>競爭定位與差異</h4>${qualitativeBody}</div>` : ''}
-      ${cards.length ? `<p class="revenue-note">來源：<a href="https://financialmodelingprep.com/" target="_blank" rel="noopener noreferrer">Financial Modeling Prep</a>。
-      ${snapshot.retrievedAt && Number.isFinite(Date.parse(snapshot.retrievedAt)) ? `資料擷取：${escape(new Date(snapshot.retrievedAt).toLocaleDateString('zh-TW'))}。` : ''}</p>` : ''}</div>`;
+      ${qualitativeBody ? `<div class="peer-qualitative"><h4>競爭定位與差異</h4>${qualitativeBody}</div>` : ''}</div>`;
   };
 
   window.renderValuationSnapshot = snapshot => {
@@ -148,9 +146,7 @@
     }
     if (!cards.length) return '';
     return `<div class="thesis-valuation-grid" aria-label="估值快照">${cards.map(([label, value]) =>
-      `<dl class="thesis-valuation-card"><dt>${escape(label)}</dt><dd>${escape(value)}</dd></dl>`).join('')}</div>
-      <p class="revenue-note">來源：<a href="https://financialmodelingprep.com/" target="_blank" rel="noopener noreferrer">Financial Modeling Prep</a>。
-      ${snapshot.retrievedAt && Number.isFinite(Date.parse(snapshot.retrievedAt)) ? `資料擷取：${escape(new Date(snapshot.retrievedAt).toLocaleDateString('zh-TW'))}。` : ''}</p>`;
+      `<dl class="thesis-valuation-card"><dt>${escape(label)}</dt><dd>${escape(value)}</dd></dl>`).join('')}</div>`;
   };
 
   window.loadRevenueCharts = async (container, backendUrl, symbol, snapshot, insights = {}) => {
@@ -174,9 +170,7 @@
       if (!container.isConnected) return;
       const cards = [card(data.product, 'product', insights.product), card(data.geographic, 'geographic', insights.geographic)].filter(Boolean);
       if (!cards.length) return;
-      container.innerHTML = `<div class="revenue-grid${cards.length === 1 ? ' revenue-grid--single' : ''}">${cards.join('')}</div>
-        <p class="revenue-note">來源：<a href="https://financialmodelingprep.com/" target="_blank" rel="noopener noreferrer">Financial Modeling Prep</a>。
-        各圖年度見標示；占比依已披露分項合計計算，未與總營收核對，分類可能重疊。</p>`;
+      container.innerHTML = `<div class="revenue-grid${cards.length === 1 ? ' revenue-grid--single' : ''}">${cards.join('')}</div>`;
       section.hidden = false;
       const chapter = section.closest('[data-segment-chapter]');
       if (chapter) {
