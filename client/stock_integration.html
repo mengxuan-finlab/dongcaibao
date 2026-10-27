@@ -437,21 +437,85 @@
     return report;
   }
 
-  function renderReportSources(data) {
-    if (!Array.isArray(data.grounding?.sources)) return '';
-    const sources = data.grounding.sources.filter(source => {
+  function collectReportSources(data) {
+    const unique = new Map();
+    const domainTitle = title => /^(?:https?:\/\/)?(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,63}\/?$/i.test(title)
+      && !/\.(pdf|html?|aspx?)\/?$/i.test(title);
+    const documentTitle = title => !!title && !domainTitle(title) && !/^https?:\/\/\S+$/i.test(title);
+    for (const source of Array.isArray(data?.grounding?.sources) ? data.grounding.sources : []) {
       try {
-        const url = new URL(source.url);
-        return url.protocol === 'https:' && !url.username && !url.password;
-      } catch { return false; }
-    });
-    const widget = typeof data.grounding.searchEntryPointHtml === 'string' ? data.grounding.searchEntryPointHtml : '';
-    if (!sources.length && !widget) return '';
-    return `<aside class="report-sources" aria-label="搜尋與參考來源">
-      ${sources.length ? `<details><summary>參考來源 · ${sources.length} 筆</summary><ol>${sources.map(source =>
-        `<li><a href="${escapeHtml(source.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(source.title || new URL(source.url).hostname)}</a>
-        ${source.retrieved ? '<small>已由 URL Context 讀取</small>' : ''}</li>`).join('')}</ol>
-        <p>來源清單不代表每個敘述均已逐句核對；網頁讀取標記僅依 API 回傳紀錄顯示。</p></details>` : ''}
+        const url = new URL(source?.url);
+        if (url.protocol !== 'https:' || url.username || url.password) continue;
+        if (!/^#!?\//.test(url.hash)) url.hash = '';
+        for (const key of [...url.searchParams.keys()]) {
+          if (/^utm_/i.test(key) || /^(gclid|fbclid)$/i.test(key)) url.searchParams.delete(key);
+        }
+        const title = typeof source.title === 'string' ? source.title.trim() : '';
+        const previous = unique.get(url.href);
+        const published = typeof source.publishedAt === 'string' ? source.publishedAt : source.publishedDate;
+        const date = typeof published === 'string' ? published.slice(0, 10) : '';
+        const publishedDate = /^\d{4}-\d{2}-\d{2}$/.test(date) && Number.isFinite(Date.parse(date))
+          && new Date(date).toISOString().slice(0, 10) === date && Date.parse(date) <= Date.now() ? date : '';
+        unique.set(url.href, { url, title: documentTitle(previous?.title) ? previous.title : title || previous?.title || '',
+          retrieved: !!source.retrieved || !!previous?.retrieved, publishedDate: publishedDate || previous?.publishedDate || '' });
+      } catch { /* Ignore malformed source URLs, not the rest of the report. */ }
+    }
+    const groups = new Map();
+    for (const source of unique.values()) {
+      const redirect = source.url.hostname === 'vertexaisearch.cloud.google.com'
+        && source.url.pathname.startsWith('/grounding-api-redirect/');
+      const site = (redirect && domainTitle(source.title) ? source.title.replace(/^https?:\/\//i, '').replace(/\/$/, '') : source.url.hostname).replace(/^www\./i, '').toLowerCase();
+      // Opaque search redirects do not reveal a document title or its final path.
+      const groupKey = redirect && !domainTitle(source.title) ? source.url.href : site;
+      if (!groups.has(groupKey)) groups.set(groupKey, { site: redirect && !domainTitle(source.title) ? '搜尋來源' : site, documents: [] });
+      let path = '';
+      if (!redirect && source.url.pathname !== '/') {
+        try { path = decodeURIComponent(source.url.pathname); } catch { path = source.url.pathname; }
+      }
+      const title = documentTitle(source.title) ? source.title : '';
+      groups.get(groupKey).documents.push({ url: source.url.href, title, path,
+        retrieved: source.retrieved, publishedDate: source.publishedDate });
+    }
+    return { groups: [...groups.values()], documentCount: unique.size };
+  }
+
+  function describeReportSource(source, site, index) {
+    const filename = (source.path || '').split('/').filter(Boolean).pop() || '';
+    const readableFilename = filename.replace(/\.(pdf|html?|aspx?)$/i, '').replace(/[_-]+/g, ' ')
+      .replace(/([a-z])([A-Z])/g, '$1 $2').replace(/(\d)([A-Z][a-z])/g, '$1 $2')
+      .replace(/\bQ([1-4])(?=\d{4}\b)/g, 'Q$1 ').trim();
+    const opaque = /^[a-f\d-]{20,}$/i.test(filename.replace(/\.[^.]+$/, ''));
+    const title = source.title || (!opaque && readableFilename ? readableFilename : `${site}｜參考文件 ${index + 1}`);
+    const evidence = `${source.title || ''} ${source.path || ''}`;
+    let type = /\.pdf(?:\b|$)/i.test(evidence) ? 'PDF 文件' : '網頁資料';
+    if (/\b(?:10[- ]?K|20[- ]?F)\b|annual[ _-]*report|年報/i.test(evidence)) type = '年報／年度申報';
+    else if (/\b10[- ]?Q\b|季度申報/i.test(evidence)) type = '季度申報文件';
+    else if (/\b8[- ]?K\b/i.test(evidence)) type = '重大事件申報';
+    else if (/transcript|逐字稿/i.test(evidence)) type = '法說會逐字稿';
+    else if (/earnings[ _-]*call|財報電話會議|法說會/i.test(evidence)) type = '法說會資料';
+    else if (/results|earnings[ _-]*release|業績|財報公告/i.test(evidence)) type = '業績公告';
+    else if (/press[ _-]*release|新聞稿/i.test(evidence)) type = '新聞稿';
+    else if (/leadership|governance|公司治理|領導團隊/i.test(evidence)) type = '團隊與公司治理';
+    return { title, type, publisher: /(^|\.)sec\.gov$/i.test(site) ? 'SEC EDGAR' : site };
+  }
+
+  function renderReportSources(data) {
+    const { groups, documentCount } = collectReportSources(data);
+    const widget = typeof data?.grounding?.searchEntryPointHtml === 'string' ? data.grounding.searchEntryPointHtml : '';
+    if (!documentCount && !widget) return '';
+    let number = 0;
+    return `<aside id="report-sources" class="report-sources" aria-label="搜尋與參考來源">
+      ${documentCount ? `<header class="report-source-heading"><h2>研究來源</h2><span>${documentCount} 份文件 · ${groups.length} 個網站／來源</span></header>
+        <ol class="report-source-catalog">${groups.flatMap(group => group.documents.map(source => {
+          const index = number++;
+          const description = describeReportSource(source, group.site, index);
+          return `<li><span class="report-source-number" aria-hidden="true">${index + 1}</span><div class="report-source-content">
+            <a class="report-source-title" href="${escapeHtml(source.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(description.title)}</a>
+            <div class="report-source-meta"><span>${escapeHtml(description.type)}</span><span>${escapeHtml(description.publisher)}</span>
+              <span>${source.retrieved ? 'URL Context 讀取' : '網路搜尋'}</span>
+              ${source.publishedDate ? `<time datetime="${escapeHtml(source.publishedDate)}">發布 ${escapeHtml(source.publishedDate.replaceAll('-', '/'))}</time>` : ''}</div>
+          </div></li>`;
+        })).join('')}</ol>` : ''}
       ${widget ? `<iframe title="Google 搜尋建議" sandbox="allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" srcdoc="${escapeHtml(widget)}"></iframe>` : ''}
     </aside>`;
   }
@@ -643,8 +707,9 @@
           </iframe>
         </div>`;
       
+      const sourceDocumentCount = collectReportSources(data).documentCount;
       const sourceNotice = data.sourceInfo ? `<aside class="report-data-status" role="status">
-        ${data.cached ? "已載入近 3 天內的公司報告" : "公司報告已生成"}${Number(data.sourceInfo.count) > 0 ? `｜${data.sourceInfo.provider === 'google_search_url_context' ? 'Google 搜尋參考來源' : '搜尋資料'} ${Number(data.sourceInfo.count)} 筆` : ''}
+        ${data.cached ? "已載入近 3 天內的公司報告" : "公司報告已生成"}${sourceDocumentCount > 0 ? `｜${data.sourceInfo.provider === 'google_search_url_context' ? 'Google 搜尋參考來源' : '搜尋資料'} ${sourceDocumentCount} 份文件` : ''}
         ${data.generatedAt ? `｜生成時間：${escapeHtml(new Date(data.generatedAt).toLocaleString('zh-TW'))}` : ""}
       </aside>` : "";
       resultElement.innerHTML = sourceNotice + renderCompanyReport(sections, symbol, chartHtml) + renderReportSources(data);
