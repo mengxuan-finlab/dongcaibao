@@ -164,7 +164,7 @@ function extractReportGrounding(result) {
 
 async function generateValidatedReport({
   basePrompt, models, generate, isRetryable, log = () => {}, timeoutMs = 65000,
-  grounded = false, segmentData = null,
+  grounded = false, segmentData = null, peerData = null,
   totalTimeoutMs = timeoutMs * 2, now = () => performance.now(),
   sleep = ms => new Promise(resolve => setTimeout(resolve, ms)), random = Math.random
 }) {
@@ -216,6 +216,14 @@ async function generateValidatedReport({
           for (const kind of ['product', 'geographic']) {
             if (segmentData?.[kind]?.status !== 'ok') report.segmentInsights[kind] = '未披露';
           }
+        }
+        if (Object.hasOwn(report.industry || {}, 'peerInsight')) {
+          const insight = report.industry.peerInsight.trim();
+          const length = [...insight].length;
+          if (peerData?.status !== 'ok' || length < 80 || length > 120 || /[\r\n]|[•●]|^\s*[-*#]|^\d+[.)、]/u.test(insight)) {
+            report.industry.peerInsight = '未披露';
+            log({ event: 'peer_insight_omitted', model, length, dataStatus: peerData?.status || 'unavailable' });
+          } else report.industry.peerInsight = insight;
         }
         let grounding, sourceValidation;
         if (grounded) {

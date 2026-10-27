@@ -146,6 +146,64 @@ ungrounded report. Local JSON validation is unchanged.
 - `company_report_sources`: source count, actual search query count and successful
   URL retrieval count, without logging full source text.
 
+## Peer Comparison
+
+Chapter 5 peer comparisons use `stock-peers` plus a target `profile`, then
+`key-metrics-ttm` and `ratios-ttm` for the target and at most four peers.
+There are no hard-coded company groups, ticker aliases, industry whitelists or
+supplier blacklists. Every query starts with its own FMP list. Candidate profiles
+must match the symbol, have a company name, and not identify an inactive listing,
+ETF or fund. Duplicate issuers are removed by returned CIK, ISIN and normalized
+company names rather than a list of special-case ticker aliases.
+
+If fewer than three peers survive, one optional Google Search Gemini call
+discovers candidates for that input company (8 seconds, SDK attempts=1, no model
+fallback). Search candidates require HTTPS tool evidence and a matching FMP
+profile/name before metric requests. Missing evidence simply leaves the list
+sparse; it never blocks or retries the main report. Business similarity still
+requires judgment; profile identity checks do not certify perfect comparability.
+Discovery sources/queries are merged into the report source list, with discovery
+counts separately recorded. `peerPolicy` in the cache digest prevents reuse of
+reports generated under the previous fixed-list policy.
+
+Only missing operating margins trigger `income-statement-ttm`. If unavailable,
+`income-statement?period=quarter&limit=8` is checked for four distinct consecutive
+fiscal quarters, valid ordered dates and a common reporting currency. Operating
+income and revenue are summed before division (not averaged quarterly margins).
+Annual rows, gaps, missing amounts, non-positive revenue and mixed currencies
+are rejected. Calculated margins retain method and period end in the snapshot
+and show this provenance in the chart. No stock-price/EPS or currency-mismatched
+P/E is synthesized. All fallback requests share the original 20-second deadline;
+401/429 stops further calls for that feed request rather than amplifying failure.
+
+The optional peer feed has a 20-second total deadline, 8-second HTTP deadlines,
+two concurrent reports and two company workers per report (four metric requests).
+Its process cache holds at most 128 symbols for 24 hours (five minutes for errors
+or unavailable comparisons). The report stores the exact `peerData` snapshot in
+the existing three-day Supabase payload. Charts and the 80-120-character,
+single-paragraph `industry.peerInsight` use that snapshot; browsers do not fetch
+fresh peer figures or receive the FMP key. No SQL migration is needed.
+
+The interpretation shares the existing report-generation call and configured
+primary/fallback models. Only sparse-list discovery adds an optional AI call,
+within the peer feed's original total deadline; cache hits do not rediscover.
+Invalid-length
+or multiline peer commentary is omitted without failing or retrying the report.
+Missing metrics stay null, non-positive P/E or known negative/zero EPS is not
+plotted, and negative operating margins retain their sign. Optional feed failures
+hide unavailable charts without blocking other chapters. Cached snapshots are
+not live quotes; different fiscal periods/accounting policies remain a caveat.
+
+If either chart lacks a valid target-plus-peer comparison, the existing Gemini
+call also researches `industry.qualitative`: an overview, sourced competitor
+product/customer differences and a watch point. This can render independently
+of FMP availability (including missing keys, unsupported markets or busy feeds).
+Unsubstantiated qualitative fields remain undisclosed and are hidden, never
+fabricated just to keep a chapter visible. Missing tool metadata remains advisory,
+not a retry/failure trigger. The source panel stays shared with the report; a
+qualitative-only comparison is not labeled as FMP financial data. Older reports
+without this optional qualitative shape remain readable.
+
 ## Persistent Cache
 
 The backend uses the existing Supabase service-role client. Browser roles have

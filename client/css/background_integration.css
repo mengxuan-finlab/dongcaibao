@@ -1867,6 +1867,11 @@ button {
 .brief-argument span { display: block; color: #103f66; font-weight: 700; font-size: 11px; margin-bottom: 8px; letter-spacing: .06em; }
 .brief-report .revenue-section { padding: 0; margin: 28px 0 0; background: transparent; border: 0; border-radius: 0; }
 .revenue-grid--single { grid-template-columns: minmax(0, 1fr); }
+.peer-chart .revenue-bar-row svg { display: block; width: 100%; height: 18px; margin-top: 7px; }
+.peer-chart .peer-target { color: #103f66; font-weight: 700; }
+.peer-comparison > .revenue-reading { margin-top: 18px; }
+.peer-calculated { display: block; margin-top: 4px; color: #637086; font-size: 11px; font-weight: 400; }
+.peer-qualitative { margin-top: 20px; }
 .brief-report .revenue-card { padding: 22px; border: 1px solid #dfe6ed; border-radius: 8px; }
 #result .brief-report .revenue-card h4 { color: #253c4e; font-size: 15px; }
 .brief-report .revenue-note a { color: #103f66; }

@@ -85,6 +85,54 @@
       ${reading ? `<div class="revenue-reading"><strong>${product ? '產品組合解讀' : '地區分布解讀'}</strong><p>${escape(reading)}</p></div>` : ''}</article>`;
   }
 
+  window.renderPeerComparison = (snapshot, insight, qualitative) => {
+    const available = value => typeof value === 'string' && value.trim()
+      && !/^(未披露|未提供|未公開|不適用|無資料|資料不足|目前資料不足|目前無法|暫無|無法確認|尚未披露)/.test(value.trim());
+    const items = Array.isArray(snapshot?.items) ? snapshot.items : [];
+    const chart = (key, title, unit) => {
+      if (snapshot?.status !== 'ok') return '';
+      const rows = items.filter(item => item && typeof item[key] === 'number' && Number.isFinite(item[key])
+        && (key !== 'peRatio' || item[key] > 0));
+      if (!rows.some(item => item.isTarget) || !rows.some(item => !item.isTarget)) return '';
+      const scale = Math.max(1, ...rows.map(item => Math.abs(item[key])));
+      const low = Math.min(0, ...rows.map(item => item[key] / scale));
+      const high = Math.max(0, ...rows.map(item => item[key] / scale));
+      const range = high - low || 1;
+      const position = value => 1 + (value / scale - low) / range * 98;
+      const zero = position(0);
+      return `<article class="revenue-card peer-chart"><h4>${title}</h4><div class="revenue-bars">
+        ${rows.map(item => {
+          const value = item[key], end = position(value);
+          const label = `${item.companyName || item.ticker} (${item.ticker})`;
+          const formatted = `${value.toLocaleString('zh-TW', { maximumFractionDigits: 1 })}${unit}`;
+          return `<div class="revenue-bar-row${item.isTarget ? ' peer-target' : ''}"><div><span>${escape(label)}${item.isTarget ? ' · 本公司' : ''}</span><b>${escape(formatted)}</b></div>
+            ${key === 'operatingMargin' && ['income_statement_ttm', 'four_quarters'].includes(item.operatingMarginSource)
+              ? `<small class="peer-calculated">TTM 損益表計算${/^\d{4}-\d{2}-\d{2}$/.test(item.operatingMarginPeriodEnd || '') ? ` · 截至 ${escape(item.operatingMarginPeriodEnd)}` : ''}</small>` : ''}
+            <svg viewBox="0 0 100 16" preserveAspectRatio="none" role="img" aria-label="${escape(label)}：${escape(formatted)}">
+              <rect x="${Math.min(zero, end)}" y="2" width="${Math.abs(end - zero)}" height="12" rx="1" fill="${item.isTarget ? COLORS[0] : '#c6cdd6'}" />
+              <line x1="${zero}" x2="${zero}" y1="0" y2="16" stroke="#8291a3" stroke-width="0.4" /></svg></div>`;
+        }).join('')}</div></article>`;
+    };
+    const cards = [chart('operatingMargin', '營業利益率對照（TTM）', '%'), chart('peRatio', '本益比估值對照（P/E TTM）', ' 倍')].filter(Boolean);
+    const peers = Array.isArray(qualitative?.peers) ? qualitative.peers.filter(item => item && available(item.company)
+      && (available(item.position) || available(item.difference))) : [];
+    const qualitativeBody = cards.length < 2 && qualitative
+      ? `${available(qualitative.overview) ? `<p class="brief-prose">${escape(qualitative.overview)}</p>` : ''}
+        ${peers.length ? `<div class="brief-table-wrap"><table class="brief-table"><thead><tr><th scope="col">同業</th><th scope="col">產品與客群定位</th><th scope="col">競爭差異</th></tr></thead>
+        <tbody>${peers.map(item => `<tr><th scope="row">${escape(item.company)}</th><td>${escape(available(item.position) ? item.position : '')}</td><td>${escape(available(item.difference) ? item.difference : '')}</td></tr>`).join('')}</tbody></table></div>` : ''}
+        ${available(qualitative.watch) ? `<div class="revenue-reading"><strong>觀察重點</strong><p>${escape(qualitative.watch)}</p></div>` : ''}`.trim()
+      : '';
+    if (!cards.length && !qualitativeBody) return '';
+    const reading = typeof insight === 'string' && [...insight.trim()].length >= 80 && [...insight.trim()].length <= 120
+      && !/[\r\n]|[•●]|^\s*[-*#]|^\d+[.)、]/u.test(insight) ? insight : '';
+    return `<div class="peer-comparison">${cards.length ? `<div class="revenue-grid${cards.length === 1 ? ' revenue-grid--single' : ''}">${cards.join('')}</div>` : ''}
+      ${cards.length && reading ? `<div class="revenue-reading"><p>${escape(reading)}</p></div>` : ''}
+      ${qualitativeBody ? `<div class="peer-qualitative"><h4>競爭定位與差異</h4>${qualitativeBody}</div>` : ''}
+      ${cards.length ? `<p class="revenue-note">來源：<a href="https://financialmodelingprep.com/" target="_blank" rel="noopener noreferrer">Financial Modeling Prep</a>。
+      ${snapshot.retrievedAt && Number.isFinite(Date.parse(snapshot.retrievedAt)) ? `資料擷取：${escape(new Date(snapshot.retrievedAt).toLocaleDateString('zh-TW'))}。` : ''}
+      TTM 為近十二個月，各公司財報期間與會計口徑可能不同；快照並非即時報價，虧損或缺少有效正值的 P/E 不繪製。同業名單依查詢股票的 FMP 建議或搜尋結果選取並核對公司身分，商業模式仍可能不同。</p>` : ''}</div>`;
+  };
+
   window.loadRevenueCharts = async (container, backendUrl, symbol, snapshot, insights = {}) => {
     if (!container) return;
     const section = container.closest('.revenue-section');
@@ -1136,9 +1184,18 @@
           || !report.management.capitalAllocation.every(text))) {
         throw new Error('團隊與策略章節未完整傳回，請稍後再試。');
       }
+      if (report.industry && Object.hasOwn(report.industry, 'qualitative')) {
+        const qualitative = report.industry.qualitative;
+        if (!qualitative || !text(qualitative.overview) || !text(qualitative.watch)
+            || !Array.isArray(qualitative.peers) || !qualitative.peers.length
+            || !qualitative.peers.every(item => item && ['company', 'position', 'difference'].every(key => text(item[key])))) {
+          throw new Error('同業競爭對照未完整傳回，請稍後再試。');
+        }
+      }
       const sections = { history: structuredHistory ? ['summary'] : ['milestones', 'footprint'],
         management: structuredManagement ? ['leadership'] : ['team', 'strategy'],
-        industry: ['competition', 'advantage'], thesis: ['opportunity', 'condition'] };
+        industry: Object.hasOwn(report.industry || {}, 'peerInsight') ? ['peerInsight'] : ['competition', 'advantage'],
+        thesis: ['opportunity', 'condition'] };
       for (const [key, required] of Object.entries(sections)) {
         if (!report[key] || !required.every(field => text(report[key][field]))) {
           throw new Error('公司報告部分章節未完整傳回，請稍後再試。');
@@ -1182,7 +1239,7 @@
       <div id="revenueCharts" aria-live="polite"></div></section>`;
   }
 
-  function renderCompactReport(report, symbol) {
+  function renderCompactReport(report, symbol, peerData) {
     if (!report.history) return renderLegacyCompactReport(report, symbol);
     const { company, products = [], history, management, industry, thesis, risks } = report;
     const available = value => typeof value === 'string' && value.trim()
@@ -1232,6 +1289,9 @@
         + (capitalPoints.length ? `<h4>資本配置哲學</h4><ul>${capitalPoints.map(value => `<li>${escapeHtml(value)}</li>`).join('')}</ul>` : '')
       : table(['策略面向', '重點'], managementRows);
     const comparison = [['產業與競爭者', industry.competition], ['差異與限制', industry.advantage]].filter(([, v]) => available(v));
+    const peerComparison = Object.hasOwn(industry, 'peerInsight');
+    const industryBody = peerComparison ? window.renderPeerComparison(peerData, industry.peerInsight, industry.qualitative)
+      : comparison.length ? `<div class="brief-comparison">${comparison.map(([label,v]) => `<div><h4>${label}</h4><p>${escapeHtml(v)}</p></div>`).join('')}</div>` : '';
     const thesisRows = [['研究論點', thesis.opportunity], ['驗證條件與反證', thesis.condition]].filter(([, v]) => available(v));
     const riskRows = risks.filter(r => available(r.risk) && available(r.reason)).map(r => [r.risk, r.reason, r.watch]);
     const sections = [
@@ -1239,7 +1299,7 @@
       ['segments', 'Segments', '業務與地區營收占比', table(['業務分部', '代表產品／服務', '對公司的意義'], productRows) + renderRevenuePlaceholder(), products, !productRows.length],
       ['history', 'History & Footprint', '發展歷程與布局', historyBody, history],
       ['management', 'Management & Strategy', '團隊與策略方向', managementBody, management],
-      ['industry', 'Industry & Competition', '產業與競爭位置', comparison.length ? `<div class="brief-comparison">${comparison.map(([label,v]) => `<div><h4>${label}</h4><p>${escapeHtml(v)}</p></div>`).join('')}</div>` : '', industry],
+      ['industry', peerComparison ? 'Peer Financials & Valuation' : 'Industry & Competition', peerComparison ? '同業財務與估值對照' : '產業與競爭位置', industryBody, industry],
       ['thesis', 'Thesis', '值得關注的理由', thesisRows.length ? `<div class="brief-argument">${thesisRows.map(([label,v]) => `<div><span>${label}</span><p>${escapeHtml(v)}</p></div>`).join('')}</div>` : '', thesis],
       ['risks', 'Risks', '什麼可能改變判斷', table(['風險', '可能影響', '觀察訊號'], riskRows), risks]
     ].filter(([, , , body]) => body);
@@ -1300,7 +1360,7 @@
 
   function renderCompanyReport(sections, symbol, chartHtml) {
     if (sections.compactReport) {
-      return renderCompactReport(sections.compactReport, symbol) + renderReadingChapter('股價走勢', symbol, chartHtml);
+      return renderCompactReport(sections.compactReport, symbol, sections.peerData) + renderReadingChapter('股價走勢', symbol, chartHtml);
     }
     const { valueChain, timeline, coreSummary, productPortfolio, dashboard, reportText } = sections;
     const fullReportHtml = renderReadingChapter('股價走勢', symbol, chartHtml) +
@@ -1316,7 +1376,7 @@
 
   function readCompanySections(data) {
     if (data.report && (['compact-v1', 'compact-v2', 'compact-v3', 'compact-v4', 'compact-v5'].includes(data.reportFormat) || data.report.company)) {
-      return { compactReport: validateCompactReport(data.report, data.reportFormat), reportText: '' };
+      return { compactReport: validateCompactReport(data.report, data.reportFormat), peerData: data.peerData, reportText: '' };
     }
     const compactStart = '<!-- COMPACT_REPORT_START -->';
     if (!data.report && typeof data.text === 'string' && data.text.includes(compactStart)) {
@@ -1326,7 +1386,7 @@
       let parsed;
       try { parsed = JSON.parse(data.text.slice(start, end).trim()); }
       catch { throw new Error('公司報告格式不完整，請稍後再試。'); }
-      return { compactReport: validateCompactReport(parsed), reportText: '' };
+      return { compactReport: validateCompactReport(parsed), peerData: data.peerData, reportText: '' };
     }
     if (data.report) {
       const { valueChain, timeline, coreSummary, productPortfolio, dashboard } = data.report;
