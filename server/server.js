@@ -490,7 +490,7 @@ app.post('/api/analyze-stock', async (req, res) => {
     const reportVersion = createHash('sha256').update(JSON.stringify({
       prompt: getBasePrompt(normalizedSymbol, '', market), schema: reportSchema,
       models: [GEMINI_PRIMARY_MODEL, GEMINI_FALLBACK_MODEL], provider: 'google_search_url_context', version: 2,
-      peerPolicy: 'dynamic-search-v1'
+      peerPolicy: 'dynamic-search-v1', peerInsightPolicy: 'paragraph-v2'
     })).digest('hex').slice(0, 24);
     const cacheKey = `company:${market}:${normalizedSymbol}:${reportVersion}`;
     const reportResult = await getCompanyReport(cacheKey, async () => {

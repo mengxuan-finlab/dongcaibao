@@ -123,14 +123,14 @@
         ${available(qualitative.watch) ? `<div class="revenue-reading"><strong>觀察重點</strong><p>${escape(qualitative.watch)}</p></div>` : ''}`.trim()
       : '';
     if (!cards.length && !qualitativeBody) return '';
-    const reading = typeof insight === 'string' && [...insight.trim()].length >= 80 && [...insight.trim()].length <= 120
-      && !/[\r\n]|[•●]|^\s*[-*#]|^\d+[.)、]/u.test(insight) ? insight : '';
+    const reading = available(insight) ? insight.split(/\r?\n/)
+      .map(line => line.trim().replace(/^(?:[-*]\s+|[•●]\s*|\d+[.)、]\s+)/u, ''))
+      .filter(Boolean).join(' ').replace(/\s+/g, ' ').trim() : '';
     return `<div class="peer-comparison">${cards.length ? `<div class="revenue-grid${cards.length === 1 ? ' revenue-grid--single' : ''}">${cards.join('')}</div>` : ''}
       ${cards.length && reading ? `<div class="revenue-reading"><p>${escape(reading)}</p></div>` : ''}
       ${qualitativeBody ? `<div class="peer-qualitative"><h4>競爭定位與差異</h4>${qualitativeBody}</div>` : ''}
       ${cards.length ? `<p class="revenue-note">來源：<a href="https://financialmodelingprep.com/" target="_blank" rel="noopener noreferrer">Financial Modeling Prep</a>。
-      ${snapshot.retrievedAt && Number.isFinite(Date.parse(snapshot.retrievedAt)) ? `資料擷取：${escape(new Date(snapshot.retrievedAt).toLocaleDateString('zh-TW'))}。` : ''}
-      TTM 為近十二個月，各公司財報期間與會計口徑可能不同；快照並非即時報價，虧損或缺少有效正值的 P/E 不繪製。同業名單依查詢股票的 FMP 建議或搜尋結果選取並核對公司身分，商業模式仍可能不同。</p>` : ''}</div>`;
+      ${snapshot.retrievedAt && Number.isFinite(Date.parse(snapshot.retrievedAt)) ? `資料擷取：${escape(new Date(snapshot.retrievedAt).toLocaleDateString('zh-TW'))}。` : ''}</p>` : ''}</div>`;
   };
 
   window.loadRevenueCharts = async (container, backendUrl, symbol, snapshot, insights = {}) => {

@@ -187,8 +187,13 @@ fresh peer figures or receive the FMP key. No SQL migration is needed.
 The interpretation shares the existing report-generation call and configured
 primary/fallback models. Only sparse-list discovery adds an optional AI call,
 within the peer feed's original total deadline; cache hits do not rediscover.
-Invalid-length
-or multiline peer commentary is omitted without failing or retrying the report.
+The 80-120-character length is a writing target, not a display gate. Commentary
+outside that range is retained and its length logged. Line breaks and list
+prefixes are normalized into a single paragraph without truncating the analysis.
+Empty commentary or unavailable comparison data is still omitted. Frontend
+rendering applies the same paragraph normalization; the chart footer contains
+only the provider link and retrieval date. `peerInsightPolicy` in the report cache
+digest prevents reuse of commentary erased by the former strict length gate.
 Missing metrics stay null, non-positive P/E or known negative/zero EPS is not
 plotted, and negative operating margins retain their sign. Optional feed failures
 hide unavailable charts without blocking other chapters. Cached snapshots are

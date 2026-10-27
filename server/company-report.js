@@ -218,12 +218,17 @@ async function generateValidatedReport({
           }
         }
         if (Object.hasOwn(report.industry || {}, 'peerInsight')) {
-          const insight = report.industry.peerInsight.trim();
+          const insight = report.industry.peerInsight.split(/\r?\n/)
+            .map(line => line.trim().replace(/^(?:[-*]\s+|[•●]\s*|\d+[.)、]\s+)/u, ''))
+            .filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
           const length = [...insight].length;
-          if (peerData?.status !== 'ok' || length < 80 || length > 120 || /[\r\n]|[•●]|^\s*[-*#]|^\d+[.)、]/u.test(insight)) {
+          if (peerData?.status !== 'ok' || !insight) {
             report.industry.peerInsight = '未披露';
             log({ event: 'peer_insight_omitted', model, length, dataStatus: peerData?.status || 'unavailable' });
-          } else report.industry.peerInsight = insight;
+          } else {
+            report.industry.peerInsight = insight;
+            if (length < 80 || length > 120) log({ event: 'peer_insight_length', model, length, outcome: 'kept' });
+          }
         }
         let grounding, sourceValidation;
         if (grounded) {
