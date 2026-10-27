@@ -54,7 +54,18 @@ pages according to chapter-specific source priorities:
 - Industry & Competition: grounded multi-source competitor/industry analysis.
 - Thesis: a supplied public research URL if present; otherwise grounded,
   dated market arguments and counterarguments, checked against official facts.
-- Risks: 10-K Item 1A and newer 10-Q risk updates. Reuse the annual report URL.
+- Risks & Catalysts: 10-K Item 1A, newer 10-Q risk updates and the latest
+  available earnings-call supply/cost guidance. Reuse existing official sources.
+  The chapter has a four-column risk matrix, a three-step conditional bear-case
+  cascade and a catalyst calendar for the next one to two quarters relative to
+  the request's verification date. Topics adapt to the queried company, not a
+  fixed hardware/platform business model. Impact and likelihood are qualitative
+  judgments; unknown ratings stay blank. Confirmed event dates require official
+  support; expected windows are labeled separately. Unsupported events are not
+  invented to fill the calendar. Empty placeholder subsections are hidden.
+  Required JSON fields remain validated, without brittle exact item counts.
+  This shares the existing generation call and three-day cache, with no new
+  API endpoint or environment variables. The prior risk-array UI remains readable.
 
 These are model instructions, not a deterministic per-chapter fetch pipeline.
 No per-company URLs were supplied, so Search discovers them. The app does not
@@ -78,7 +89,8 @@ returned Search Suggestions are preserved when available. No URLs are invented.
 The prompt requires supported, qualified legal-risk statements. When tool URLs
 are absent, compact-report litigation/enforcement risk entries are conservatively
 replaced with a conditional generic risk, dropping unsupported names, amounts,
-dates or claims that an event has already been verified.
+dates or claims that an event has already been verified. This also covers the
+structured risk matrix and cascade; unsupported legal-event catalysts are hidden.
 Google's returned Search Suggestions HTML is displayed in a script-disabled
 sandboxed iframe; citation links accept only HTTPS URLs without credentials.
 See the official Search, URL Context, and structured-output documentation:

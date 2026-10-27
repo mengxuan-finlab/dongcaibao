@@ -387,7 +387,15 @@
       throw new Error('公司報告部分章節未完整傳回，請稍後再試。');
     }
     const fmpOnlySegments = ['compact-v3', 'compact-v4', 'compact-v5'].includes(format) || !Object.hasOwn(report, 'products');
-    const fields = { risks: ['risk', 'reason', 'watch'] };
+    const structuredRisks = report.risks && !Array.isArray(report.risks);
+    const fields = structuredRisks ? {} : { risks: ['risk', 'reason', 'watch'] };
+    if (structuredRisks && (!Array.isArray(report.risks.matrix) || !report.risks.matrix.length
+        || !report.risks.matrix.every(item => item && ['dimension', 'impact', 'probability', 'watch'].every(key => text(item[key])))
+        || !Array.isArray(report.risks.cascade) || !report.risks.cascade.length || !report.risks.cascade.every(text)
+        || !Array.isArray(report.risks.catalysts) || !report.risks.catalysts.length
+        || !report.risks.catalysts.every(item => item && ['event', 'timing', 'status', 'watch'].every(key => text(item[key]))))) {
+      throw new Error('風險與催化劑章節未完整傳回，請稍後再試。');
+    }
     if (!fmpOnlySegments) fields.products = ['name', 'significance'];
     const structuredHistory = report.history && Object.hasOwn(report.history, 'summary');
     if (structuredHistory && (!text(report.history.summary)
@@ -590,7 +598,21 @@
         + table(['關鍵分析維度', '正向支持條件（Bull Case）', '核心反證／破口條件（Bear Risks）'], thesisRows)
         + (thesisReading ? `<div class="revenue-reading thesis-reading"><p>${escapeHtml(thesisReading)}</p></div>` : '')
       : thesisRows.length ? `<div class="brief-argument">${thesisRows.map(([label,v]) => `<div><span>${label}</span><p>${escapeHtml(v)}</p></div>`).join('')}</div>` : '';
-    const riskRows = risks.filter(r => available(r.risk) && available(r.reason)).map(r => [r.risk, r.reason, r.watch]);
+    const structuredRisks = !Array.isArray(risks);
+    const riskRows = structuredRisks
+      ? risks.matrix.filter(r => available(r.dimension) && available(r.watch))
+        .map(r => [r.dimension, ['高', '中'].includes(r.impact) ? r.impact : '',
+          ['高', '中'].includes(r.probability) ? r.probability : '', r.watch])
+      : risks.filter(r => available(r.risk) && available(r.reason)).map(r => [r.risk, r.reason, r.watch]);
+    const cascade = structuredRisks ? risks.cascade.filter(available) : [];
+    const catalysts = structuredRisks ? risks.catalysts.filter(item => available(item.event) && available(item.watch))
+      .map(item => [available(item.timing) ? `${['已公告', '預計'].includes(item.status) ? `${item.status}：` : ''}${item.timing}` : '',
+        item.event, item.watch]) : [];
+    const risksBody = structuredRisks
+      ? (riskRows.length ? '<h4>核心風險評估矩陣</h4>' + table(['風險維度', '潛在衝擊', '發生機率（定性）', '核心觀察重點'], riskRows) : '')
+        + (cascade.length ? `<h4>熊市骨牌推導</h4><ol>${cascade.map(step => `<li>${escapeHtml(step)}</li>`).join('')}</ol>` : '')
+        + (catalysts.length ? '<h4>未來關鍵催化劑</h4>' + table(['時間', '事件', '該看什麼數據'], catalysts) : '')
+      : table(['風險', '可能影響', '觀察訊號'], riskRows);
     const sections = [
       ['business', 'Business', '公司如何運作', expandedBusinessBody, company],
       ['segments', 'Segments', '業務與地區營收占比', table(['業務分部', '代表產品／服務', '對公司的意義'], productRows) + renderRevenuePlaceholder(), products, !productRows.length],
@@ -598,7 +620,7 @@
       ['management', 'Management & Strategy', '團隊與策略方向', managementBody, management],
       ['industry', peerComparison ? 'Peer Financials & Valuation' : 'Industry & Competition', peerComparison ? '同業財務與估值對照' : '產業與競爭位置', industryBody, industry],
       ['thesis', structuredThesis ? 'Investment Thesis' : 'Thesis', structuredThesis ? '核心研究論點' : '值得關注的理由', thesisBody, thesis],
-      ['risks', 'Risks', '什麼可能改變判斷', table(['風險', '可能影響', '觀察訊號'], riskRows), risks]
+      ['risks', 'Risks & Catalysts', '主要風險與催化劑', risksBody, risks]
     ].filter(([, , , body]) => body);
     return `<div class="brief-layout"><nav class="brief-toc" aria-label="報告章節"><span>CONTENTS</span>
       ${sections.map(([id, english, title, , , hidden], i) => `<a href="#brief-${id}" data-report-link="${id}"${hidden ? ' hidden' : ''}><b>${String(i + 1).padStart(2, '0')}</b>${escapeHtml(title)}</a>`).join('')}</nav>

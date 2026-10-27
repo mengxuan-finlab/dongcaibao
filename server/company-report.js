@@ -248,14 +248,32 @@ async function generateValidatedReport({
             urlEvidence: telemetry.urlAttemptCount ? 'reported' : 'not_reported',
             toolsEnabled: ['googleSearch', 'urlContext'], ...telemetry };
           let cautiousRiskCount = 0;
-          if (!links.sources.length && Array.isArray(report.risks)) {
+          if (!links.sources.length) {
             const legalEvent = /訴訟|起訴|判決|罰款|裁罰|處罰|調查|違法|指控|和解|禁令|\b(lawsuit|litigation|penalty|penalties|fine|fined|sanction|settlement|investigation)\b/i;
-            report.risks = report.risks.map(risk => {
+            if (Array.isArray(report.risks)) report.risks = report.risks.map(risk => {
               if (!legalEvent.test([risk.risk, risk.reason, risk.watch].join(' '))) return risk;
               cautiousRiskCount++;
               return { risk: '法律與監管風險', reason: '若發生訴訟或監管執法，可能增加合規成本或影響營運。',
                 watch: '可觀察官方公告、監管文件與法院紀錄。' };
             });
+            else if (report.risks?.matrix) {
+              report.risks.matrix = report.risks.matrix.map(risk => {
+                if (!legalEvent.test([risk.dimension, risk.watch].join(' '))) return risk;
+                cautiousRiskCount++;
+                return { dimension: '法律與監管風險', impact: '未披露', probability: '未披露',
+                  watch: '若發生監管執法，可能增加合規成本或影響營運；可觀察官方公告及監管文件。' };
+              });
+              report.risks.cascade = report.risks.cascade.map(step => {
+                if (!legalEvent.test(step)) return step;
+                cautiousRiskCount++;
+                return '若合規成本上升或營運受到限制，可能進一步壓縮獲利與現金流。';
+              });
+              report.risks.catalysts = report.risks.catalysts.map(event => {
+                if (!legalEvent.test(Object.values(event).join(' '))) return event;
+                cautiousRiskCount++;
+                return { event: '未披露', timing: '未披露', status: '未披露', watch: '未披露' };
+              });
+            }
           }
           sourceValidation.cautiousRiskCount = cautiousRiskCount;
           log({ event: 'company_report_sources', attempt: attemptCount, model, mode, ...sourceValidation });
