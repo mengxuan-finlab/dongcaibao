@@ -610,7 +610,11 @@
         item.event, item.watch]) : [];
     const risksBody = structuredRisks
       ? (riskRows.length ? '<h4>核心風險評估矩陣</h4>' + table(['風險維度', '潛在衝擊', '發生機率（定性）', '核心觀察重點'], riskRows) : '')
-        + (cascade.length ? `<h4>熊市骨牌推導</h4><ol>${cascade.map(step => `<li>${escapeHtml(step)}</li>`).join('')}</ol>` : '')
+        + (cascade.length ? `<figure class="bear-cascade${cascade.length > 3 ? ' bear-cascade--stacked' : ''}">
+          <figcaption><span>BEAR CASE CASCADE</span><h4>熊市骨牌推導</h4></figcaption>
+          <ol class="bear-cascade-steps" role="list" style="--cascade-count:${cascade.length}">${cascade.map((step, i) =>
+            `<li class="bear-cascade-step"><span class="bear-cascade-number" aria-hidden="true">${String(i + 1).padStart(2, '0')}</span><p>${escapeHtml(step)}</p></li>`).join('')}</ol>
+          </figure>` : '')
         + (catalysts.length ? '<h4>未來關鍵催化劑</h4>' + table(['時間', '事件', '該看什麼數據'], catalysts) : '')
       : table(['風險', '可能影響', '觀察訊號'], riskRows);
     const sections = [
