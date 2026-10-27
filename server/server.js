@@ -497,7 +497,8 @@ app.post('/api/analyze-stock', async (req, res) => {
       const [revenueData, peerData] = market === 'US' && process.env.FMP_API_KEY
         ? await Promise.all([getRevenueSegments(normalizedSymbol), getPeerComparison(normalizedSymbol)])
         : [{ product: { status: 'unavailable' }, geographic: { status: 'unavailable' } }, { status: 'unavailable', items: [] }];
-      const finalPrompt = getBasePrompt(normalizedSymbol, `查證日期：${new Date().toISOString().slice(0, 10)}。請使用已啟用的 Google Search 與 URL Context 工具查證。`, market, revenueData, peerData);
+      const valuationData = peerData.valuationData || null;
+      const finalPrompt = getBasePrompt(normalizedSymbol, `查證日期：${new Date().toISOString().slice(0, 10)}。請使用已啟用的 Google Search 與 URL Context 工具查證。`, market, revenueData, peerData, valuationData);
       let attempt = 0;
       const generated = await generateValidatedReport({
         basePrompt: finalPrompt,
@@ -530,7 +531,7 @@ app.post('/api/analyze-stock', async (req, res) => {
       console.log('[公司分析]', { requestId, model: generated.modelName, provider: 'google_search_url_context',
         sourceCount: sources.length, searchQueryCount: searchQueries.length, retrievedCount });
       return {
-        ...generated, searchContext, revenueData, peerData,
+        ...generated, searchContext, revenueData, peerData, valuationData,
         generatedAt: new Date().toISOString(),
         sourceInfo: { provider: 'google_search_url_context', count: sources.length,
           searchQueryCount: searchQueries.length, retrievedCount, limited: false }
@@ -540,6 +541,9 @@ app.post('/api/analyze-stock', async (req, res) => {
       if (value.reportFormat === 'compact-v5' && !value.revenueData) throw new Error('Report revenue snapshot is missing');
       if (Object.hasOwn(value.report.industry || {}, 'peerInsight') && !Array.isArray(value.peerData?.items)) {
         throw new Error('Report peer snapshot is missing');
+      }
+      if (Object.hasOwn(value.report.thesis || {}, 'matrix') && !Object.hasOwn(value, 'valuationData')) {
+        throw new Error('Report valuation snapshot is missing');
       }
       if (!value.sourceInfo || typeof value.sourceInfo.limited !== 'boolean'
           || value.sourceInfo.provider !== 'google_search_url_context'

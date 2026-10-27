@@ -67,13 +67,25 @@ function normalizePeerMetrics(peer, metricsRows, ratiosRows, target) {
   const margin = finite(ratios.operatingProfitMarginTTM);
   const earnings = finite(ratios.netIncomePerShareTTM);
   const pe = finite(ratios.priceToEarningsRatioTTM);
+  const ev = finite(metrics.evToEBITDATTM);
+  const fcf = finite(metrics.freeCashFlowYieldTTM);
   return { ...peer, companyName: String(peer.companyName), isTarget: peer.ticker === target,
     operatingMargin: margin === null || !Number.isFinite(margin * 100) ? null : margin * 100,
     operatingMarginSource: margin === null ? null : 'ratios_ttm',
     peRatio: pe !== null && pe > 0 && (earnings === null || earnings > 0) ? pe : null,
-    marketCap: finite(metrics.marketCap),
+    marketCap: finite(metrics.marketCap) > 0 ? metrics.marketCap : null,
+    evToEbitda: ev !== null && ev > 0 ? ev : null,
+    fcfYield: fcf !== null && Number.isFinite(fcf * 100) ? fcf * 100 : null,
     // Retrieval time is not a common fiscal period; retain any dates supplied by FMP.
     metricDate: typeof ratios.date === 'string' ? ratios.date : null };
+}
+
+function createValuationSnapshot(symbol, target, retrievedAt) {
+  return { symbol, retrievedAt, source: 'Financial Modeling Prep',
+    marketCap: target?.marketCap ?? null,
+    currency: /^[A-Z]{3}$/.test(target?.currency || '') ? target.currency : null,
+    peRatio: target?.peRatio ?? null, evToEbitda: target?.evToEbitda ?? null,
+    fcfYield: target?.fcfYield ?? null };
 }
 
 function createPeerFeed({ fetchRows, discoverPeers, now = Date.now, log = () => {} }) {
@@ -97,10 +109,14 @@ function createPeerFeed({ fetchRows, discoverPeers, now = Date.now, log = () => 
           return [];
         }
       };
-      const [peers, profiles] = await Promise.all([read('stock-peers', symbol), read('profile', symbol)]);
+      const [peers, profiles, targetMetrics, targetRatios] = await Promise.all([
+        read('stock-peers', symbol), read('profile', symbol),
+        read('key-metrics-ttm', symbol), read('ratios-ttm', symbol)
+      ]);
       const profile = Array.isArray(profiles) ? profiles.find(row => row?.symbol === symbol) || {} : {};
       const initial = selectPeers(peers, symbol, profile);
-      const selected = [{ ...initial[0], industry: profile.industry || null, sector: profile.sector || null }];
+      const selected = [{ ...initial[0], industry: profile.industry || null, sector: profile.sector || null,
+        currency: profile.currency || null }];
       const seenSymbols = new Set([symbol]);
       const seenIssuers = new Set(issuerKeys(profile));
       const verifyCandidates = async candidates => {
@@ -168,6 +184,10 @@ function createPeerFeed({ fetchRows, discoverPeers, now = Date.now, log = () => 
       await Promise.all(Array.from({ length: Math.min(2, selected.length) }, async () => {
         while (next < selected.length) {
           const index = next++, peer = selected[index];
+          if (peer.ticker === symbol) {
+            items[index] = normalizePeerMetrics(peer, targetMetrics, targetRatios, symbol);
+            continue;
+          }
           const [metrics, ratios] = await Promise.all([
             read('key-metrics-ttm', peer.ticker), read('ratios-ttm', peer.ticker)
           ]);
@@ -193,6 +213,7 @@ function createPeerFeed({ fetchRows, discoverPeers, now = Date.now, log = () => 
         && items.some(item => !item.isTarget && Number.isFinite(item[key])));
       const value = { status: comparable ? 'ok' : 'unavailable', source: 'Financial Modeling Prep',
         retrievedAt: new Date(now()).toISOString(), items, discoverySources, discoverySearchQueries, discoveryEntryPointHtml };
+      value.valuationData = createValuationSnapshot(symbol, target, value.retrievedAt);
       if (cache.size >= 128) cache.delete(cache.keys().next().value);
       cache.set(symbol, { value, expires: now() + (!failed && comparable ? 86400000 : 300000) });
       log({ event: 'peer_data_result', symbol, status: value.status, itemCount: items.length, partial: failed,
@@ -205,4 +226,4 @@ function createPeerFeed({ fetchRows, discoverPeers, now = Date.now, log = () => 
   };
 }
 
-module.exports = { selectPeers, calculateTtmMargin, normalizePeerMetrics, createPeerFeed };
+module.exports = { selectPeers, calculateTtmMargin, normalizePeerMetrics, createValuationSnapshot, createPeerFeed };

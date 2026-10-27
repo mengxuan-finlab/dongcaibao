@@ -209,6 +209,33 @@ not a retry/failure trigger. The source panel stays shared with the report; a
 qualitative-only comparison is not labeled as FMP financial data. Older reports
 without this optional qualitative shape remain readable.
 
+## Investment Thesis
+
+Chapter 6 uses `thesis.matrix` (dimension/bull/bear rows) and `thesis.reading`,
+a 100-130-character single-paragraph writing target, not a hard length gate.
+Line breaks/list prefixes are normalized without truncating substantive text.
+The prompt links valuation expectations to evidenced operating assumptions and
+a falsification signal, without presuming all companies have premium valuations,
+hardware replacement cycles or services platforms. Qualitative analysis remains
+available when numerical data is missing; old opportunity/condition reports
+continue to render.
+
+`valuationData` is extracted from the target's existing key-metrics/ratios calls,
+which now start alongside the initial peer/profile calls, before optional peer
+discovery or verification. No additional data endpoint or AI call is added for
+this chapter. Missing peers do not suppress valid target valuations. Cards use
+only this exact FMP snapshot, also injected into the prompt and persisted in the
+three-day report payload. The changed prompt/schema naturally invalidates old
+report keys; no table migration is required.
+
+Field mapping: marketCap, priceToEarningsRatioTTM, evToEBITDATTM and
+freeCashFlowYieldTTM. FCF yield is converted from a fraction to percent once;
+negative/zero yields are retained. Missing/non-positive market caps and valuation
+multiples are hidden; market cap also requires the target profile's currency,
+never an assumed USD or a reporting-currency conversion. No unavailable values
+are replaced with zero or model-generated numbers. The frontend shows source
+and retrieval date without an extra explanatory disclaimer block.
+
 ## Persistent Cache
 
 The backend uses the existing Supabase service-role client. Browser roles have

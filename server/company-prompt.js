@@ -8,7 +8,7 @@ function detectMarket(symbol) {
   return 'US';
 }
 
-const getBasePrompt = (symbol, searchContext, market = 'US', revenueData = null, peerData = null) => `
+const getBasePrompt = (symbol, searchContext, market = 'US', revenueData = null, peerData = null, valuationData = null) => `
 請用以下資料整理一份繁體中文「公司研究短報」，只有七節：Business、Segments、History & Footprint、Management & Strategy、Peer Financials & Valuation、Thesis、Risks。
 【股票代碼】${symbol}
 【市場別】${market}
@@ -20,6 +20,9 @@ ${revenueData ? JSON.stringify(revenueData) : '本次尚未提供 FMP 資料；�
 
 【FMP 同業財務與估值快照】
 ${peerData ? JSON.stringify(peerData) : '本次尚未提供同業資料；peerInsight 填「未披露」。'}
+
+【FMP 目標公司估值快照】
+${valuationData ? JSON.stringify(valuationData) : '本次未提供有效估值快照；只做有依據的質化論點，不編造估值倍數、溢價或便宜昂貴判斷。'}
 
 【查證方式】
 - 必須使用 Google Search 查證股票代碼所對應的公司，不要只靠模型記憶；優先搜尋公司官網、投資人關係、年報與監管申報。
@@ -35,16 +38,16 @@ ${peerData ? JSON.stringify(peerData) : '本次尚未提供同業資料；peerIn
 3. History & Footprint：使用最新官方 10-K 公司簡介、公司官方 About / History，或 Google Search Grounding 檢索重大歷史事件；可用 URL Context 讀取原始頁面，核對公司身分及事件年份。現行營運布局優先核對最新官方年報及據點資料，不要將舊布局、宣布興建或已出售的據點當成現有產能。
 4. Management & Strategy：優先搜尋並讀取最近已舉行季度的 Earnings Call Transcript，或最新 10-K 的管理層討論（MD&A），擷取策略與資本配置原則。策略是管理層主張，不是已實現成果；CEO/CFO 現任職務、背景及交接另以官方 Leadership、IR 或正式人事公告查證，區分已宣布、尚未生效及已完成交接，不把接班傳聞當事實。沒有可讀逐字稿或 MD&A 時，可改用同季度官方業績公告或簡報，明確說明資料依據，不冒稱已讀逐字稿。
 5. 同業財務與估值對照：營業利益率與 P/E 僅使用上述 FMP 同業快照，不能從 Google 搜尋或記憶補值；operatingMarginSource 為 income_statement_ttm 或 four_quarters 表示程式以同一公司 TTM 損益表或四個連續季度計算，保留其期間，不冒稱為即時資料。comparisonType 為 fmp_peer 是依輸入股票取得的供應商建議名單，search_peer 是針對該股票搜尋並經 FMP 公司身分核對的候選同業，不代表已確認商業模式完全相同，需利用 industry、sector 及官方業務內容辨識差異。不得套用固定公司或固定產業清單。當其中一項或全部數字缺少可比資料時，重用官方業務說明，必要時以 Google Search 與 URL Context 確認 2-4 家主要競爭者的產品、客群與競爭差異，形成定性對照。沒有 FMP 名單時也可搜尋同業，但不得由模型補填財務數值，未證實的名稱及產品必須省略。
-6. Thesis：輸入資料若包含使用者指定的深度分析／研報 URL，使用 URL Context 讀取並結合官方事實查核；沒有指定時，Google Search 搜尋可公開讀取且具日期的市場主要論點與反方觀點。不強制使用 Seeking Alpha、Substack 或付費券商報告；不能繞過付費牆，也不能從標題猜全文。將第三方意見標示為觀點，再形成附條件的研究推論，不能複製長文或推薦買賣。
+6. Investment Thesis：估值只用上述 FMP 目標公司估值快照，市值、P/E、EV/EBITDA、FCF Yield 四張數據卡由前端渲染，不在 JSON 自造卡片數字。fcfYield 已是百分比，不可再乘 100；市值只能連同已知 currency 使用，null 不代表零，缺值不得從網頁或記憶補齊。輸入資料若包含指定的深度分析／研報 URL，使用 URL Context 讀取並結合官方事實查核；沒有指定時，Google Search 搜尋可公開讀取且具日期的主要論點與反方觀點。可以重用既有官方資料，不必為本章增加無關搜尋；不能繞過付費牆、從標題猜全文或複製長文，第三方意見與分析判斷須區分於已確認事實。
 7. Risks：優先重用 Business 找到的最新官方 10-K，使用 URL Context 讀取 Item 1A（Risk Factors），再檢查較新 10-Q 的風險更新。只選兩個與公司最相關的風險，不把年報稱為已涵蓋所有風險；觀察訊號若屬研究推論，標示「可觀察」而非冒稱公司已披露指標。
 - 若公司以 20-F 等其他表格申報，使用對應的 Business 與 Risk Factors 章節，不冒稱有 10-K Item 1／1A；台股改用官方年報、公開資訊觀測站及法說會資料，沿用相同章節分工。
 
 【寫作要求】
-- 全文說明以約 1300-1800 個繁體中文字為目標（不含欄位名）；第一章約 250-350 字，第二章產品與地區解讀各約 70-110 字、各 2-3 句，第三、四章依下方總結、表格與條列要求，其餘章節保持精簡。一般說明欄位只用一句、約 15-35 字；核心定位可用 40-70 字的一句話。避免重複，不要長篇背景。
+- 全文說明以約 1450-2000 個繁體中文字為目標（不含欄位名）；第一章約 250-350 字，第二章產品與地區解讀各約 70-110 字、各 2-3 句，第三、四、六章依下方總結、表格與條列要求，其餘章節保持精簡。一般說明欄位只用一句、約 15-35 字；核心定位可用 40-70 字的一句話。避免重複，不要長篇背景。
 - 只使用可確認的事實；資訊不足明確填「未披露」或「目前資料不足以判斷」，不要捏造數據、產品或事件。
 - 重大訴訟、監管處罰、刑事指控等具體事件，只有實際可核對的官方文件或可靠來源支持時才能明確陳述。缺少支持時改成條件式的一般風險或省略具體指控，不得宣稱「已查證／已證實」，也不得只加「可能」就保留未經支持的人名、案名、日期或罰款金額。
 - 推論需標示「可能」並簡述依據；不要給目標價或買賣建議。
-- 除第五章指定的同業比率、估值解讀及定性競爭對照外，不要額外產生財務分析、估值模型、預測、長時間軸、競爭比較表、研究問題或新聞標籤。
+- 除第五章同業比較及第六章指定的估值快照與研究論點外，不要額外產生財務分析、估值模型、預測、長時間軸、競爭比較表、研究問題或新聞標籤。
 - 產品及地區營收數據由 FMP 圖表提供，解讀不估算營收占比，也不復述圖表數字。
 
 【欄位要求】
@@ -69,13 +72,15 @@ ${peerData ? JSON.stringify(peerData) : '本次尚未提供同業資料；peerIn
   - capitalAllocation：以兩點精簡條列為目標，每項一句約 35-60 字。第一點歸納股息、庫藏股回購、CapEx 及必要研發投入的配置優先原則，區分研發費用與資本支出；第二點指出股東回報與成長投資之間的平衡及可觀察條件。優先順序須有管理層說法或可確認政策支持，不能由單年金額推定永久原則，也不能無依據斷言回購已被 AI 投資擠壓；資料不足的項目填「未披露」。
 - industry.peerInsight（同業財務與估值對照）：輸出嚴格 80-120 個字的一整段純文字，不要標題、條列、項目符號、Markdown 或換行。語氣為專業機構買方研究，先說目標營業利益率相較有效同業的相對位置，再銜接 P/E 相對評價與溢價成立的條件。不得預設所有公司已脫離代工、擁有生態系溢價或估值合理；僅有兩項比率不能證明溢價原因或合理價，須結合有依據的業務差異，以獲利品質、成長可持續性等條件說明，而不是買賣建議。operatingMargin 已是百分比，不可再乘 100；負營業利益率可比較，peRatio 為 null 代表不可比較（含虧損或缺值），不得補零或稱低估，不能由 null 推定已知虧損。只有 status 為 ok 才解讀，缺少其中一項指標時只比較有效項目並自然交代限制，不得編造排名；status 非 ok 填「未披露」。
 - industry.qualitative：第五章的定性備援。當營業利益率或 P/E 沒有「目標與至少一家同業皆有有效值」時，仍須嘗試依可靠的官方業務資料及搜尋內容填寫 overview（一句核心競爭定位）、peers（2-4 個有依據的對照，每項 company 為公司名稱、position 為其主要產品／客群、difference 為與目標的差異，各一句短句）、watch（一句可觀察的競爭訊號）。只陳述有依據的定性事實，不編數字、市占、估值排名，不以「資料無法取得」充當分析，不把候選名單直接當作已查證的商業關係。兩圖皆有可比資料時可全部填「未披露」，peers 保留一項各欄為「未披露」；來源連定性資訊也不支持時，同樣使用「未披露」，不得為保留章節而編造。
-- thesis（Thesis）：opportunity 一句提出附依據且標示為推論的核心研究論點；condition 一句寫出論點成立的條件或可推翻的訊號，不是推薦買進。
+- thesis（Investment Thesis）包含以下兩個部分，內容依本次輸入公司的實際業務調整，不套固定公司範例，也不是買賣建議：
+  - matrix：三個主要分析維度為目標，每項 dimension 是關鍵分析維度短標題、bull 是正向支持條件、bear 是核心反證／破口條件，各一句精簡說明。優先檢視產品換機／需求週期、服務平台毛利結構與估值容錯空間，但非硬體公司改用實際需求週期，沒有服務平台者改用自身業務組合、定價能力或獲利品質；不能只憑營收占比捏造服務毛利。不為湊三項編造條件，缺資料以「未披露」保留結構。
+  - reading：一整段約 100-130 字的高資訊密度買方研究文字，不要標題、條列式分點或換行。直接指出估值要求與可驗證基本面之間的核心緊張關係，再說明溢價若要成立須滿足哪些假設，最後落在一個最脆弱、可追蹤的觀察訊號。P/E 數字本身不足以判定高估，不預設所有股票都是高估值或基本面強勁；若稱溢價，須有本次快照的可比基準及質化依據，否則寫估值成立條件。數字不足時仍可用已確認業務事實討論論點與反證，但不宣稱高估、低估或合理價。供應鏈、監管等訊號必須與該公司相關，不編造已發生的事件，也不機械地列出四張卡片數字。
 - risks（Risks）：以 2 個主要風險為目標，risk 為短標題、reason 一句具體影響、watch 一個追蹤訊號。
 - 所有欄位都要填寫，陣列不可空白；資料不足可明確註明，不要為了湊數編造。
 
 【輸出結構】
 <!-- COMPACT_REPORT_START -->
-{"company":{"symbol":"${symbol}","overview":"一句話核心商業定位、客群與可確認規模","revenue":"收入來源短句","customers":"付費客群短句","process":[{"stage":"實際商業流程階段","description":"公司及合作方在此階段的活動"}],"profitCapture":"價值捕捉環節、依據與推論限制","pricing":{"model":"實際收費模式組合","recognition":"官方收入認列政策","channels":"直銷與合作通路；占比僅限官方披露"},"defensibility":"整套商業模式的複製障礙及限制"},"segmentInsights":{"product":"產品結構、可驗證成長角色與依賴風險的短段落","geographic":"收入基本盤、待驗證擴張條件與地區風險的短段落"},"history":{"summary":"100-150 字戰略進化模式、優勢與伴隨風險","milestones":[{"year":"可確認的年份","event":"重大轉折事件","significance":"商業與戰略意義"}],"footprint":{"research":"主要研發中心所在地","manufacturing":"自有或外包製造組裝據點及有依據的產能集中風險","sales":"全球銷售通路與覆蓋範圍"}},"management":{"leadership":"CEO/CFO 核心動態、背景與策略意涵","pillars":[{"pillar":"核心策略支柱","objective":"戰略目標","initiatives":"具體推動項目或可觀察指標"}],"capitalAllocation":["股息、回購與成長投資的配置原則","股東回報與研發及資本支出的平衡"]},"industry":{"peerInsight":"80-120 字單段同業營業利益率與本益比解讀","qualitative":{"overview":"有依據的核心競爭定位","peers":[{"company":"有來源支持的同業名稱","position":"同業主要產品與客群","difference":"與目標公司的競爭差異"}],"watch":"可觀察的競爭訊號"}},"thesis":{"opportunity":"有依據的研究推論","condition":"成立條件或反證訊號"},"risks":[{"risk":"具體風險","reason":"對公司的影響","watch":"追蹤訊號"}]}
+{"company":{"symbol":"${symbol}","overview":"一句話核心商業定位、客群與可確認規模","revenue":"收入來源短句","customers":"付費客群短句","process":[{"stage":"實際商業流程階段","description":"公司及合作方在此階段的活動"}],"profitCapture":"價值捕捉環節、依據與推論限制","pricing":{"model":"實際收費模式組合","recognition":"官方收入認列政策","channels":"直銷與合作通路；占比僅限官方披露"},"defensibility":"整套商業模式的複製障礙及限制"},"segmentInsights":{"product":"產品結構、可驗證成長角色與依賴風險的短段落","geographic":"收入基本盤、待驗證擴張條件與地區風險的短段落"},"history":{"summary":"100-150 字戰略進化模式、優勢與伴隨風險","milestones":[{"year":"可確認的年份","event":"重大轉折事件","significance":"商業與戰略意義"}],"footprint":{"research":"主要研發中心所在地","manufacturing":"自有或外包製造組裝據點及有依據的產能集中風險","sales":"全球銷售通路與覆蓋範圍"}},"management":{"leadership":"CEO/CFO 核心動態、背景與策略意涵","pillars":[{"pillar":"核心策略支柱","objective":"戰略目標","initiatives":"具體推動項目或可觀察指標"}],"capitalAllocation":["股息、回購與成長投資的配置原則","股東回報與研發及資本支出的平衡"]},"industry":{"peerInsight":"80-120 字單段同業營業利益率與本益比解讀","qualitative":{"overview":"有依據的核心競爭定位","peers":[{"company":"有來源支持的同業名稱","position":"同業主要產品與客群","difference":"與目標公司的競爭差異"}],"watch":"可觀察的競爭訊號"}},"thesis":{"matrix":[{"dimension":"關鍵分析維度","bull":"正向支持條件","bear":"核心反證或破口條件"}],"reading":"100-130 字單段估值與基本面的核心張力、假設與脆弱訊號"},"risks":[{"risk":"具體風險","reason":"對公司的影響","watch":"追蹤訊號"}]}
 <!-- COMPACT_REPORT_END -->
 `;
 

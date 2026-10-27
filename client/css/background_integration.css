@@ -1872,6 +1872,11 @@ button {
 .peer-comparison > .revenue-reading { margin-top: 18px; }
 .peer-calculated { display: block; margin-top: 4px; color: #637086; font-size: 11px; font-weight: 400; }
 .peer-qualitative { margin-top: 20px; }
+.thesis-valuation-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 0 0 12px; }
+.thesis-valuation-card { min-width: 0; margin: 0; padding: 18px 16px; border: 1px solid #dfe6ed; border-radius: 8px; background: #f7f9fc; }
+.thesis-valuation-card dt { color: #637086; font-size: 12px; line-height: 1.6; }
+.thesis-valuation-card dd { margin: 10px 0 0; color: #103f66; font-size: 22px; font-weight: 700; overflow-wrap: anywhere; }
+.thesis-reading { margin-top: 20px; }
 .brief-report .revenue-card { padding: 22px; border: 1px solid #dfe6ed; border-radius: 8px; }
 #result .brief-report .revenue-card h4 { color: #253c4e; font-size: 15px; }
 .brief-report .revenue-note a { color: #103f66; }

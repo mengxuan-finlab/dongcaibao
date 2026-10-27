@@ -12,7 +12,6 @@
   <meta name="author" content="小炫">
 
   <link rel="stylesheet" href="css/background_integration.css">
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 
 </head>
@@ -133,6 +132,27 @@
       ${snapshot.retrievedAt && Number.isFinite(Date.parse(snapshot.retrievedAt)) ? `資料擷取：${escape(new Date(snapshot.retrievedAt).toLocaleDateString('zh-TW'))}。` : ''}</p>` : ''}</div>`;
   };
 
+  window.renderValuationSnapshot = snapshot => {
+    if (!snapshot || typeof snapshot !== 'object') return '';
+    const positive = value => typeof value === 'number' && Number.isFinite(value) && value > 0;
+    const multiple = value => `${value.toLocaleString('zh-TW', { maximumFractionDigits: 1 })} 倍`;
+    const cards = [];
+    if (positive(snapshot.marketCap) && /^[A-Z]{3}$/.test(snapshot.currency || '')) {
+      cards.push(['市值', new Intl.NumberFormat('zh-TW', { style: 'currency', currency: snapshot.currency,
+        currencyDisplay: 'code', notation: 'compact', maximumFractionDigits: 2 }).format(snapshot.marketCap)]);
+    }
+    if (positive(snapshot.peRatio)) cards.push(['P/E（TTM）', multiple(snapshot.peRatio)]);
+    if (positive(snapshot.evToEbitda)) cards.push(['EV/EBITDA（TTM）', multiple(snapshot.evToEbitda)]);
+    if (typeof snapshot.fcfYield === 'number' && Number.isFinite(snapshot.fcfYield)) {
+      cards.push(['自由現金流收益率', `${snapshot.fcfYield.toLocaleString('zh-TW', { maximumFractionDigits: 2 })}%`]);
+    }
+    if (!cards.length) return '';
+    return `<div class="thesis-valuation-grid" aria-label="估值快照">${cards.map(([label, value]) =>
+      `<dl class="thesis-valuation-card"><dt>${escape(label)}</dt><dd>${escape(value)}</dd></dl>`).join('')}</div>
+      <p class="revenue-note">來源：<a href="https://financialmodelingprep.com/" target="_blank" rel="noopener noreferrer">Financial Modeling Prep</a>。
+      ${snapshot.retrievedAt && Number.isFinite(Date.parse(snapshot.retrievedAt)) ? `資料擷取：${escape(new Date(snapshot.retrievedAt).toLocaleDateString('zh-TW'))}。` : ''}</p>`;
+  };
+
   window.loadRevenueCharts = async (container, backendUrl, symbol, snapshot, insights = {}) => {
     if (!container) return;
     const section = container.closest('.revenue-section');
@@ -198,6 +218,9 @@
     planModal.classList.remove("show");
   }
 
+  planModalClose.addEventListener("click", hidePlanModal);
+  planModalBackdrop.addEventListener("click", hidePlanModal);
+
   function escapeHtml(value) {
     return String(value ?? "")
       .replaceAll("&", "&amp;")
@@ -207,12 +230,6 @@
       .replaceAll("'", "&#039;");
   }
 
-  function normalizeValueChainItems(items) {
-    if (!Array.isArray(items)) return [];
-    return items
-      .map(item => String(item || "").trim())
-      .filter(Boolean);
-  }
 
   function startAdoptionCard(container) {
     const controller = new AbortController();
@@ -266,816 +283,18 @@
     return () => { clearTimeout(timeout); controller.abort(); };
   }
 
-  function extractValueChain(responseText) {
-    const text = String(responseText || "");
-    const startMarker = "<" + "!-- VALUE_CHAIN_START --" + ">";
-    const endMarker = "<" + "!-- VALUE_CHAIN_END --" + ">";
-    const startIndex = text.indexOf(startMarker);
-    const endIndex = text.indexOf(endMarker, startIndex + startMarker.length);
-
-    if (startIndex === -1 || endIndex === -1) {
-      return { valueChain: null, reportText: responseText };
-    }
-
-    const rawBlockEnd = endIndex + endMarker.length;
-    const rawJsonBlock = text.slice(startIndex + startMarker.length, endIndex);
-    const reportText = (text.slice(0, startIndex) + text.slice(rawBlockEnd)).trim();
-
-    try {
-      const rawJson = rawJsonBlock
-        .replace(/^```(?:json)?\s*/i, "")
-        .replace(/\s*```$/i, "")
-        .trim();
-      const parsed = JSON.parse(rawJson);
-      const valueChain = {
-        company: String(parsed.company || "").trim(),
-        position: String(parsed.position || "").trim(),
-        upstream: normalizeValueChainItems(parsed.upstream),
-        offerings: normalizeValueChainItems(parsed.offerings),
-        customers: normalizeValueChainItems(parsed.customers),
-        revenue: normalizeValueChainItems(parsed.revenue)
-      };
-
-      return { valueChain, reportText };
-    } catch (error) {
-      console.warn("價值鏈資料解析失敗，改用純文字報告。", error);
-      return { valueChain: null, reportText: reportText.trim() };
-    }
-  }
-
-  function extractTimeline(responseText) {
-    const text = String(responseText || "");
-    const startMarker = "<" + "!-- TIMELINE_START --" + ">";
-    const endMarker = "<" + "!-- TIMELINE_END --" + ">";
-    const startIndex = text.indexOf(startMarker);
-    const endIndex = text.indexOf(endMarker, startIndex + startMarker.length);
-
-    if (startIndex === -1 || endIndex === -1) {
-      return { timeline: null, reportText: responseText };
-    }
-
-    const rawBlockEnd = endIndex + endMarker.length;
-    const rawJsonBlock = text.slice(startIndex + startMarker.length, endIndex);
-    const reportText = (text.slice(0, startIndex) + text.slice(rawBlockEnd)).trim();
-
-    try {
-      const rawJson = rawJsonBlock
-        .replace(/^```(?:json)?\s*/i, "")
-        .replace(/\s*```$/i, "")
-        .trim();
-      const parsed = JSON.parse(rawJson);
-      const items = Array.isArray(parsed.items)
-        ? parsed.items
-            .map(item => ({
-              period: String(item?.period || "").trim(),
-              event: String(item?.event || "").trim(),
-              impact: String(item?.impact || "").trim()
-            }))
-            .filter(item => item.period && item.event)
-            .slice(0, 6)
-        : [];
-
-      return {
-        timeline: items.length ? { items } : null,
-        reportText
-      };
-    } catch (error) {
-      console.warn("公司時間線資料解析失敗，改用純文字報告。", error);
-      return { timeline: null, reportText: reportText.trim() };
-    }
-  }
-
-  function extractCoreSummary(responseText) {
-    const text = String(responseText || "");
-    const startMarker = "<" + "!-- CORE_SUMMARY_START --" + ">";
-    const endMarker = "<" + "!-- CORE_SUMMARY_END --" + ">";
-    const startIndex = text.indexOf(startMarker);
-    const endIndex = text.indexOf(endMarker, startIndex + startMarker.length);
-
-    if (startIndex === -1 || endIndex === -1) {
-      return { coreSummary: null, reportText: responseText };
-    }
-
-    const rawBlockEnd = endIndex + endMarker.length;
-    const rawJsonBlock = text.slice(startIndex + startMarker.length, endIndex);
-    const reportText = (text.slice(0, startIndex) + text.slice(rawBlockEnd)).trim();
-
-    try {
-      const rawJson = rawJsonBlock
-        .replace(/^```(?:json)?\s*/i, "")
-        .replace(/\s*```$/i, "")
-        .trim();
-      const parsed = JSON.parse(rawJson);
-      const normalizeText = value => String(value || "未披露").trim() || "未披露";
-      const focus = Array.isArray(parsed.focus)
-        ? parsed.focus.map(normalizeText).filter(Boolean).slice(0, 4)
-        : [];
-
-      return {
-        coreSummary: {
-          company: normalizeText(parsed.company),
-          identity: normalizeText(parsed.identity),
-          problem: normalizeText(parsed.problem),
-          revenue: normalizeText(parsed.revenue),
-          edge: normalizeText(parsed.edge),
-          momentum: normalizeText(parsed.momentum),
-          pressure: normalizeText(parsed.pressure),
-          focus: focus.length ? focus : ["未披露"]
-        },
-        reportText
-      };
-    } catch (error) {
-      console.warn("核心摘要資料解析失敗，改用純文字報告。", error);
-      return { coreSummary: null, reportText: reportText.trim() };
-    }
-  }
-
-  function extractProductPortfolio(responseText) {
-    const text = String(responseText || "");
-    const startMarker = "<" + "!-- PRODUCT_PORTFOLIO_START --" + ">";
-    const endMarker = "<" + "!-- PRODUCT_PORTFOLIO_END --" + ">";
-    const startIndex = text.indexOf(startMarker);
-    const endIndex = text.indexOf(endMarker, startIndex + startMarker.length);
-
-    if (startIndex === -1 || endIndex === -1) {
-      return { productPortfolio: null, reportText: responseText };
-    }
-
-    const rawBlockEnd = endIndex + endMarker.length;
-    const rawJsonBlock = text.slice(startIndex + startMarker.length, endIndex);
-    const reportText = (text.slice(0, startIndex) + text.slice(rawBlockEnd)).trim();
-
-    try {
-      const rawJson = rawJsonBlock
-        .replace(/^```(?:json)?\s*/i, "")
-        .replace(/\s*```$/i, "")
-        .trim();
-      const parsed = JSON.parse(rawJson);
-      const normalizeText = value => String(value || "未披露").trim() || "未披露";
-      const items = Array.isArray(parsed.items)
-        ? parsed.items
-            .map(item => ({
-              area: normalizeText(item?.area),
-              type: normalizeText(item?.type),
-              examples: Array.isArray(item?.examples)
-                ? item.examples.map(normalizeText)
-                : ["未披露"],
-              significance: normalizeText(item?.significance)
-            }))
-            .slice(0, 6)
-        : [];
-
-      return {
-        productPortfolio: items.length
-          ? { overview: normalizeText(parsed.overview), items }
-          : null,
-        reportText
-      };
-    } catch (error) {
-      console.warn("產品組合資料解析失敗，改用純文字報告。", error);
-      return { productPortfolio: null, reportText: reportText.trim() };
-    }
-  }
-
-  function extractResearchDashboard(responseText) {
-    const text = String(responseText || "");
-    const startMarker = "<" + "!-- RESEARCH_DASHBOARD_START --" + ">";
-    const endMarker = "<" + "!-- RESEARCH_DASHBOARD_END --" + ">";
-    const startIndex = text.indexOf(startMarker);
-    const endIndex = text.indexOf(endMarker, startIndex + startMarker.length);
-
-    if (startIndex === -1 || endIndex === -1) {
-      return { dashboard: null, reportText: responseText };
-    }
-
-    const rawBlockEnd = endIndex + endMarker.length;
-    const rawJsonBlock = text.slice(startIndex + startMarker.length, endIndex);
-    const reportText = (text.slice(0, startIndex) + text.slice(rawBlockEnd)).trim();
-
-    try {
-      const rawJson = rawJsonBlock
-        .replace(/^```(?:json)?\s*/i, "")
-        .replace(/\s*```$/i, "")
-        .trim();
-      return { dashboard: JSON.parse(rawJson), reportText };
-    } catch (error) {
-      console.debug("研究儀表板資料解析失敗，已略過儀表板區塊。", error);
-      return { dashboard: null, reportText: reportText.trim() };
-    }
-  }
-
-  function safeText(value) {
-    return String(value || "未披露").trim() || "未披露";
-  }
-
-  function safeItems(value, limit = 10) {
-    return Array.isArray(value) ? value.slice(0, limit) : [];
-  }
-
-  function renderDashboardHeading(eyebrow, title, description) {
-    return `
-      <div class="research-panel__heading">
-        <span>${escapeHtml(eyebrow)}</span>
-        <h2>${escapeHtml(title)}</h2>
-        ${description ? `<p>${escapeHtml(description)}</p>` : ""}
-      </div>
-    `;
-  }
-
-  function renderInfoCards(items, className = "") {
-    return `
-      <div class="research-card-grid ${className}">
-        ${items.map((item, index) => `
-          <article class="research-card">
-            <span class="research-card__number">${String(index + 1).padStart(2, "0")}</span>
-            <p class="research-card__label">${escapeHtml(item.label)}</p>
-            <p class="research-card__text">${escapeHtml(safeText(item.text))}</p>
-          </article>
-        `).join("")}
-      </div>
-    `;
-  }
-
-  function renderDataTable(headers, rows) {
-    if (!rows.length) return `<p class="research-empty">目前資料不足以判斷</p>`;
-    return `
-      <div class="research-table-wrap">
-        <table class="research-table">
-          <thead><tr>${headers.map(header => `<th>${escapeHtml(header)}</th>`).join("")}</tr></thead>
-          <tbody>
-            ${rows.map(row => `
-              <tr>${row.map(cell => `<td>${escapeHtml(safeText(cell))}</td>`).join("")}</tr>
-            `).join("")}
-          </tbody>
-        </table>
-      </div>
-    `;
-  }
-
-  function renderResearchDashboard(dashboard, symbol) {
-    if (!dashboard) return "";
-
-    const vision = dashboard.vision || {};
-    const operating = dashboard.operatingModel || {};
-    const revenue = dashboard.revenueModel || {};
-    const industry = dashboard.industry || {};
-    const governance = dashboard.governance || {};
-    const research = dashboard.research || {};
-
-    const visionHtml = `
-      <section class="research-panel research-panel--light">
-        ${renderDashboardHeading("COMPANY PURPOSE", "公司願景與客戶痛點", "從公司想解決的問題，看它如何降低門檻並建立信任。")}
-        ${renderInfoCards([
-          { label: "公司想做什麼", text: vision.goal },
-          { label: "傳統痛點", text: vision.pain },
-          { label: "降低門檻", text: vision.access },
-          { label: "信任與便利", text: vision.trust }
-        ])}
-      </section>
-    `;
-
-    const operatingSteps = safeItems(operating.steps, 5);
-    const operatingHtml = `
-      <section class="research-panel research-panel--dark">
-        ${renderDashboardHeading("OPERATING MODEL", `${symbol} 怎麼做生意？`, safeText(operating.overview))}
-        <div class="process-flow">
-          ${operatingSteps.map((item, index) => `
-            <article class="process-flow__step">
-              <div class="process-flow__index">${String(index + 1).padStart(2, "0")}</div>
-              <p class="process-flow__stage">${escapeHtml(safeText(item.step))}</p>
-              <h3>${escapeHtml(safeText(item.action))}</h3>
-              <p><strong>客戶優勢</strong>${escapeHtml(safeText(item.customerBenefit))}</p>
-              <p><strong>商業影響</strong>${escapeHtml(safeText(item.businessImpact))}</p>
-            </article>
-          `).join("")}
-        </div>
-        <h3 class="research-subtitle">產品策略</h3>
-        ${renderDataTable(
-          ["領域", "產品定位與特點", "戰略意義"],
-          safeItems(operating.strategies, 6).map(item => [item.area, item.positioning, item.significance])
-        )}
-        <h3 class="research-subtitle">技術與營運效率</h3>
-        ${renderInfoCards(
-          safeItems(operating.capabilities, 8).map(item => ({
-            label: safeText(item.name),
-            text: `${safeText(item.mechanism)}｜${safeText(item.impact)}`
-          })),
-          "research-card-grid--three"
-        )}
-      </section>
-    `;
-
-    const revenueHtml = `
-      <section class="research-panel research-panel--light">
-        ${renderDashboardHeading("REVENUE ENGINE", "收入怎麼來？", "拆解付費者、付費機制、收入品質與成本結構。")}
-        ${renderInfoCards([
-          { label: "誰付錢", text: revenue.payer },
-          { label: "付費理由", text: revenue.reason },
-          { label: "付費方式", text: revenue.payment },
-          { label: "收入可預測性", text: revenue.predictability },
-          { label: "交叉銷售機會", text: revenue.crossSell }
-        ], "research-card-grid--revenue")}
-        <h3 class="research-subtitle">成本結構與毛利特性</h3>
-        ${renderDataTable(
-          ["成本要素", "優勢或壓力", "財務影響"],
-          safeItems(revenue.costs, 8).map(item => [item.factor, item.advantageOrPressure, item.financialImpact])
-        )}
-      </section>
-    `;
-
-    const advantagesHtml = `
-      <section class="research-panel research-panel--dark">
-        ${renderDashboardHeading("COMPETITIVE MOAT", `${symbol} 憑什麼贏？`, "每項優勢都連結競爭差異、護城河類型與可驗證指標。")}
-        <div class="moat-grid">
-          ${safeItems(dashboard.advantages, 5).map(item => `
-            <article class="moat-card">
-              <div class="moat-card__top">
-                <span>${escapeHtml(safeText(item.moatType))}</span>
-                <h3>${escapeHtml(safeText(item.source))}</h3>
-              </div>
-              <p><strong>厲害在哪</strong>${escapeHtml(safeText(item.strength))}</p>
-              <p><strong>競爭差異</strong>${escapeHtml(safeText(item.difference))}</p>
-              <p class="moat-card__metric"><strong>追蹤指標</strong>${escapeHtml(safeText(item.metric))}</p>
-            </article>
-          `).join("")}
-        </div>
-      </section>
-    `;
-
-    const risksHtml = `
-      <section class="research-panel research-panel--risk">
-        ${renderDashboardHeading("RISK RADAR", `${symbol} 的潛在風險`, "從發生原因一路連結到財務影響與預警訊號。")}
-        <div class="risk-paths">
-          ${safeItems(dashboard.risks, 5).map((item, index) => `
-            <article class="risk-card">
-              <span class="risk-card__index">${String(index + 1).padStart(2, "0")}</span>
-              <h3>${escapeHtml(safeText(item.risk))}</h3>
-              <div class="risk-path">
-                <p><strong>觸發原因</strong>${escapeHtml(safeText(item.cause))}</p>
-                <p><strong>營運影響</strong>${escapeHtml(safeText(item.importance))}</p>
-                <p><strong>財務與指標</strong>${escapeHtml(safeText(item.affectedMetrics))}</p>
-                <p><strong>觀察訊號</strong>${escapeHtml(safeText(item.monitoring))}</p>
-              </div>
-            </article>
-          `).join("")}
-        </div>
-      </section>
-    `;
-
-    const themes = safeItems(industry.themes, 8);
-    const industryHtml = `
-      <section class="research-panel research-panel--light">
-        ${renderDashboardHeading("INDUSTRY LANDSCAPE", "產業位置與競爭", safeText(industry.overview))}
-        ${renderInfoCards([
-          { label: "成長原因與需求", text: industry.growthDrivers },
-          { label: "滲透率與週期性", text: industry.penetrationCycle }
-        ], "research-card-grid--two")}
-        <div class="research-tags">${themes.map(item => `<span>${escapeHtml(safeText(item))}</span>`).join("")}</div>
-        <h3 class="research-subtitle">競爭者威脅</h3>
-        ${renderDataTable(
-          ["競爭者", "定位", "優勢", "劣勢", "客群重疊度"],
-          safeItems(industry.competitors, 8).map(item => [
-            item.name, item.positioning, item.strength, item.weakness, item.overlap
-          ])
-        )}
-        <h3 class="research-subtitle">產業順風與逆風</h3>
-        <div class="wind-grid">
-          ${safeItems(industry.winds, 6).map(item => {
-            const isTailwind = safeText(item.type).includes("順");
-            return `
-              <article class="wind-card ${isTailwind ? "wind-card--tail" : "wind-card--head"}">
-                <span>${escapeHtml(safeText(item.type))}</span>
-                <h3>${escapeHtml(safeText(item.factor))}</h3>
-                <p>${escapeHtml(safeText(item.companyImpact))}</p>
-              </article>
-            `;
-          }).join("")}
-        </div>
-      </section>
-    `;
-
-    const financialsHtml = `
-      <section class="research-panel research-panel--dark">
-        ${renderDashboardHeading("FINANCIAL FUNDAMENTALS", "財務基本面分析", "不只看數字，也說明每項指標為什麼重要、接下來該看什麼。")}
-        <div class="financial-grid">
-          ${safeItems(dashboard.financials, 5).map(item => `
-            <article class="financial-card">
-              <h3>${escapeHtml(safeText(item.area))}</h3>
-              <p class="financial-card__assessment">${escapeHtml(safeText(item.assessment))}</p>
-              <p><strong>重要性</strong>${escapeHtml(safeText(item.importance))}</p>
-              <p><strong>後續觀察</strong>${escapeHtml(safeText(item.watch))}</p>
-            </article>
-          `).join("")}
-        </div>
-      </section>
-    `;
-
-    const variablesHtml = `
-      <section class="research-panel research-panel--light">
-        ${renderDashboardHeading("KEY VARIABLES", "未來 1-3 年關鍵變數", "用正面與負面訊號驗證成長及競爭力是否延續。")}
-        ${renderDataTable(
-          ["關鍵變數", "為什麼重要", "正面訊號", "負面訊號"],
-          safeItems(dashboard.variables, 8).map(item => [
-            item.variable, item.importance, item.positiveSignal, item.negativeSignal
-          ])
-        )}
-      </section>
-    `;
-
-    const governanceHtml = `
-      <section class="research-panel research-panel--dark">
-        ${renderDashboardHeading("MANAGEMENT & GOVERNANCE", "管理層與公司治理", "觀察策略執行、風險應對與治理品質。")}
-        ${renderInfoCards([
-          { label: "領導與執行風格", text: governance.leadership },
-          { label: "長期目標與策略", text: governance.strategy },
-          { label: "主要風險應對", text: governance.riskResponse },
-          { label: "治理觀察訊號", text: governance.signals }
-        ])}
-      </section>
-    `;
-
-    const researchHtml = `
-      <section class="research-panel research-panel--light">
-        ${renderDashboardHeading("RESEARCH PLAYBOOK", "分析與後續研究", "把公司研究轉成可持續驗證的問題、清單與財報閱讀框架。")}
-        <h3 class="research-subtitle">最值得研究的核心問題</h3>
-        <div class="question-grid">
-          ${safeItems(research.questions, 5).map((item, index) => `
-            <article class="question-card">
-              <span>Q${index + 1}</span>
-              <h3>${escapeHtml(safeText(item.question))}</h3>
-              <p>${escapeHtml(safeText(item.importance))}</p>
-            </article>
-          `).join("")}
-        </div>
-        <h3 class="research-subtitle">後續追蹤清單</h3>
-        ${renderDataTable(
-          ["追蹤主題", "要看什麼", "為什麼重要"],
-          safeItems(research.tracking, 10).map(item => [item.topic, item.watch, item.importance])
-        )}
-        <h3 class="research-subtitle">懂才抱財報閱讀指南</h3>
-        <div class="metric-grid">
-          ${safeItems(research.metrics, 10).map(item => `
-            <article class="metric-card">
-              <h3>${escapeHtml(safeText(item.metric))}</h3>
-              <p>${escapeHtml(safeText(item.importance))}</p>
-              <div><strong>關注方向</strong>${escapeHtml(safeText(item.direction))}</div>
-            </article>
-          `).join("")}
-        </div>
-      </section>
-    `;
-
-    const newsHtml = `
-      <section class="research-panel research-panel--news">
-        ${renderDashboardHeading("NEWS MONITORING", "關鍵新訊追蹤清單", `為 ${symbol} 建立五個自動化新聞監測維度。`)}
-        <div class="news-monitor-grid">
-          ${safeItems(dashboard.newsTags, 5).map((group, index) => `
-            <article class="news-monitor-card">
-              <span>${String(index + 1).padStart(2, "0")}</span>
-              <h3>${escapeHtml(safeText(group.category))}</h3>
-              <div>${safeItems(group.items, 4).map(item => `<p>${escapeHtml(safeText(item))}</p>`).join("")}</div>
-            </article>
-          `).join("")}
-        </div>
-      </section>
-    `;
-
-    return [
-      ["公司願景與客戶痛點", vision.goal, visionHtml],
-      ["營運流程與產品策略", operating.overview, operatingHtml],
-      ["收入與成本結構", revenue.payment, revenueHtml],
-      ["競爭優勢與護城河", dashboard.advantages?.[0]?.source, advantagesHtml],
-      ["風險傳導路徑", dashboard.risks?.[0]?.risk, risksHtml],
-      ["產業位置與競爭", industry.overview, industryHtml],
-      ["財務基本面", dashboard.financials?.[0]?.assessment, financialsHtml],
-      ["未來關鍵變數", dashboard.variables?.[0]?.variable, variablesHtml],
-      ["管理層與治理", governance.strategy, governanceHtml],
-      ["研究與財報追蹤", research.questions?.[0]?.question, researchHtml],
-      ["新聞監測", "核心業務、財務、競爭、宏觀與治理", newsHtml]
-    ].map(([title, preview, content]) => renderReadingChapter(title, preview, content)).join("");
-  }
 
   function renderReadingChapter(title, preview, content) {
     if (!content) return "";
     return `<details class="reading-chapter">
       <summary><span class="reading-chapter__title">${escapeHtml(title)}</span>
-        <span class="reading-chapter__preview">${escapeHtml(safeText(preview))}</span>
+        <span class="reading-chapter__preview">${escapeHtml(String(preview || '').trim())}</span>
         <span class="reading-chapter__toggle" aria-hidden="true">+</span>
       </summary>
       <div class="reading-chapter__body">${content}</div>
     </details>`;
   }
 
-  function renderQuickOverview(summary, dashboard, valueChain, symbol, productPortfolio = null) {
-    if (!summary && !dashboard) return "";
-    const revenue = dashboard?.revenueModel || {};
-    const metrics = safeItems(dashboard?.research?.metrics, 3);
-    const advantages = safeItems(dashboard?.advantages, 3);
-    const risks = safeItems(dashboard?.risks, 3);
-    const products = safeItems(productPortfolio?.items, 3);
-    const chain = [
-      ["提供價值", safeItems(valueChain?.offerings, 3).join("、") || summary?.identity],
-      ["服務客戶", safeItems(valueChain?.customers, 3).join("、") || revenue.payer],
-      ["取得收入", revenue.payment || summary?.revenue]
-    ];
-    return `<section class="quick-overview">
-      <span class="quick-overview__eyebrow">QUICK READ · 公司研究入口</span>
-      <h2>${escapeHtml(symbol)}，先看懂五件事</h2>
-      <article class="quick-topic">
-        <h3><span>01</span> 公司在做什麼</h3>
-        <p>${escapeHtml(safeText(summary?.identity || dashboard?.vision?.goal))}</p>
-        ${products.length ? `<div class="quick-topic__tags" aria-label="主要產品節選">${products.map(item => `<span>${escapeHtml(safeText(item.type || item.area))}</span>`).join("")}</div>` : ""}
-      </article>
-      <article class="quick-topic">
-        <h3><span>02</span> 怎麼賺錢</h3>
-        <div class="business-route">${chain.map(([label, text]) => `<div><strong>${label}</strong><p>${escapeHtml(safeText(text))}</p></div>`).join("")}</div>
-      </article>
-      <article class="quick-topic quick-topic--growth">
-        <h3><span>03</span> 為什麼值得關注</h3>
-        <p>${escapeHtml(safeText(summary?.momentum))}</p>
-        ${advantages.length ? `<div class="quick-topic__tags" aria-label="競爭優勢節選">${advantages.map(item => `<span>${escapeHtml(safeText(item.source))}</span>`).join("")}</div>` : ""}
-      </article>
-      <article class="quick-topic quick-topic--risk">
-        <h3><span>04</span> 最大的風險</h3>
-        ${risks.length ? `<ul class="quick-topic__risks">${risks.map(item => `<li><strong>${escapeHtml(safeText(item.risk))}</strong><p>${escapeHtml(safeText(item.importance))}</p></li>`).join("")}</ul>` : `<p>${escapeHtml(safeText(summary?.pressure))}</p>`}
-      </article>
-      <article class="quick-topic">
-        <h3><span>05</span> 接下來看什麼</h3>
-        ${metrics.length ? `<div class="quick-metrics">${metrics.map(item => `<div><strong>${escapeHtml(safeText(item.metric))}</strong><p>${escapeHtml(safeText(item.direction))}</p></div>`).join("")}</div>` : '<p>目前資料不足以判斷</p>'}
-      </article>
-      <p class="quick-overview__hint">總覽依報告順序節選重點，並非投資排序。完整產品、風險與追蹤指標保留在下方「深入閱讀」。</p>
-    </section>`;
-  }
-
-  function findJsonObjectEnd(text, startIndex) {
-    let depth = 0;
-    let inString = false;
-    let escaped = false;
-
-    for (let index = startIndex; index < text.length; index += 1) {
-      const char = text[index];
-
-      if (inString) {
-        if (escaped) {
-          escaped = false;
-        } else if (char === "\\") {
-          escaped = true;
-        } else if (char === '"') {
-          inString = false;
-        }
-        continue;
-      }
-
-      if (char === '"') {
-        inString = true;
-      } else if (char === "{") {
-        depth += 1;
-      } else if (char === "}") {
-        depth -= 1;
-        if (depth === 0) return index + 1;
-      }
-    }
-
-    return -1;
-  }
-
-  function formatUnexpectedOverviewJson(data) {
-    if (!data || typeof data.overview !== "string" || !Array.isArray(data.items)) {
-      return null;
-    }
-
-    const sections = data.items
-      .map(item => {
-        const area = String(item?.area || "").trim();
-        const type = String(item?.type || "").trim();
-        const examples = Array.isArray(item?.examples)
-          ? item.examples.map(example => String(example || "").trim()).filter(Boolean)
-          : [];
-        const significance = String(item?.significance || "").trim();
-
-        if (!area && !type && !examples.length && !significance) return "";
-
-        const title = [area, type].filter(Boolean).join("｜") || "產品與服務";
-        const lines = [`### ${title}`];
-        if (examples.length) lines.push(`- **代表項目：** ${examples.join("、")}`);
-        if (significance) lines.push(`- **對公司的意義：** ${significance}`);
-        return lines.join("\n");
-      })
-      .filter(Boolean);
-
-    return [
-      "## 主要產品與服務",
-      data.overview.trim(),
-      ...sections
-    ].filter(Boolean).join("\n\n");
-  }
-
-  function normalizeUnexpectedJson(responseText) {
-    let text = String(responseText || "");
-    let searchIndex = 0;
-
-    while (searchIndex < text.length) {
-      const startIndex = text.indexOf("{", searchIndex);
-      if (startIndex === -1) break;
-
-      const endIndex = findJsonObjectEnd(text, startIndex);
-      if (endIndex === -1) break;
-
-      const candidate = text.slice(startIndex, endIndex);
-
-      try {
-        const parsed = JSON.parse(candidate);
-        const replacement = formatUnexpectedOverviewJson(parsed);
-
-        if (replacement) {
-          text = text.slice(0, startIndex) + replacement + text.slice(endIndex);
-          searchIndex = startIndex + replacement.length;
-          continue;
-        }
-      } catch (error) {
-        // This brace belongs to normal report text, so continue searching.
-      }
-
-      searchIndex = startIndex + 1;
-    }
-
-    return text
-      .replace(/```json\s*(?=\{)/gi, "")
-      .replace(/(\})\s*```/g, "$1")
-      .trim();
-  }
-
-  function renderValueChainList(items) {
-    const safeItems = items.length ? items : ["未披露"];
-    return `<ul>${safeItems.map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`;
-  }
-
-  function renderValueChain(valueChain, fallbackSymbol) {
-    if (!valueChain) return "";
-
-    const company = valueChain.company || fallbackSymbol;
-    const position = valueChain.position || "產業鏈定位未披露";
-
-    return `
-      <section class="value-chain" aria-labelledby="valueChainTitle">
-        <div class="value-chain__heading">
-          <span>BUSINESS MAP</span>
-          <h2 id="valueChainTitle">商業模式與產業價值鏈</h2>
-          <p>快速看懂公司從哪裡取得資源、提供什麼價值，以及向誰收費。</p>
-        </div>
-
-        <div class="value-chain__flow">
-          <article class="value-chain__card">
-            <div class="value-chain__icon" aria-hidden="true">01</div>
-            <p class="value-chain__label">上游資源</p>
-            ${renderValueChainList(valueChain.upstream)}
-          </article>
-
-          <div class="value-chain__arrow" aria-hidden="true">→</div>
-
-          <article class="value-chain__card value-chain__card--company">
-            <div class="value-chain__icon" aria-hidden="true">02</div>
-            <p class="value-chain__label">核心公司</p>
-            <h3>${escapeHtml(company)}</h3>
-            <p class="value-chain__position">${escapeHtml(position)}</p>
-            ${renderValueChainList(valueChain.offerings)}
-          </article>
-
-          <div class="value-chain__arrow" aria-hidden="true">→</div>
-
-          <article class="value-chain__card">
-            <div class="value-chain__icon" aria-hidden="true">03</div>
-            <p class="value-chain__label">客戶與市場</p>
-            ${renderValueChainList(valueChain.customers)}
-          </article>
-        </div>
-
-        <div class="value-chain__revenue">
-          <strong>收入來源</strong>
-          <div>${valueChain.revenue.map(item => `<span>${escapeHtml(item)}</span>`).join("") || "<span>未披露</span>"}</div>
-        </div>
-      </section>
-    `;
-  }
-
-  function renderTimeline(timeline) {
-    if (!timeline?.items?.length) return "";
-
-    const itemsHtml = timeline.items.map((item, index) => `
-      <article class="company-timeline__item">
-        <div class="company-timeline__marker" aria-hidden="true">
-          <span>${String(index + 1).padStart(2, "0")}</span>
-        </div>
-        <div class="company-timeline__content">
-          <p class="company-timeline__period">${escapeHtml(item.period)}</p>
-          <h3>${escapeHtml(item.event)}</h3>
-          ${item.impact ? `<p class="company-timeline__impact">${escapeHtml(item.impact)}</p>` : ""}
-        </div>
-      </article>
-    `).join("");
-
-    return `
-      <section class="company-timeline" aria-labelledby="companyTimelineTitle">
-        <div class="company-timeline__heading">
-          <span>COMPANY JOURNEY</span>
-          <h2 id="companyTimelineTitle">公司發展時間線</h2>
-          <p>從關鍵節點看懂公司如何走到現在。</p>
-        </div>
-        <div class="company-timeline__track">
-          ${itemsHtml}
-        </div>
-      </section>
-    `;
-  }
-
-  function renderCoreSummary(coreSummary, fallbackSymbol) {
-    if (!coreSummary) return "";
-
-    const company = coreSummary.company === "未披露"
-      ? fallbackSymbol
-      : coreSummary.company;
-    const cards = [
-      ["01", "公司定位", coreSummary.identity],
-      ["02", "解決痛點", coreSummary.problem],
-      ["03", "收入引擎", coreSummary.revenue],
-      ["04", "模式特色", coreSummary.edge]
-    ];
-
-    return `
-      <section class="core-summary" aria-labelledby="coreSummaryTitle">
-        <div class="core-summary__heading">
-          <div>
-            <span>INVESTMENT SNAPSHOT</span>
-            <h2 id="coreSummaryTitle">${escapeHtml(company)} 核心摘要</h2>
-          </div>
-          <p>先用一張圖掌握公司如何創造價值，以及近期最該注意的變化。</p>
-        </div>
-
-        <div class="core-summary__grid">
-          ${cards.map(([number, label, content]) => `
-            <article class="core-summary__card">
-              <span class="core-summary__number">${number}</span>
-              <p class="core-summary__label">${label}</p>
-              <p class="core-summary__text">${escapeHtml(content)}</p>
-            </article>
-          `).join("")}
-        </div>
-
-        <div class="core-summary__signals">
-          <article class="core-summary__signal core-summary__signal--positive">
-            <p class="core-summary__label">成長動能</p>
-            <p>${escapeHtml(coreSummary.momentum)}</p>
-          </article>
-          <article class="core-summary__signal core-summary__signal--risk">
-            <p class="core-summary__label">主要壓力</p>
-            <p>${escapeHtml(coreSummary.pressure)}</p>
-          </article>
-        </div>
-
-        <div class="core-summary__focus">
-          <strong>後續研究焦點</strong>
-          <div>${coreSummary.focus.map(item => `<span>${escapeHtml(item)}</span>`).join("")}</div>
-        </div>
-      </section>
-    `;
-  }
-
-  function renderProductPortfolio(productPortfolio) {
-    if (!productPortfolio?.items?.length) return "";
-
-    const itemsHtml = productPortfolio.items.map((item, index) => `
-      <article class="product-portfolio__card">
-        <div class="product-portfolio__topline">
-          <span>${String(index + 1).padStart(2, "0")}</span>
-          <p>${escapeHtml(item.area)}</p>
-        </div>
-        <h3>${escapeHtml(item.type)}</h3>
-        <div class="product-portfolio__examples">
-          ${item.examples.map(example => `<span>${escapeHtml(example)}</span>`).join("")}
-        </div>
-        <div class="product-portfolio__meaning">
-          <strong>對公司的意義</strong>
-          <p>${escapeHtml(item.significance)}</p>
-        </div>
-      </article>
-    `).join("");
-
-    return `
-      <section class="product-portfolio" aria-labelledby="productPortfolioTitle">
-        <div class="product-portfolio__heading">
-          <span>PRODUCT PORTFOLIO</span>
-          <h2 id="productPortfolioTitle">主要產品與服務</h2>
-          <p>${escapeHtml(productPortfolio.overview)}</p>
-        </div>
-        <div class="product-portfolio__grid">
-          ${itemsHtml}
-        </div>
-      </section>
-    `;
-  }
-
-  planModalClose.addEventListener("click", hidePlanModal);
-  planModalBackdrop.addEventListener("click", hidePlanModal);
 
   async function getCurrentUserPlan() {
     const { data: { user } } = await supabaseClient.auth.getUser();
@@ -1164,46 +383,49 @@
         || !report.company.pricing || !['model', 'recognition', 'channels'].every(key => text(report.company.pricing[key])))) {
       throw new Error('公司運作章節未完整傳回，請稍後再試。');
     }
-    const sevenSections = ['compact-v2', 'compact-v3', 'compact-v4', 'compact-v5'].includes(format) || ['history', 'management', 'industry', 'thesis'].some(key => key in report);
-    const fmpOnlySegments = ['compact-v3', 'compact-v4', 'compact-v5'].includes(format) || (sevenSections && !Object.hasOwn(report, 'products'));
+    if (!report.history || !report.management || !report.industry || !report.thesis) {
+      throw new Error('公司報告部分章節未完整傳回，請稍後再試。');
+    }
+    const fmpOnlySegments = ['compact-v3', 'compact-v4', 'compact-v5'].includes(format) || !Object.hasOwn(report, 'products');
     const fields = { risks: ['risk', 'reason', 'watch'] };
     if (!fmpOnlySegments) fields.products = ['name', 'significance'];
-    if (sevenSections) {
-      const structuredHistory = report.history && Object.hasOwn(report.history, 'summary');
-      if (structuredHistory && (!text(report.history.summary)
-          || !Array.isArray(report.history.milestones) || !report.history.milestones.length
-          || !report.history.milestones.every(item => item && ['year', 'event', 'significance'].every(key => text(item[key])))
-          || !report.history.footprint || !['research', 'manufacturing', 'sales'].every(key => text(report.history.footprint[key])))) {
-        throw new Error('歷史與足跡章節未完整傳回，請稍後再試。');
+    const structuredHistory = report.history && Object.hasOwn(report.history, 'summary');
+    if (structuredHistory && (!text(report.history.summary)
+        || !Array.isArray(report.history.milestones) || !report.history.milestones.length
+        || !report.history.milestones.every(item => item && ['year', 'event', 'significance'].every(key => text(item[key])))
+        || !report.history.footprint || !['research', 'manufacturing', 'sales'].every(key => text(report.history.footprint[key])))) {
+      throw new Error('歷史與足跡章節未完整傳回，請稍後再試。');
+    }
+    const structuredManagement = report.management && Object.hasOwn(report.management, 'leadership');
+    if (structuredManagement && (!text(report.management.leadership)
+        || !Array.isArray(report.management.pillars) || !report.management.pillars.length
+        || !report.management.pillars.every(item => item && ['pillar', 'objective', 'initiatives'].every(key => text(item[key])))
+        || !Array.isArray(report.management.capitalAllocation) || !report.management.capitalAllocation.length
+        || !report.management.capitalAllocation.every(text))) {
+      throw new Error('團隊與策略章節未完整傳回，請稍後再試。');
+    }
+    if (report.industry && Object.hasOwn(report.industry, 'qualitative')) {
+      const qualitative = report.industry.qualitative;
+      if (!qualitative || !text(qualitative.overview) || !text(qualitative.watch)
+          || !Array.isArray(qualitative.peers) || !qualitative.peers.length
+          || !qualitative.peers.every(item => item && ['company', 'position', 'difference'].every(key => text(item[key])))) {
+        throw new Error('同業競爭對照未完整傳回，請稍後再試。');
       }
-      const structuredManagement = report.management && Object.hasOwn(report.management, 'leadership');
-      if (structuredManagement && (!text(report.management.leadership)
-          || !Array.isArray(report.management.pillars) || !report.management.pillars.length
-          || !report.management.pillars.every(item => item && ['pillar', 'objective', 'initiatives'].every(key => text(item[key])))
-          || !Array.isArray(report.management.capitalAllocation) || !report.management.capitalAllocation.length
-          || !report.management.capitalAllocation.every(text))) {
-        throw new Error('團隊與策略章節未完整傳回，請稍後再試。');
+    }
+    const structuredThesis = report.thesis && Object.hasOwn(report.thesis, 'matrix');
+    if (structuredThesis && (!text(report.thesis.reading)
+        || !Array.isArray(report.thesis.matrix) || !report.thesis.matrix.length
+        || !report.thesis.matrix.every(item => item && ['dimension', 'bull', 'bear'].every(key => text(item[key]))))) {
+      throw new Error('核心研究論點未完整傳回，請稍後再試。');
+    }
+    const sections = { history: structuredHistory ? ['summary'] : ['milestones', 'footprint'],
+      management: structuredManagement ? ['leadership'] : ['team', 'strategy'],
+      industry: Object.hasOwn(report.industry || {}, 'peerInsight') ? ['peerInsight'] : ['competition', 'advantage'],
+      thesis: structuredThesis ? ['reading'] : ['opportunity', 'condition'] };
+    for (const [key, required] of Object.entries(sections)) {
+      if (!report[key] || !required.every(field => text(report[key][field]))) {
+        throw new Error('公司報告部分章節未完整傳回，請稍後再試。');
       }
-      if (report.industry && Object.hasOwn(report.industry, 'qualitative')) {
-        const qualitative = report.industry.qualitative;
-        if (!qualitative || !text(qualitative.overview) || !text(qualitative.watch)
-            || !Array.isArray(qualitative.peers) || !qualitative.peers.length
-            || !qualitative.peers.every(item => item && ['company', 'position', 'difference'].every(key => text(item[key])))) {
-          throw new Error('同業競爭對照未完整傳回，請稍後再試。');
-        }
-      }
-      const sections = { history: structuredHistory ? ['summary'] : ['milestones', 'footprint'],
-        management: structuredManagement ? ['leadership'] : ['team', 'strategy'],
-        industry: Object.hasOwn(report.industry || {}, 'peerInsight') ? ['peerInsight'] : ['competition', 'advantage'],
-        thesis: ['opportunity', 'condition'] };
-      for (const [key, required] of Object.entries(sections)) {
-        if (!report[key] || !required.every(field => text(report[key][field]))) {
-          throw new Error('公司報告部分章節未完整傳回，請稍後再試。');
-        }
-      }
-    } else {
-      fields.growth = ['driver', 'reason', 'watch'];
-      fields.financialWatch = ['metric', 'importance', 'watch'];
     }
     for (const [key, required] of Object.entries(fields)) {
       if (!Array.isArray(report[key]) || !report[key].length || !report[key].every(item =>
@@ -1239,8 +461,7 @@
       <div id="revenueCharts" aria-live="polite"></div></section>`;
   }
 
-  function renderCompactReport(report, symbol, peerData) {
-    if (!report.history) return renderLegacyCompactReport(report, symbol);
+  function renderCompactReport(report, symbol, peerData, valuationData) {
     const { company, products = [], history, management, industry, thesis, risks } = report;
     const available = value => typeof value === 'string' && value.trim()
       && !/^(未披露|未提供|未公開|不適用|無資料|資料不足|目前資料不足|目前無法|暫無|無法確認|尚未披露)/.test(value.trim());
@@ -1292,7 +513,19 @@
     const peerComparison = Object.hasOwn(industry, 'peerInsight');
     const industryBody = peerComparison ? window.renderPeerComparison(peerData, industry.peerInsight, industry.qualitative)
       : comparison.length ? `<div class="brief-comparison">${comparison.map(([label,v]) => `<div><h4>${label}</h4><p>${escapeHtml(v)}</p></div>`).join('')}</div>` : '';
-    const thesisRows = [['研究論點', thesis.opportunity], ['驗證條件與反證', thesis.condition]].filter(([, v]) => available(v));
+    const structuredThesis = Array.isArray(thesis.matrix);
+    const thesisRows = structuredThesis
+      ? thesis.matrix.filter(item => available(item.dimension) && (available(item.bull) || available(item.bear)))
+        .map(item => [item.dimension, item.bull, item.bear])
+      : [['研究論點', thesis.opportunity], ['驗證條件與反證', thesis.condition]].filter(([, v]) => available(v));
+    const thesisReading = available(thesis.reading) ? thesis.reading.split(/\r?\n/)
+      .map(line => line.trim().replace(/^(?:[-*]\s+|[•●]\s*|\d+[.)、]\s+)/u, ''))
+      .filter(Boolean).join(' ').replace(/\s+/g, ' ').trim() : '';
+    const thesisBody = structuredThesis
+      ? window.renderValuationSnapshot(valuationData)
+        + table(['關鍵分析維度', '正向支持條件（Bull Case）', '核心反證／破口條件（Bear Risks）'], thesisRows)
+        + (thesisReading ? `<div class="revenue-reading thesis-reading"><p>${escapeHtml(thesisReading)}</p></div>` : '')
+      : thesisRows.length ? `<div class="brief-argument">${thesisRows.map(([label,v]) => `<div><span>${label}</span><p>${escapeHtml(v)}</p></div>`).join('')}</div>` : '';
     const riskRows = risks.filter(r => available(r.risk) && available(r.reason)).map(r => [r.risk, r.reason, r.watch]);
     const sections = [
       ['business', 'Business', '公司如何運作', expandedBusinessBody, company],
@@ -1300,7 +533,7 @@
       ['history', 'History & Footprint', '發展歷程與布局', historyBody, history],
       ['management', 'Management & Strategy', '團隊與策略方向', managementBody, management],
       ['industry', peerComparison ? 'Peer Financials & Valuation' : 'Industry & Competition', peerComparison ? '同業財務與估值對照' : '產業與競爭位置', industryBody, industry],
-      ['thesis', 'Thesis', '值得關注的理由', thesisRows.length ? `<div class="brief-argument">${thesisRows.map(([label,v]) => `<div><span>${label}</span><p>${escapeHtml(v)}</p></div>`).join('')}</div>` : '', thesis],
+      ['thesis', structuredThesis ? 'Investment Thesis' : 'Thesis', structuredThesis ? '核心研究論點' : '值得關注的理由', thesisBody, thesis],
       ['risks', 'Risks', '什麼可能改變判斷', table(['風險', '可能影響', '觀察訊號'], riskRows), risks]
     ].filter(([, , , body]) => body);
     return `<div class="brief-layout"><nav class="brief-toc" aria-label="報告章節"><span>CONTENTS</span>
@@ -1314,97 +547,17 @@
       </section></div>`;
   }
 
-  function renderLegacyCompactReport(report, symbol) {
-    const { company, products, growth, risks, financialWatch } = report;
-    const signals = (items, titleKey) => `<ol class="compact-signals">${items.map(item => `<li>
-      <strong>${escapeHtml(item[titleKey])}</strong><p>${escapeHtml(item.reason)}</p>
-      <p class="compact-watch"><b>觀察：</b>${escapeHtml(item.watch)}</p>
-    </li>`).join('')}</ol>`;
-    return `<section class="quick-overview compact-report">
-      <span class="quick-overview__eyebrow">COMPANY BRIEF · 公司研究精簡版</span>
-      <h2>${escapeHtml(company.symbol || symbol)}，看懂四個重點</h2>
-      <article class="quick-topic">
-        <h3><span>01</span> 公司做什麼、如何賺錢</h3>
-        <p>${escapeHtml(company.overview)}</p>
-        <div class="business-route compact-business-route">
-          <div><strong>收入來源</strong><p>${escapeHtml(company.revenue)}</p></div>
-          <div><strong>主要客戶</strong><p>${escapeHtml(company.customers)}</p></div>
-        </div>
-      </article>
-      <article class="quick-topic">
-        <h3><span>02</span> 主要產品與服務</h3>
-        <div class="compact-products">${products.map(item => `<div class="compact-product">
-          <h4>${escapeHtml(item.name)}</h4>
-          <p><b>代表產品：</b>${item.examples.map(escapeHtml).join('、')}</p>
-          <p>${escapeHtml(item.significance)}</p>
-        </div>`).join('')}</div>
-      </article>
-      ${renderRevenuePlaceholder()}
-      <article class="quick-topic">
-        <h3><span>03</span> 成長動能與風險</h3>
-        <div class="compact-outlook">
-          <div class="compact-outlook__growth"><h4>成長動能</h4>${signals(growth, 'driver')}</div>
-          <div class="compact-outlook__risks"><h4>主要風險</h4>${signals(risks, 'risk')}</div>
-        </div>
-      </article>
-      <article class="quick-topic">
-        <h3><span>04</span> 財報與營運觀察</h3>
-        <div class="quick-metrics">${financialWatch.map(item => `<div>
-          <strong>${escapeHtml(item.metric)}</strong><p>${escapeHtml(item.importance)}</p>
-          <p class="compact-watch"><b>觀察：</b>${escapeHtml(item.watch)}</p>
-        </div>`).join('')}</div>
-      </article>
-      <p class="quick-overview__hint">聚焦理解公司的必要資訊，不代表完整研究或投資排序。請留意報告生成時間。</p>
-    </section>`;
-  }
-
   function renderCompanyReport(sections, symbol, chartHtml) {
-    if (sections.compactReport) {
-      return renderCompactReport(sections.compactReport, symbol, sections.peerData) + renderReadingChapter('股價走勢', symbol, chartHtml);
-    }
-    const { valueChain, timeline, coreSummary, productPortfolio, dashboard, reportText } = sections;
-    const fullReportHtml = renderReadingChapter('股價走勢', symbol, chartHtml) +
-      renderReadingChapter('商業模式與產業價值鏈', valueChain?.position, renderValueChain(valueChain, symbol)) +
-      renderReadingChapter('公司發展時間線', timeline?.items?.[0]?.event, renderTimeline(timeline)) +
-      renderReadingChapter('完整核心摘要', coreSummary?.identity, renderCoreSummary(coreSummary, symbol)) +
-      renderReadingChapter('主要產品與服務', productPortfolio?.overview, renderProductPortfolio(productPortfolio)) +
-      renderResearchDashboard(dashboard, symbol) + marked.parse(reportText);
-    return renderQuickOverview(coreSummary, dashboard, valueChain, symbol, productPortfolio) +
-      renderRevenuePlaceholder() +
-      renderReadingChapter('深入閱讀', '展開舊版完整分析', fullReportHtml);
+    return renderCompactReport(sections.compactReport, symbol, sections.peerData, sections.valuationData)
+      + renderReadingChapter('股價走勢', symbol, chartHtml);
   }
 
   function readCompanySections(data) {
-    if (data.report && (['compact-v1', 'compact-v2', 'compact-v3', 'compact-v4', 'compact-v5'].includes(data.reportFormat) || data.report.company)) {
-      return { compactReport: validateCompactReport(data.report, data.reportFormat), peerData: data.peerData, reportText: '' };
+    if (!data?.report?.company || !data.report.history) {
+      throw new Error('報告版本不相容，請更新後端後重新產生。');
     }
-    const compactStart = '<!-- COMPACT_REPORT_START -->';
-    if (!data.report && typeof data.text === 'string' && data.text.includes(compactStart)) {
-      const start = data.text.indexOf(compactStart) + compactStart.length;
-      const end = data.text.indexOf('<!-- COMPACT_REPORT_END -->', start);
-      if (end < 0) throw new Error('公司報告部分章節未完整傳回，請稍後再試。');
-      let parsed;
-      try { parsed = JSON.parse(data.text.slice(start, end).trim()); }
-      catch { throw new Error('公司報告格式不完整，請稍後再試。'); }
-      return { compactReport: validateCompactReport(parsed), peerData: data.peerData, reportText: '' };
-    }
-    if (data.report) {
-      const { valueChain, timeline, coreSummary, productPortfolio, dashboard } = data.report;
-      if (!valueChain || !timeline || !coreSummary || !productPortfolio || !dashboard) {
-        throw new Error("公司報告格式不完整，請稍後再試。");
-      }
-      return { valueChain, timeline, coreSummary, productPortfolio, dashboard, reportText: "" };
-    }
-    // Allow older deployed API responses during a rolling deployment.
-    const { valueChain, reportText: a } = extractValueChain(data.text);
-    const { timeline, reportText: b } = extractTimeline(a);
-    const { coreSummary, reportText: c } = extractCoreSummary(b);
-    const { productPortfolio, reportText: d } = extractProductPortfolio(c);
-    const { dashboard, reportText } = extractResearchDashboard(d);
-    if (!valueChain || !timeline || !coreSummary || !productPortfolio || !dashboard) {
-      throw new Error("公司報告部分章節未完整傳回，請稍後再試。");
-    }
-    return { valueChain, timeline, coreSummary, productPortfolio, dashboard, reportText: normalizeUnexpectedJson(reportText) };
+    return { compactReport: validateCompactReport(data.report, data.reportFormat),
+      peerData: data.peerData, valuationData: data.valuationData };
   }
 
   document.getElementById("symbolInput").addEventListener("keydown", event => {
@@ -1474,7 +627,6 @@
       
       const resultElement = document.getElementById("result");
 
-      resultElement.classList.remove("pro-report-style");
 
    
       const sections = readCompanySections(data);

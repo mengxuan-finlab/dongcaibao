@@ -37,6 +37,11 @@ function schemaFor(value, path = '', compact = false) {
     ...(['valueChain.company', 'coreSummary.company', 'company.symbol'].includes(path) ? { enum: [value] } : {}) };
 }
 
+function normalizeParagraph(value) {
+  return value.split(/\r?\n/).map(line => line.trim().replace(/^(?:[-*]\s+|[•●]\s*|\d+[.)、]\s+)/u, ''))
+    .filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+}
+
 function buildContract(basePrompt) {
   const compactStart = '<!-- COMPACT_REPORT_START -->';
   const compactEnd = '<!-- COMPACT_REPORT_END -->';
@@ -218,9 +223,7 @@ async function generateValidatedReport({
           }
         }
         if (Object.hasOwn(report.industry || {}, 'peerInsight')) {
-          const insight = report.industry.peerInsight.split(/\r?\n/)
-            .map(line => line.trim().replace(/^(?:[-*]\s+|[•●]\s*|\d+[.)、]\s+)/u, ''))
-            .filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+          const insight = normalizeParagraph(report.industry.peerInsight);
           const length = [...insight].length;
           if (peerData?.status !== 'ok' || !insight) {
             report.industry.peerInsight = '未披露';
@@ -229,6 +232,11 @@ async function generateValidatedReport({
             report.industry.peerInsight = insight;
             if (length < 80 || length > 120) log({ event: 'peer_insight_length', model, length, outcome: 'kept' });
           }
+        }
+        if (Object.hasOwn(report.thesis || {}, 'reading')) {
+          report.thesis.reading = normalizeParagraph(report.thesis.reading) || '未披露';
+          const length = [...report.thesis.reading].length;
+          if (length < 100 || length > 130) log({ event: 'thesis_reading_length', model, length, outcome: 'kept' });
         }
         let grounding, sourceValidation;
         if (grounded) {
