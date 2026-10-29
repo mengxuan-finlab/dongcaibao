@@ -975,6 +975,11 @@ async function renderDashboards() {
   }
 
   document.getElementById("addBtn").addEventListener("click", addStock);
+  document.getElementById('symbolInput').addEventListener('keydown', event => {
+    if (event.key !== 'Enter' || event.isComposing || event.keyCode === 229 || event.repeat) return;
+    event.preventDefault();
+    document.getElementById('addBtn').click();
+  });
   window.addEventListener('pagehide', () => clearTimeout(pollTimer));
   window.addEventListener('pageshow', event => { if (event.persisted) void loadTrackedStocks(); });
   supabaseClient.auth.onAuthStateChange((event) => {
