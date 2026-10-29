@@ -487,7 +487,7 @@
 
   function scheduleFinancialPoll() {
     clearTimeout(pollTimer);
-    if (currentUser && tracked.some(s => ['pending', 'review', 'financial_queued', 'financial_running'].includes(s.status))) {
+    if (currentUser && tracked.some(s => ['pending', 'financial_queued', 'financial_running'].includes(s.status))) {
       pollTimer = setTimeout(loadTrackedStocks, 5000);
     }
   }
@@ -811,10 +811,11 @@ async function renderDashboards() {
         <div class="dash-card" style="text-align:center; padding: 60px;">
           <div style="font-size:40px; margin-bottom:10px;">⏳</div>
           <h2>AI 正在分析 ${escapeFinancial(s.symbol)} ...</h2>
-          <p>${isTw ? "系統正在準備台股財務分析，完成時間依排程與上游服務而定。" : s.status === 'financial_queued'
+          <p>${s.status === 'financial_queued'
             ? '後端已收到任務，正在等待處理。完成後此頁會自動更新。'
+            : isTw ? '後端正在取得月營收、季報數據並生成台股分析，完成後此頁會自動更新。'
             : '後端正在取得官方文件、財務數據並生成分析，完成後此頁會自動更新。'}</p>
-          ${!isTw && s.status === 'pending' ? '<button type="button" id="startFinancialBtn">開始生成</button>' : ''}
+          ${s.status === 'pending' ? '<button type="button" id="startFinancialBtn">開始生成</button>' : ''}
           <button type="button" id="pendingRefreshBtn">重新整理狀態</button>
         </div>`;
       document.getElementById("pendingRefreshBtn").addEventListener("click", loadTrackedStocks);
@@ -848,7 +849,7 @@ async function renderDashboards() {
     
     const iframeHtml = authenticatedUrl 
       ? `<iframe src="${escapeFinancial(authenticatedUrl)}" referrerpolicy="no-referrer" title="財務圖表"></iframe>`
-      : `<div style="text-align:center; padding:40px; background:#f9fafb; border-radius:8px;">${isTw ? "台股圖表資料生成中，請稍候排程更新。" : "尚未連結圖表數據"}</div>`;
+      : `<div style="text-align:center; padding:40px; background:#f9fafb; border-radius:8px;">尚未連結圖表數據</div>`;
 
     const reportTitle = isTw ? `${escapeFinancial(s.symbol)} 台股財務追蹤報告` : `${escapeFinancial(s.symbol)} 財務分析報告`;
     const financialTabText = isTw ? "月營收與季報追蹤" : "三大財報及估值分析";
@@ -858,12 +859,12 @@ async function renderDashboards() {
       <div class="dash-card">
         <div style="display:flex; justify-content:space-between; align-items:center;">
           <h2>${reportTitle}</h2>
-          <span class="status-badge">${s.status === "review" ? "AI 分析待更新" : "已完成"}</span>
+          <span class="status-badge">${['review', 'tw_review'].includes(s.status) ? "AI 分析待更新" : "已完成"}</span>
         </div>
 
         <div style="margin:12px 0; display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
           <button id="refreshReportBtn" type="button">重新整理狀態</button>
-          ${s.status === "review" ? '<span style="font-size:13px; color:#64748b;">已排入分析排程，完成後請重新整理。</span>' : ""}
+          ${['review', 'tw_review'].includes(s.status) ? '<button id="resumeFinancialBtn" type="button">完成財報分析</button>' : ''}
         </div>
 
         <div class="tab-container">
@@ -882,6 +883,12 @@ async function renderDashboards() {
       </div>
     `;
     document.getElementById("refreshReportBtn").addEventListener("click", loadTrackedStocks);
+    document.getElementById('resumeFinancialBtn')?.addEventListener('click', async event => {
+      event.currentTarget.disabled = true;
+      try { await startFinancialReport(s.id); await loadTrackedStocks(); }
+      catch (error) { alert(error.message); }
+      finally { const button = document.getElementById('resumeFinancialBtn'); if (button) button.disabled = false; }
+    });
 }
 
   function updateAddButtonState() {
@@ -903,7 +910,8 @@ async function renderDashboards() {
       return;
     }
     const input = document.getElementById("symbolInput");
-    const symbolRaw = input.value.trim().toUpperCase();
+    const enteredSymbol = input.value.trim().toUpperCase();
+    const symbolRaw = isTaiwanStock(enteredSymbol) ? enteredSymbol.replace(/\.(TW|TWO)$/, '') : enteredSymbol;
     if (!symbolRaw) return;
     if (!/^[A-Z0-9][A-Z0-9.^-]{0,19}$/.test(symbolRaw)) { alert('股票代碼格式不正確。'); return; }
 
@@ -940,10 +948,8 @@ async function renderDashboards() {
       if (error) throw error;
       input.value = "";
       await loadTrackedStocks();
-      if (!isTaiwanStock(symbolRaw)) {
-        await startFinancialReport(inserted.id);
-        await loadTrackedStocks();
-      }
+      await startFinancialReport(inserted.id);
+      await loadTrackedStocks();
     } catch (error) {
       alert("新增或啟動未完成：" + error.message + ' 若清單已有這支股票，可從報告頁重試。');
     } finally {

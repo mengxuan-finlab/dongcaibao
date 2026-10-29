@@ -1,5 +1,6 @@
 const { extractReportGrounding, validateReport, providerSchema } = require('./company-report');
 const { httpStatus, errorSource, safeErrorMessage, retryDelayMs } = require('./gemini-runtime');
+const { isTaiwanSymbol, TAIWAN_SCHEMA, loadTaiwanSnapshot, buildTaiwanPrompt, taiwanSummary } = require('./taiwan-financial');
 
 const METRICS = ['revenue', 'gross_profit', 'net_income', 'eps_diluted', 'total_equity',
   'current_ratio', 'long_term_solvency', 'operating_cash_flow', 'free_cash_flow',
@@ -127,48 +128,56 @@ function extractFilingText(html) {
     .replace(/\s+/g, ' ').trim().slice(0, 65000);
 }
 
-function createFinancialGenerator({ fetchRows, fetchFiling, generate, models, log = () => {}, now = Date.now,
+function createFinancialGenerator({ fetchRows, fetchFiling, fetchTaiwanRows, generate, models, log = () => {}, now = Date.now,
   sleep = ms => new Promise(resolve => setTimeout(resolve, ms)) }) {
   return async (job, signal) => {
     const started = now(), context = { requestId: job.lease_token, jobId: job.id, symbol: job.symbol };
     const emit = info => log({ ...context, ...info });
-    const specs = [['iq', 'income-statement', 'quarter'], ['ia', 'income-statement', 'annual'],
-      ['bq', 'balance-sheet-statement', 'quarter'], ['ca', 'cash-flow-statement', 'annual'],
-      ['mq', 'key-metrics', 'annual'], ['mt', 'key-metrics-ttm'], ['rq', 'ratios', 'annual'],
-      ['rt', 'ratios-ttm'], ['filings', 'sec-filings-search/symbol'], ['profile', 'profile']];
-    const raw = {};
-    // Bound concurrent upstream requests; one denied endpoint must not become fake zeros.
-    let cursor = 0;
-    await Promise.all([0, 1, 2].map(async () => {
-      while (cursor < specs.length) {
-        signal.throwIfAborted();
-        const [key, endpoint, period] = specs[cursor++];
-        try {
-          raw[key] = await fetchRows(endpoint, job.symbol, period, signal);
-          if (!Array.isArray(raw[key])) throw new Error('FMP_INVALID_RESPONSE');
-        } catch (error) {
-          if (signal.aborted) throw error;
-          emit({ event: 'financial_data_error', endpoint, status: httpStatus(error) });
-          raw[key] = [];
-        }
-      }
-    }));
-    const snapshot = normalizeFinancialData(raw, job.symbol), filing = selectFiling(raw.filings, job.symbol);
-    const profile = raw.profile?.find(row => row.symbol === job.symbol);
-    let issuerHost = '';
-    try { issuerHost = new URL(profile?.website).hostname.replace(/^www\./, ''); } catch { /* No confirmed issuer host. */ }
-    snapshot.companyName = profile?.companyName || job.symbol;
-    snapshot.officialWebsite = issuerHost ? profile.website : null;
-    let filingText = '';
-    if (filing) {
-      try {
-        filingText = extractFilingText(await fetchFiling(filing.url, signal));
-        if (filingText.length < 500 || /your request originates from an undeclared|request rate threshold exceeded|access denied/i.test(filingText)) filingText = '';
-      }
-      catch (error) { if (signal.aborted) throw error; emit({ event: 'financial_document_error', status: httpStatus(error) }); }
-    }
+    const taiwan = isTaiwanSymbol(job.symbol);
     const date = new Date(now()).toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' });
-    const contents = buildFinancialPrompt(job.symbol, snapshot, filing, filingText, date);
+    let snapshot, filing = null, filingText = '', issuerHost = '';
+    if (taiwan) {
+      if (!fetchTaiwanRows) throw new Error('FINMIND_NOT_CONFIGURED');
+      snapshot = await loadTaiwanSnapshot({ symbol: job.symbol, fetchRows: fetchTaiwanRows, signal, asOf: date, log: emit });
+    } else {
+      const specs = [['iq', 'income-statement', 'quarter'], ['ia', 'income-statement', 'annual'],
+        ['bq', 'balance-sheet-statement', 'quarter'], ['ca', 'cash-flow-statement', 'annual'],
+        ['mq', 'key-metrics', 'annual'], ['mt', 'key-metrics-ttm'], ['rq', 'ratios', 'annual'],
+        ['rt', 'ratios-ttm'], ['filings', 'sec-filings-search/symbol'], ['profile', 'profile']];
+      const raw = {};
+      // Bound concurrent upstream requests; one denied endpoint must not become fake zeros.
+      let cursor = 0;
+      await Promise.all([0, 1, 2].map(async () => {
+        while (cursor < specs.length) {
+          signal.throwIfAborted();
+          const [key, endpoint, period] = specs[cursor++];
+          try {
+            raw[key] = await fetchRows(endpoint, job.symbol, period, signal);
+            if (!Array.isArray(raw[key])) throw new Error('FMP_INVALID_RESPONSE');
+          } catch (error) {
+            if (signal.aborted) throw error;
+            emit({ event: 'financial_data_error', endpoint, status: httpStatus(error) });
+            raw[key] = [];
+          }
+        }
+      }));
+      snapshot = normalizeFinancialData(raw, job.symbol);
+      filing = selectFiling(raw.filings, job.symbol);
+      const profile = raw.profile?.find(row => row.symbol === job.symbol);
+      try { issuerHost = new URL(profile?.website).hostname.replace(/^www\./, ''); } catch { /* No confirmed issuer host. */ }
+      snapshot.companyName = profile?.companyName || job.symbol;
+      snapshot.officialWebsite = issuerHost ? profile.website : null;
+      if (filing) {
+        try {
+          filingText = extractFilingText(await fetchFiling(filing.url, signal));
+          if (filingText.length < 500 || /your request originates from an undeclared|request rate threshold exceeded|access denied/i.test(filingText)) filingText = '';
+        }
+        catch (error) { if (signal.aborted) throw error; emit({ event: 'financial_document_error', status: httpStatus(error) }); }
+      }
+    }
+    const schema = taiwan ? TAIWAN_SCHEMA : ANALYSIS_SCHEMA;
+    const contents = taiwan ? buildTaiwanPrompt(job.symbol, snapshot, date)
+      : buildFinancialPrompt(job.symbol, snapshot, filing, filingText, date);
     let lastError, jsonOnly = false;
     const names = [...new Set(models.filter(Boolean))].slice(0, 2);
     for (let attempt = 0; attempt < 3; attempt++) {
@@ -178,7 +187,7 @@ function createFinancialGenerator({ fetchRows, fetchFiling, generate, models, lo
       try {
         const result = await generate({ model, contents, config: {
           tools: [{ googleSearch: {} }, { urlContext: {} }], responseMimeType: 'application/json',
-          ...(!jsonOnly ? { responseJsonSchema: providerSchema(ANALYSIS_SCHEMA) } : {}),
+          ...(!jsonOnly ? { responseJsonSchema: providerSchema(schema) } : {}),
           maxOutputTokens: 8192, temperature: model.startsWith('gemini-3') ? 1 : 0.3,
           ...(model.startsWith('gemini-3') ? { thinkingConfig: { thinkingLevel: 'low' } } : {}),
           abortSignal: signal,
@@ -187,20 +196,20 @@ function createFinancialGenerator({ fetchRows, fetchFiling, generate, models, lo
         received = true;
         if (result.candidates?.[0]?.finishReason !== 'STOP') throw new Error('FINANCIAL_INCOMPLETE_OUTPUT');
         const output = JSON.parse(String(result.text || '').replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim());
-        validateReport(output, ANALYSIS_SCHEMA);
+        validateReport(output, schema);
         const grounding = extractReportGrounding(result);
         if (filingText && !grounding.sources.some(source => source.url === filing.url)) {
           grounding.sources.push({ url: filing.url, title: `${job.symbol} ${filing.form} ${filing.filingDate}`, retrieved: true });
         }
         // Only a successful page read or our own download can substantiate an official-document summary.
-        const readOfficial = !!filingText || grounding.sources.some(source => {
+        const readOfficial = !taiwan && (!!filingText || grounding.sources.some(source => {
           const url = new URL(source.url);
           return source.retrieved && (source.url === filing?.url
             || /https:\/\/(?:www\.)?sec\.gov\/Archives\//i.test(source.url)
             || (issuerHost && (url.hostname === issuerHost || url.hostname.endsWith(`.${issuerHost}`))
               && /earnings|results|financial|quarter|annual|10[-_]?q|10[-_]?k|20[-_]?f/i.test(url.pathname)));
-        });
-        if (!readOfficial) {
+        }));
+        if (!taiwan && !readOfficial) {
           for (const key of Object.keys(output.official)) output.official[key] = '未披露';
         }
         let cautiousRiskCount = 0;
@@ -217,12 +226,14 @@ function createFinancialGenerator({ fetchRows, fetchFiling, generate, models, lo
             return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, cautious(item)]));
           };
           output.ai = cautious(output.ai);
+          if (taiwan) output.official = cautious(output.official);
         }
         emit({ event: 'financial_sources', sourceCount: grounding.sources.length,
           searchQueryCount: grounding.searchQueries.length, ...grounding.telemetry, downloadedOfficial: !!filingText,
-          officialSummaryAvailable: readOfficial, cautiousRiskCount, durationMs: now() - started });
-        return { summary: readOfficial ? officialSummary(output.official) : null,
-          report: { symbol: job.symbol, as_of: date, ...snapshot, ai: safeAnalysisText(output.ai), analysis_mode: 'full',
+          officialSummaryAvailable: readOfficial, market: taiwan ? 'TW' : 'US', cautiousRiskCount, durationMs: now() - started });
+        return { summary: taiwan ? (snapshot.data.monthly_revenue.some(point => point.value !== null) ? taiwanSummary(output.official) : null)
+          : readOfficial ? officialSummary(output.official) : null,
+          report: { symbol: job.symbol, as_of: date, ...snapshot, ai: taiwan ? output.ai : safeAnalysisText(output.ai), analysis_mode: 'full',
             generation_provider: 'google_search_url_context', filing,
             sources: grounding.sources, searchEntryPointHtml: grounding.searchEntryPointHtml,
             research: { searchQueries: grounding.searchQueries, ...grounding.telemetry, officialSummaryAvailable: readOfficial } } };

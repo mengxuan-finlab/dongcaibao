@@ -5,7 +5,7 @@
 1. 在 Supabase SQL Editor 執行 `sql/guest-financial-trial.sql` 全文。
 2. 在 Supabase Authentication 的登入提供者設定啟用 Anonymous Sign-Ins。
 3. 發布 `dongcaibao` 的前端與後端更新。
-4. 美股一鍵生成改由 Node 後端處理：依 `FINANCIAL_BACKEND_SETUP.md` 執行 `sql/financial-report-jobs.sql` 並發布後端。台股既有排程仍需 service_role key；不要將台股排程一併停掉。
+4. 美股與台股一鍵生成均由 Node 後端處理：依 `FINANCIAL_BACKEND_SETUP.md` 執行最新版 `sql/financial-report-jobs.sql` 並發布後端；台股另將原本的 `FINMIND_TOKEN` 設定到 Render。兩邊確認成功後，停用 `HIMS_chart` 舊財報 workflow。
 
 官方設定文件：https://supabase.com/docs/guides/auth/auth-anonymous
 
@@ -22,7 +22,7 @@ SQL 不修改或刪除既有報告。它增加所有 authenticated 使用者的�
 - 點第二檔入口：應引導登入。
 - 同一匿名 session 直接呼叫資料庫新增第二檔、刪除或更新：應拒絕。
 - 使用另一個匿名 session：不能讀到第一位訪客的報告。
-- 後端任務完成（台股仍依既有排程）：訪客可讀取自己的 report_json、圖表與 AI 分析。
+- 後端任務完成：訪客可讀取自己的 report_json、圖表與 AI 分析，美股與台股均不需等排程。
 - 登入既有會員：顯示其原本追蹤清單及 5 檔上限。
 - 若匿名登入失敗，檢查是否啟用 Anonymous Sign-Ins，以及原有 auth.users 建立 profile 的 trigger 是否允許 email 為空。
 

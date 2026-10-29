@@ -181,6 +181,17 @@ async function financialRpc(name, args = {}) {
 }
 const generateFinancialReport = createFinancialGenerator({
   models: [GEMINI_PRIMARY_MODEL, GEMINI_FALLBACK_MODEL], generate: callGemini, log: financialLog,
+  fetchTaiwanRows: async (dataset, stockId, startDate, signal) => {
+    const response = await axios.get('https://api.finmindtrade.com/api/v4/data', {
+      params: { dataset, data_id: stockId, start_date: startDate },
+      headers: process.env.FINMIND_TOKEN ? { Authorization: `Bearer ${process.env.FINMIND_TOKEN}` } : {},
+      timeout: 15000, signal, maxRedirects: 0, maxContentLength: 3 * 1024 * 1024
+    });
+    if (Number(response.data?.status) !== 200 || !Array.isArray(response.data?.data)) {
+      throw Object.assign(new Error('FINMIND_REQUEST_FAILED'), { status: Number(response.data?.status) || null });
+    }
+    return response.data.data;
+  },
   fetchRows: async (endpoint, symbol, period, signal) => {
     if (!process.env.FMP_API_KEY) throw new Error('FMP_API_KEY_NOT_CONFIGURED');
     const response = await axios.get(`https://financialmodelingprep.com/stable/${endpoint}`, {
@@ -223,14 +234,15 @@ app.post('/api/financial-reports', async (req, res) => {
   try {
     const { data: { user }, error } = await supabase.auth.getUser(token);
     if (error || !user) return res.status(401).json({ error: '登入已失效，請重新登入。' });
-    if (!process.env.FMP_API_KEY || !process.env.GEMINI_API_KEY) return res.status(503).json({ error: '財報服務尚未設定完成。' });
+    if (!process.env.GEMINI_API_KEY) return res.status(503).json({ error: '財報服務尚未設定完成。' });
     const result = await financialRpc('start_financial_report', { p_user: user.id, p_tracking: trackingId });
     financialWorker.wake();
     return res.status(result.state === 'ready' ? 200 : 202).json(result);
   } catch (error) {
     const message = String(error.message || '');
     if (/REPORT_NOT_FOUND/.test(message)) return res.status(404).json({ error: '找不到你的財報任務。' });
-    if (/US_SYMBOL_REQUIRED/.test(message)) return res.status(400).json({ error: '台股目前仍使用既有財報流程。' });
+    if (/US_SYMBOL_REQUIRED/.test(message)) return res.status(503).json({ error: '台股後端資料庫尚未更新，請先執行新版 financial-report-jobs.sql。' });
+    if (/FINANCIAL_SYMBOL_REQUIRED/.test(message)) return res.status(400).json({ error: '股票代碼格式不正確。' });
     if (/REPORT_DAILY_LIMIT|REPORT_RETRY_COOLDOWN|TRACKING_LIMIT|REPORT_QUEUE_FULL/.test(message)) {
       res.set('Retry-After', '60');
       return res.status(429).json({ error: /DAILY_LIMIT/.test(message) ? '今日財報生成次數已達上限，請明天再試。'

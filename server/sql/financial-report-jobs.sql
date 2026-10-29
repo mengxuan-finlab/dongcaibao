@@ -32,6 +32,8 @@ declare
   job public.financial_report_jobs%rowtype;
   usage_count integer;
   today date := (now() at time zone 'Asia/Taipei')::date;
+  ready_status text;
+  target_url text;
 begin
   -- Use one short transaction lock for admission, claim and completion so
   -- capacity checks and row-lock ordering are consistent across replicas.
@@ -39,11 +41,16 @@ begin
   select * into stock from public.tracked_stocks
     where id::text = p_tracking and user_id = p_user for update;
   if not found then raise exception 'REPORT_NOT_FOUND'; end if;
-  if stock.symbol !~ '^[A-Z][A-Z0-9.^-]{0,19}$' then raise exception 'US_SYMBOL_REQUIRED'; end if;
+  if stock.symbol !~ '^[A-Z][A-Z0-9.^-]{0,19}$' and stock.symbol !~ '^[0-9]{4}(\.TW|\.TWO)?$' then
+    raise exception 'FINANCIAL_SYMBOL_REQUIRED';
+  end if;
+  ready_status := case when stock.symbol ~ '^[0-9]{4}(\.TW|\.TWO)?$' then 'tw_ready' else 'ready' end;
+  target_url := 'https://hims-chart.vercel.app/' || case when ready_status = 'tw_ready' then 'tw_report.html' else '' end
+    || '?symbol=' || stock.symbol;
   if (select count(*) from public.tracked_stocks where user_id = p_user) > 5 then
     raise exception 'TRACKING_LIMIT';
   end if;
-  if stock.status = 'ready' and stock.report_json is not null
+  if stock.status in ('ready', 'tw_ready') and stock.report_json is not null
     and coalesce(stock.report_json ->> 'as_of', '') >= to_char(now() - interval '3 days', 'YYYY-MM-DD') then
     return jsonb_build_object('state', 'ready');
   end if;
@@ -54,8 +61,8 @@ begin
     end if;
     if job.state in ('queued', 'running') then return jsonb_build_object('state', job.state); end if;
     if job.state = 'ready' and job.result is not null and job.updated_at > now() - interval '3 days' then
-      update public.tracked_stocks set report_json = job.result, summary = job.summary, status = 'ready',
-        report_url = 'https://hims-chart.vercel.app/?symbol=' || stock.symbol
+      update public.tracked_stocks set report_json = job.result, summary = job.summary, status = ready_status,
+        report_url = target_url
         where id::text = p_tracking and user_id = p_user;
       return jsonb_build_object('state', 'ready');
     end if;
@@ -125,8 +132,10 @@ begin
   select * into job from public.financial_report_jobs where id = p_job and lease_token = p_lease
     and state = 'running' and lease_until > now() for update;
   if not found then return false; end if;
-  update public.tracked_stocks set report_json = p_result, summary = p_summary, status = 'ready',
-    report_url = 'https://hims-chart.vercel.app/?symbol=' || job.symbol
+  update public.tracked_stocks set report_json = p_result, summary = p_summary,
+    status = case when job.symbol ~ '^[0-9]{4}(\.TW|\.TWO)?$' then 'tw_ready' else 'ready' end,
+    report_url = 'https://hims-chart.vercel.app/' || case when job.symbol ~ '^[0-9]{4}(\.TW|\.TWO)?$' then 'tw_report.html' else '' end
+      || '?symbol=' || job.symbol
     where id::text = job.tracking_id and user_id = job.user_id and symbol = job.symbol;
   if not found then
     update public.financial_report_jobs set state = 'failed', phase = 'removed', updated_at = now() where id = job.id;
