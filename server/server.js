@@ -13,6 +13,7 @@ const { createSupabaseReportStore } = require('./report-store');
 const { getBasePrompt, normalizeSymbol, detectMarket } = require('./company-prompt');
 const { ADOPTION_API, createAdoptionFeed } = require('./adoption');
 const { createPeerFeed } = require('./peer-comparison');
+const { createFinancialGenerator, createFinancialWorker } = require('./financial-report');
 const KINDS = {
   product: 'revenue-product-segmentation',
   geographic: 'revenue-geographic-segmentation'
@@ -171,6 +172,75 @@ console.log('[Gemini SDK]', { installedVersion: installedSdkVersion(), sdkAttemp
 const GEMINI_PRIMARY_MODEL = process.env.GEMINI_MODEL?.trim() || "gemini-3.8-flash";
 const GEMINI_FALLBACK_MODEL = process.env.GEMINI_FALLBACK_MODEL?.trim() || "gemini-3.6-flash";
 console.log(`[AI 模型設定] 主要模型: ${GEMINI_PRIMARY_MODEL} | 備援模型: ${GEMINI_FALLBACK_MODEL}`);
+
+const financialLog = info => console.log('[財報生成]', info);
+async function financialRpc(name, args = {}) {
+  const { data, error } = await supabase.rpc(name, args).abortSignal(AbortSignal.timeout(10000));
+  if (error) throw error;
+  return data;
+}
+const generateFinancialReport = createFinancialGenerator({
+  models: [GEMINI_PRIMARY_MODEL, GEMINI_FALLBACK_MODEL], generate: callGemini, log: financialLog,
+  fetchRows: async (endpoint, symbol, period, signal) => {
+    if (!process.env.FMP_API_KEY) throw new Error('FMP_API_KEY_NOT_CONFIGURED');
+    const response = await axios.get(`https://financialmodelingprep.com/stable/${endpoint}`, {
+      params: { symbol, apikey: process.env.FMP_API_KEY, ...(period ? { period } : {}),
+        limit: endpoint === 'sec-filings-search/symbol' ? 50 : 5,
+        ...(endpoint === 'sec-filings-search/symbol' ? {
+          from: new Date(Date.now() - 550 * 86400000).toISOString().slice(0, 10),
+          to: new Date().toISOString().slice(0, 10)
+        } : {}) },
+      timeout: 10000, signal, maxRedirects: 0, maxContentLength: 3 * 1024 * 1024
+    });
+    return response.data;
+  },
+  fetchFiling: async (url, signal) => {
+    // URL is already restricted to SEC Archives by selectFiling; do not follow redirects.
+    const response = await axios.get(url, { timeout: 12000, signal, maxRedirects: 0,
+      maxContentLength: 4 * 1024 * 1024, responseType: 'text',
+      headers: { 'User-Agent': 'Dongcaibao financial research (ryanlee940904@gmail.com)' } });
+    if (!/text\/html|text\/plain|application\/xhtml\+xml/i.test(response.headers['content-type'] || '')) return '';
+    return response.data;
+  }
+});
+const financialWorker = createFinancialWorker({
+  run: generateFinancialReport, log: financialLog,
+  store: {
+    claim: async () => (await financialRpc('claim_financial_report'))?.[0] || null,
+    finish: (job, result) => financialRpc('finish_financial_report', {
+      p_job: job.id, p_lease: job.lease_token, p_result: result.report, p_summary: result.summary
+    }),
+    fail: job => financialRpc('fail_financial_report', { p_job: job.id, p_lease: job.lease_token })
+  }
+});
+
+app.post('/api/financial-reports', async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  const token = req.headers.authorization?.match(/^Bearer (\S+)$/i)?.[1];
+  if (!token) return res.status(401).json({ error: '請先登入或建立訪客試用。' });
+  const trackingId = String(req.body?.trackingId || '');
+  if (!/^[A-Za-z0-9-]{1,64}$/.test(trackingId)) return res.status(400).json({ error: '財報任務編號不正確。' });
+  try {
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    if (error || !user) return res.status(401).json({ error: '登入已失效，請重新登入。' });
+    if (!process.env.FMP_API_KEY || !process.env.GEMINI_API_KEY) return res.status(503).json({ error: '財報服務尚未設定完成。' });
+    const result = await financialRpc('start_financial_report', { p_user: user.id, p_tracking: trackingId });
+    financialWorker.wake();
+    return res.status(result.state === 'ready' ? 200 : 202).json(result);
+  } catch (error) {
+    const message = String(error.message || '');
+    if (/REPORT_NOT_FOUND/.test(message)) return res.status(404).json({ error: '找不到你的財報任務。' });
+    if (/US_SYMBOL_REQUIRED/.test(message)) return res.status(400).json({ error: '台股目前仍使用既有財報流程。' });
+    if (/REPORT_DAILY_LIMIT|REPORT_RETRY_COOLDOWN|TRACKING_LIMIT|REPORT_QUEUE_FULL/.test(message)) {
+      res.set('Retry-After', '60');
+      return res.status(429).json({ error: /DAILY_LIMIT/.test(message) ? '今日財報生成次數已達上限，請明天再試。'
+        : /TRACKING_LIMIT/.test(message) ? '已超過追蹤數量上限，請先移除多餘股票。' : '請求較多或重試過於頻繁，請稍後再試。' });
+    }
+    if (/REPORT_ALREADY_RUNNING/.test(message)) return res.status(409).json({ error: '這支股票已有生成任務，請稍候再試。' });
+    financialLog({ event: 'financial_admission_error', message: safeErrorMessage(error) });
+    return res.status(503).json({ error: '財報後端尚未就緒或暫時無法連線，請稍後再試。' });
+  }
+});
 const GEMINI_RETRYABLE_STATUS = new Set([408, 429, 500, 502, 503, 504]);
 
 function isRetryableGeminiError(error) {
@@ -981,4 +1051,5 @@ app.post('/lemonsqueezy-webhook', express.json(), async (req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`後端伺服器啟動中： http://localhost:${PORT}`);
+  financialWorker.start();
 });

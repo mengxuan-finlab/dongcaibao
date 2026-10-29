@@ -460,6 +460,51 @@
   const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
 
   const FINANCIAL_TRACKING_LIMIT = 5;
+  const FINANCIAL_BACKEND = 'https://dongcaibao.onrender.com';
+  let pollTimer = null;
+  let loadingStocks = false;
+  let addingStock = false;
+  const startingReports = new Set();
+
+  function escapeFinancial(value) {
+    return String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+  }
+
+  async function startFinancialReport(id) {
+    if (startingReports.has(id)) return;
+    startingReports.add(id);
+    try {
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if (!session) throw new Error('登入已失效，請重新登入。');
+      const response = await fetch(`${FINANCIAL_BACKEND}/api/financial-reports`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ trackingId: id }), signal: AbortSignal.timeout(20000)
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || '財報生成暫時無法啟動。');
+    } finally { startingReports.delete(id); }
+  }
+
+  function scheduleFinancialPoll() {
+    clearTimeout(pollTimer);
+    if (currentUser && tracked.some(s => ['pending', 'review', 'financial_queued', 'financial_running'].includes(s.status))) {
+      pollTimer = setTimeout(loadTrackedStocks, 5000);
+    }
+  }
+
+  function renderFinancialSources(report) {
+    if (report?.generation_provider !== 'google_search_url_context') return '';
+    const sources = (Array.isArray(report.sources) ? report.sources : []).flatMap(source => {
+      try {
+        const url = new URL(source.url);
+        if (url.protocol !== 'https:' || url.username || url.password) return [];
+        return [`<li><a href="${escapeFinancial(url.href)}" target="_blank" rel="noopener noreferrer">${escapeFinancial(source.title || url.hostname)}</a></li>`];
+      } catch { return []; }
+    });
+    const suggestions = typeof report.searchEntryPointHtml === 'string' && report.searchEntryPointHtml
+      ? `<iframe title="Google 搜尋建議" sandbox="allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" style="width:100%;height:150px;border:0" srcdoc="${escapeFinancial(report.searchEntryPointHtml)}"></iframe>` : '';
+    return sources.length || suggestions ? `<details style="margin-top:20px"><summary>研究來源</summary><ul>${sources.join('')}</ul>${suggestions}</details>` : '';
+  }
 
   let currentUser = null;
   let currentLimit = FINANCIAL_TRACKING_LIMIT;
@@ -468,6 +513,7 @@
   let selectedStockId = null;
 
   async function init() {
+    clearTimeout(pollTimer);
     document.getElementById("addBtn").disabled = true;
     try {
       const { data, error } = await supabaseClient.auth.getSession();
@@ -497,17 +543,22 @@
   }
 
   async function loadTrackedStocks() {
-    if (!currentUser) return;
+    if (!currentUser || loadingStocks) return;
+    loadingStocks = true;
+    const userId = currentUser.id;
+    const before = JSON.stringify(tracked);
+    try {
     const { data, error } = await supabaseClient
       .from("tracked_stocks")
-      .select("id, symbol, status, report_url, summary")
-      .eq("user_id", currentUser.id)
+      .select("id, symbol, status, report_url, summary, report_json")
+      .eq("user_id", userId)
       .order("created_at", { ascending: true });
 
     if (error) {
       console.error("讀取追蹤股票失敗：", error);
       return;
     }
+    if (currentUser?.id !== userId) return;
 
     tracked = data || [];
 
@@ -519,9 +570,17 @@
       selectedStockId = null;
     }
 
-    renderStockList();
-    renderDashboards();
+    if (before !== JSON.stringify(tracked) || !document.querySelector('#dashboards .dash-card')) {
+      renderStockList();
+      await renderDashboards();
+    }
     updateAddButtonState();
+    } catch (error) {
+      console.error('更新財報狀態失敗：', error);
+    } finally {
+      loadingStocks = false;
+      scheduleFinancialPoll();
+    }
   }
 
   function renderStockList() {
@@ -537,7 +596,8 @@
           review: "審核中",
           tw_review: "月營收完成",
           tw_ready: "已完成",
-          no_report: "無資料"
+          no_report: "無資料",
+          financial_queued: "等待處理", financial_running: "生成中", financial_error: "生成未完成"
         };
         let statusText = statusMap[s.status] || "準備中";
         const activeClass = s.id === selectedStockId ? "active" : "";
@@ -545,7 +605,7 @@
         return `
           <div class="stock-item ${activeClass}" onclick="selectStock(${s.id})">
             <span>
-              ${s.symbol}
+              ${escapeFinancial(s.symbol)}
               <span class="status-tag">${statusText}</span>
             </span>
             ${isGuest ? '<span class="status-tag">訪客試用</span>' : `<button onclick="event.stopPropagation(); removeStock(${s.id})">移除</button>`}
@@ -623,8 +683,15 @@
       return `<div class="report-empty">暫無文字摘要。</div>`;
     }
 
-    const parsed = document.createElement("div");
-    parsed.innerHTML = marked.parse(markdown);
+    const template = document.createElement('template');
+    template.innerHTML = marked.parse(markdown);
+    const safeTags = new Set(['H1', 'H2', 'H3', 'H4', 'P', 'UL', 'OL', 'LI', 'STRONG', 'EM', 'B', 'I', 'CODE', 'PRE', 'BR', 'HR', 'BLOCKQUOTE', 'TABLE', 'THEAD', 'TBODY', 'TR', 'TH', 'TD']);
+    for (const node of Array.from(template.content.querySelectorAll('*'))) {
+      if (!safeTags.has(node.tagName)) node.replaceWith(document.createTextNode(node.textContent));
+      else for (const attr of Array.from(node.attributes)) node.removeAttribute(attr.name);
+    }
+    const parsed = document.createElement('div');
+    parsed.append(template.content);
     const slides = [];
     let currentSlide = null;
 
@@ -657,8 +724,8 @@
     const slideHtml = slides.map((slide, index) => `
       <section class="report-slide ${index === 0 ? "active" : ""}" data-slide-index="${index}">
         <div class="report-slide-copy">
-          <div class="report-kicker">${symbol} · Quarterly filing</div>
-          <h3>${slide.title}</h3>
+          <div class="report-kicker">${escapeFinancial(symbol)} · Quarterly filing</div>
+          <h3>${escapeFinancial(slide.title)}</h3>
           <div class="report-slide-body">
             ${slide.content.join("") || "<p>本頁為報告章節封面，請繼續瀏覽下一頁。</p>"}
           </div>
@@ -727,15 +794,36 @@ async function renderDashboards() {
     if (!s) { container.innerHTML = ""; return; }
     const isTw = isTaiwanStock(s.symbol);
 
-    if (s.status === "pending") {
+    if (s.status === 'financial_error') {
+      container.innerHTML = `<div class="dash-card"><h2>${escapeFinancial(s.symbol)} 財報未完成</h2>
+        <p>資料或 AI 服務暫時無法完成處理，請稍後重試。已保存的追蹤紀錄不會刪除。</p>
+        <button id="retryFinancialBtn" type="button">重新生成</button></div>`;
+      document.getElementById('retryFinancialBtn').addEventListener('click', async event => {
+        event.currentTarget.disabled = true;
+        try { await startFinancialReport(s.id); await loadTrackedStocks(); }
+        catch (error) { alert(error.message); }
+        finally { const button = document.getElementById('retryFinancialBtn'); if (button) button.disabled = false; }
+      });
+      return;
+    }
+    if (['pending', 'financial_queued', 'financial_running'].includes(s.status)) {
       container.innerHTML = `
         <div class="dash-card" style="text-align:center; padding: 60px;">
           <div style="font-size:40px; margin-bottom:10px;">⏳</div>
-          <h2>AI 正在分析 ${s.symbol} ...</h2>
-          <p>${isTw ? "系統正在準備台股財務分析。" : "系統正在準備財報與 AI 分析。"}完成時間依排程與上游服務而定。</p>
+          <h2>AI 正在分析 ${escapeFinancial(s.symbol)} ...</h2>
+          <p>${isTw ? "系統正在準備台股財務分析，完成時間依排程與上游服務而定。" : s.status === 'financial_queued'
+            ? '後端已收到任務，正在等待處理。完成後此頁會自動更新。'
+            : '後端正在取得官方文件、財務數據並生成分析，完成後此頁會自動更新。'}</p>
+          ${!isTw && s.status === 'pending' ? '<button type="button" id="startFinancialBtn">開始生成</button>' : ''}
           <button type="button" id="pendingRefreshBtn">重新整理狀態</button>
         </div>`;
       document.getElementById("pendingRefreshBtn").addEventListener("click", loadTrackedStocks);
+      document.getElementById('startFinancialBtn')?.addEventListener('click', async event => {
+        event.currentTarget.disabled = true;
+        try { await startFinancialReport(s.id); await loadTrackedStocks(); }
+        catch (error) { alert(error.message); }
+        finally { const button = document.getElementById('startFinancialBtn'); if (button) button.disabled = false; }
+      });
       return;
     }
 
@@ -743,19 +831,28 @@ async function renderDashboards() {
     const accessToken = session?.access_token || "";
     const refreshToken = session?.refresh_token || "";
 
-    const authenticatedUrl = s.report_url 
-      ? `${s.report_url}&access_token=${accessToken}&refresh_token=${refreshToken}`
-      : null;
+    if (selectedStockId !== s.id || currentUser?.id !== session?.user?.id) return;
+    let authenticatedUrl = null;
+    if (s.report_url) {
+      try {
+        const url = new URL(s.report_url);
+        if (url.origin === 'https://hims-chart.vercel.app') {
+          url.searchParams.set('access_token', accessToken);
+          url.searchParams.set('refresh_token', refreshToken);
+          authenticatedUrl = url.href;
+        }
+      } catch { /* Never send session credentials to an arbitrary report URL. */ }
+    }
 
     const summaryHtml = buildReportDeck(s.summary, s.symbol);
     
     const iframeHtml = authenticatedUrl 
-      ? `<iframe src="${authenticatedUrl}"></iframe>` 
+      ? `<iframe src="${escapeFinancial(authenticatedUrl)}" referrerpolicy="no-referrer" title="財務圖表"></iframe>`
       : `<div style="text-align:center; padding:40px; background:#f9fafb; border-radius:8px;">${isTw ? "台股圖表資料生成中，請稍候排程更新。" : "尚未連結圖表數據"}</div>`;
 
-    const reportTitle = isTw ? `${s.symbol} 台股財務追蹤報告` : `${s.symbol} 財務分析報告`;
+    const reportTitle = isTw ? `${escapeFinancial(s.symbol)} 台股財務追蹤報告` : `${escapeFinancial(s.symbol)} 財務分析報告`;
     const financialTabText = isTw ? "月營收與季報追蹤" : "三大財報及估值分析";
-    const docTabText = isTw ? "台股月營收分析" : "最新季度官方文件";
+    const docTabText = isTw ? "台股月營收分析" : "最新官方財報文件";
 
     container.innerHTML = `
       <div class="dash-card">
@@ -781,6 +878,7 @@ async function renderDashboards() {
         <div id="view-doc" class="view-section">
           ${summaryHtml}
         </div>
+        ${renderFinancialSources(s.report_json)}
       </div>
     `;
     document.getElementById("refreshReportBtn").addEventListener("click", loadTrackedStocks);
@@ -788,6 +886,7 @@ async function renderDashboards() {
 
   function updateAddButtonState() {
     const addBtn = document.getElementById("addBtn");
+    if (addingStock) { addBtn.disabled = true; return; }
     if (tracked.length >= currentLimit) {
       addBtn.disabled = !isGuest;
       addBtn.textContent = isGuest ? "登入以追蹤更多" : "已達 5 檔追蹤上限";
@@ -798,6 +897,7 @@ async function renderDashboards() {
   }
 
   async function addStock() {
+    if (addingStock) return;
     if (isGuest && tracked.length >= 1) {
       window.open("index.html?login=1", "_blank", "noopener");
       return;
@@ -805,6 +905,7 @@ async function renderDashboards() {
     const input = document.getElementById("symbolInput");
     const symbolRaw = input.value.trim().toUpperCase();
     if (!symbolRaw) return;
+    if (!/^[A-Z0-9][A-Z0-9.^-]{0,19}$/.test(symbolRaw)) { alert('股票代碼格式不正確。'); return; }
 
     if (tracked.length >= currentLimit) {
       alert(`目前最多可追蹤 ${currentLimit} 檔，請先移除其他股票。`);
@@ -812,6 +913,7 @@ async function renderDashboards() {
     }
 
     const addBtn = document.getElementById("addBtn");
+    addingStock = true;
     addBtn.disabled = true;
     try {
       if (isGuest) {
@@ -833,14 +935,19 @@ async function renderDashboards() {
         summary: null
       };
       const query = supabaseClient.from("tracked_stocks");
-      const { error } = isGuest ? await query.insert(row)
-        : await query.upsert(row, { onConflict: 'user_id, symbol' });
+      const { data: inserted, error } = isGuest ? await query.insert(row).select('id').single()
+        : await query.upsert(row, { onConflict: 'user_id, symbol' }).select('id').single();
       if (error) throw error;
       input.value = "";
       await loadTrackedStocks();
+      if (!isTaiwanStock(symbolRaw)) {
+        await startFinancialReport(inserted.id);
+        await loadTrackedStocks();
+      }
     } catch (error) {
-      alert("新增失敗：" + error.message);
+      alert("新增或啟動未完成：" + error.message + ' 若清單已有這支股票，可從報告頁重試。');
     } finally {
+      addingStock = false;
       updateAddButtonState();
     }
 }
@@ -862,6 +969,8 @@ async function renderDashboards() {
   }
 
   document.getElementById("addBtn").addEventListener("click", addStock);
+  window.addEventListener('pagehide', () => clearTimeout(pollTimer));
+  window.addEventListener('pageshow', event => { if (event.persisted) void loadTrackedStocks(); });
   supabaseClient.auth.onAuthStateChange((event) => {
     if (["SIGNED_IN", "SIGNED_OUT", "USER_UPDATED"].includes(event)) setTimeout(init, 0);
   });
