@@ -1686,7 +1686,7 @@ button {
 }
 
 /* Research entry and its compact, in-report search state. */
-.research-workspace .research-library-layout { max-width: 1600px; display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 28px; padding-top: 30px; }
+.research-workspace .research-library-layout { max-width: 1440px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 28px; padding-top: 30px; }
 .research-main { min-width: 0; }
 .research-library { padding: 22px 18px; border: 1px solid #e1e6ee; border-radius: 12px; background: #fff; align-self: start; }
 .library-eyebrow { margin-bottom: 14px; color: #8273ac; font-size: 9px; letter-spacing: 1.5px; }
@@ -1694,9 +1694,9 @@ button {
 .research-library h2 span { font-size: 11px; color: #8b96a6; font-weight: 400; }
 .library-description, .library-note { font-size: 11px; line-height: 1.9; color: #8490a2; margin-top: 12px; }
 .library-note { border-top: 1px solid #e5eaf1; padding-top: 16px; margin-top: 20px; }
-#libraryList { margin-top: 22px; }
+#libraryList { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
 .library-message { font-size: 12px; color: #8490a2; line-height: 1.9; }
-.library-item { display: flex; align-items: center; border: 1px solid transparent; border-radius: 7px; padding: 3px; margin-bottom: 6px; }
+.library-item { display: flex; align-items: center; flex: 1 1 160px; min-width: 0; border: 1px solid #e5eaf1; border-radius: 7px; padding: 3px; }
 .library-item.active { background: #f0edf7; border-color: #d8cfea; }
 .library-item button { border: 0; margin: 0; background: transparent; color: #3c526c; padding: 10px 8px; font: inherit; font-size: 13px; cursor: pointer; }
 .library-item button:first-child { flex: 1; min-width: 0; text-align: left; }
@@ -1712,7 +1712,7 @@ button {
 @media (max-width: 1050px) {
   .research-workspace .research-library-layout { grid-template-columns: minmax(0, 1fr); gap: 24px; padding-top: 24px; }
   .research-library { padding: 18px; }
-  #libraryList { display: flex; gap: 8px; overflow-x: auto; margin-top: 16px; }
+  #libraryList { flex-wrap: nowrap; gap: 8px; overflow-x: auto; margin-top: 16px; }
   .library-item { min-width: 155px; flex: 0 0 auto; border-color: #e5eaf1; }
   .library-description { display: none; }
   .library-note { margin-top: 12px; padding-top: 12px; }
