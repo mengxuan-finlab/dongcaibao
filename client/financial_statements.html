@@ -4,117 +4,159 @@
   <meta charset="UTF-8" />
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="shortcut icon" href="/favicon.ico" />
-  <title>懂才抱｜財報追蹤管理</title>
+  <title>財報分析｜懂才抱</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
   <style>
+    * { box-sizing: border-box; }
     body {
       margin: 0;
       font-family: system-ui, -apple-system, "Segoe UI", "Microsoft JhengHei", sans-serif;
-      background: #f3f4f6;
+      background: #f5f7fa;
+      color: #1c3048;
     }
+    .workspace-header { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 max(28px, calc((100vw - 1380px) / 2)); min-height: 76px; background: #0c1526; color: #eef0fa; }
+    .workspace-brand { display: flex; align-items: center; gap: 18px; color: #eef0fa; text-decoration: none; font-size: 23px; font-weight: 700; letter-spacing: 2px; }
+    .workspace-brand span { padding-left: 18px; border-left: 1px solid #3c4558; font-size: 9px; font-weight: 500; letter-spacing: 2px; color: #a7b2c7; }
+    .workspace-header nav { display: flex; align-items: stretch; gap: 28px; align-self: stretch; }
+    .workspace-header nav a { display: flex; align-items: center; color: #9faec4; font-size: 13px; text-decoration: none; border-bottom: 2px solid transparent; padding-top: 2px; }
+    .workspace-header nav a[aria-current] { color: #eeeafa; border-bottom-color: #b4a4ec; }
+    .workspace-header nav a:hover { color: #fff; }
+    :is(a, button, input):focus-visible { outline: 3px solid #a296ce; outline-offset: 4px; }
     .layout {
       display: grid;
-      grid-template-columns: 320px 1fr;
-      min-height: 100vh;
+      grid-template-columns: 280px minmax(0, 1fr);
+      gap: 28px;
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 32px 30px 48px;
+      min-height: calc(100vh - 76px);
+      align-items: start;
     }
     .sidebar {
-      background: #111827;
-      color: #e5e7eb;
+      background: #fff;
+      color: #1c3048;
       padding: 24px;
+      border: 1px solid #e1e6ee;
+      border-radius: 12px;
+      min-width: 0;
     }
+    .sidebar-eyebrow { margin: 0 0 12px; color: #8273ac; font-size: 9px; letter-spacing: 2px; }
     .sidebar h1 {
-      font-size: 20px;
-      margin-bottom: 16px;
+      font-size: 23px;
+      font-weight: 600;
+      margin: 0 0 10px;
     }
+    .sidebar-description { margin: 0 0 24px; color: #7a8799; font-size: 12px; line-height: 1.8; }
     .sidebar .plan {
-      font-size: 14px;
-      margin-bottom: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      font-size: 12px;
+      padding: 12px;
+      margin-bottom: 24px;
+      border-radius: 7px;
+      background: #f3f5f9;
+      color: #6a7b90;
     }
+    .plan strong { color: #3f536c; font-weight: 500; }
     .sidebar label {
-      font-size: 14px;
+      font-size: 12px;
+      color: #596b82;
       display: block;
-      margin: 12px 0 4px;
+      margin: 0 0 10px;
     }
     .sidebar input {
       width: 100%;
-      padding: 8px;
-      border-radius: 6px;
-      border: 1px solid #374151;
-      background: #111827;
-      color: #f9fafb;
+      padding: 13px 12px;
+      border-radius: 7px;
+      border: 1px solid #dce2ec;
+      background: #fff;
+      color: #1c3048;
+      font: inherit;
+      font-size: 16px;
       box-sizing: border-box;
     }
     .sidebar button {
-      margin-top: 8px;
-      padding: 8px 12px;
-      border-radius: 6px;
+      margin-top: 10px;
+      padding: 13px 12px;
+      border-radius: 7px;
       border: none;
       cursor: pointer;
-      background: #4f46e5;
+      background: #243a55;
       color: #f9fafb;
       font-size: 14px;
       width: 100%;
     }
     .sidebar button:disabled {
-      background: #6b7280;
+      background: #9ba7b7;
       cursor: not-allowed;
     }
     .stock-list {
-      margin-top: 16px;
+      margin-top: 12px;
       font-size: 14px;
     }
     .stock-item {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 8px 10px;
+      padding: 4px;
       border-radius: 8px;
-      margin-bottom: 4px;
-      cursor: pointer;
+      margin-bottom: 6px;
       border: 1px solid transparent;
     }
     .stock-item:hover {
-      background: #1f2937;
+      background: #f5f7fa;
     }
     .stock-item.active {
-      background: #1f2937;
-      border-color: #4f46e5;
+      background: #f0edf7;
+      border-color: #d8cfea;
     }
     .stock-item .status-tag {
       font-size: 11px;
       padding: 2px 6px;
       border-radius: 999px;
-      margin-left: 6px;
-      background: #374151;
-      color: #d1d5db;
+      background: #e9edf3;
+      color: #718098;
     }
-    .stock-item button {
-      padding: 2px 8px;
-      font-size: 12px;
-      background: #b91c1c;
+    .stock-item .stock-remove {
+      margin: 0;
+      padding: 9px 7px;
+      font-size: 11px;
+      color: #8b6c79;
+      background: transparent;
       width: auto;
     }
+    .stock-item .stock-select { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 6px 9px; flex: 1; min-width: 0; width: auto; background: transparent; color: #3a506d; text-align: left; padding: 10px 8px; margin: 0; }
+    .stock-symbol { font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+    .stock-item.active .stock-symbol { color: #66518c; }
+    .watchlist-heading { display: flex; align-items: center; justify-content: space-between; border-top: 1px solid #e7ebf1; padding-top: 22px; margin-top: 24px; }
+    .watchlist-heading h2 { font-size: 12px; font-weight: 500; margin: 0; color: #596b82; }
+    #trackedCount { color: #8b96a6; font-size: 11px; }
+    #trialHint { font-size: 11px; margin-top: 12px; color: #7b8798; line-height: 1.8; }
+    #financialAuthEntry { margin: 12px 0 0; font-size: 12px; }
+    #financialAuthEntry a { color: #786499; text-underline-offset: 3px; }
+    .stock-list-empty { color: #97a1b0; padding: 12px 0; font-size: 12px; }
 
     .content {
-      padding: 24px;
-      overflow-y: auto;
+      min-width: 0;
     }
     .dashboards {
       display: grid;
       grid-template-columns: 1fr;
       gap: 16px;
-      max-width: 1000px;
+      min-width: 0;
       margin: 0 auto;
     }
     .dash-card {
       background: #ffffff;
       border-radius: 12px;
-      border: 1px solid #e5e7eb;
+      border: 1px solid #e1e6ee;
       padding: 24px;
-      box-shadow: 0 4px 12px rgba(15,23,42,0.06);
+      box-shadow: none;
       min-height: 500px;
     }
     .dash-card h2 {
@@ -123,6 +165,29 @@
       border-bottom: 1px solid #e5e7eb;
       padding-bottom: 12px;
     }
+    .dashboard-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; padding-bottom: 20px; margin-bottom: 24px; border-bottom: 1px solid #e7ebf1; }
+    .dashboard-heading .dashboard-eyebrow { margin: 0 0 10px; color: #8a96a7; font-size: 9px; letter-spacing: 1.7px; }
+    .dashboard-heading h2 { font-size: 22px; color: #243c57; border: 0; padding: 0; margin: 0; }
+    .dashboard-heading .status-badge { margin: 0; }
+    .dash-card > details { color: #6a7b90; font-size: 12px; line-height: 1.9; }
+    .dash-card > details summary { cursor: pointer; }
+    .dash-card > details a { color: #3f5978; overflow-wrap: anywhere; }
+    .dash-card :is(#retryFinancialBtn, #startFinancialBtn, #resumeFinancialBtn) { background: #243a55; border: 0; border-radius: 7px; padding: 12px 20px; color: #fff; cursor: pointer; font: inherit; font-size: 13px; }
+    .dash-card button:disabled { cursor: not-allowed; opacity: .55; }
+    .financial-empty { display: grid; align-content: center; min-height: 660px; padding: 64px clamp(24px, 5vw, 70px); }
+    .financial-empty .empty-eyebrow { color: #8273ac; font-size: 10px; letter-spacing: 2.5px; margin: 0 0 20px; }
+    .financial-empty h2 { border: 0; color: #243c57; padding: 0; margin: 0 0 20px; font-size: clamp(26px, 2.6vw, 36px); font-weight: 600; line-height: 1.5; letter-spacing: -.03em; }
+    .financial-empty .empty-description { max-width: 480px; color: #7a8799; font-size: 14px; line-height: 1.9; margin: 0 0 32px; }
+    .empty-features { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin: 0 0 30px; }
+    .empty-feature { min-width: 0; border: 1px solid #e3e8f0; background: #f7f9fc; border-radius: 8px; padding: 20px 14px; }
+    .empty-feature strong { display: block; color: #50647e; font-size: 12px; font-weight: 500; margin-top: 18px; }
+    .empty-feature svg { width: 100%; max-width: 100px; height: 52px; display: block; }
+    .empty-hint { color: #8a96a7; font-size: 12px; line-height: 1.9; margin: 0; }
+    .state-card { display: grid; place-content: center; text-align: center; padding: 48px 30px; min-height: 500px; }
+    .state-card h2 { border: 0; padding: 0; margin: 0 0 16px; color: #29425e; font-size: 22px; }
+    .state-card p { color: #7a8799; font-size: 14px; line-height: 1.9; max-width: 520px; margin: 0 auto 24px; }
+    .financial-loading-mark { display: block; height: 30px; width: 30px; border-radius: 50%; border: 2px solid #e6eaf1; border-top-color: #9c89bd; margin: 0 auto 26px; animation: financial-spin 1s linear infinite; }
+    @keyframes financial-spin { to { transform: rotate(360deg); } }
     
     .tab-container {
       display: flex;
@@ -145,9 +210,9 @@
       background: #f9fafb;
     }
     .tab-btn.active {
-      background: #4f46e5;
+      background: #243a55;
       color: white;
-      border-color: #4f46e5;
+      border-color: #243a55;
     }
 
     .view-section {
@@ -172,13 +237,13 @@
     }
 
     .report-deck {
-      --deck-accent: #4f46e5;
+      --deck-accent: #b4a4ec;
       position: relative;
       overflow: hidden;
       border-radius: 18px;
       background: #0f172a;
       color: #f8fafc;
-      box-shadow: 0 18px 45px rgba(15, 23, 42, 0.18);
+      box-shadow: none;
     }
     .report-slide {
       display: none;
@@ -192,8 +257,8 @@
     .report-slide-copy {
       padding: 54px 48px 82px;
       background:
-        radial-gradient(circle at 15% 10%, rgba(99,102,241,.22), transparent 35%),
-        linear-gradient(145deg, #111827, #0f172a);
+        radial-gradient(circle at 15% 10%, rgba(156,137,189,.15), transparent 45%),
+        linear-gradient(145deg, #172337, #0c1526);
     }
     .report-kicker {
       display: inline-flex;
@@ -249,7 +314,7 @@
       min-height: 360px;
       padding: 34px;
       overflow: hidden;
-      background: linear-gradient(145deg, #e0e7ff, #f8fafc 55%, #dbeafe);
+      background: linear-gradient(145deg, #eae6f4, #f8fafc 55%, #e4edf3);
     }
     .report-visual::before,
     .report-visual::after {
@@ -346,8 +411,8 @@
       font-size: 12px;
       padding: 2px 8px;
       border-radius: 999px;
-      background: #eef2ff;
-      color: #3730a3;
+      background: #f0edf7;
+      color: #786499;
       margin-bottom: 10px;
     }
     .status-badge.pending {
@@ -356,14 +421,28 @@
     }
 
 @media (max-width: 768px) {
+  .workspace-header { min-height: 66px; padding: 0 20px; gap: 18px; }
+  .workspace-brand { font-size: 20px; letter-spacing: 1px; }
+  .workspace-brand span { display: none; }
+  .workspace-header nav { gap: 20px; }
+  .workspace-header nav a { font-size: 12px; }
   .layout {
-    grid-template-columns: 1fr; 
-    display: block;
+    grid-template-columns: minmax(0, 1fr);
+    padding: 20px 16px 32px;
+    gap: 20px;
+    min-height: calc(100vh - 66px);
   }
   .sidebar {
-    padding: 16px;
-    border-bottom: 4px solid #4f46e5;
+    padding: 22px;
   }
+  .sidebar-eyebrow, .sidebar-description { display: none; }
+  .sidebar h1 { font-size: 21px; margin-bottom: 18px; }
+  .sidebar .plan { margin-bottom: 18px; }
+  .tracking-entry { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+  .tracking-entry #symbolInput { min-width: 0; }
+  .tracking-entry #symbolInput::placeholder { font-size: 12px; }
+  .tracking-entry #addBtn { margin: 0; width: auto; padding: 12px; font-size: 12px; }
+  .watchlist-heading { margin-top: 18px; padding-top: 18px; }
   .stock-list {
     display: flex;
     overflow-x: auto;
@@ -374,22 +453,27 @@
   .stock-item {
     flex: 0 0 auto;
     margin-bottom: 0;
-    min-width: 120px;
-    flex-direction: column;
-    align-items: flex-start;
-    padding: 10px;
+    min-width: 150px;
+    max-width: 240px;
+    padding: 4px;
+    border-color: #e3e8f0;
   }
-  .stock-item button {
-    margin-top: 8px;
-    width: 100%;
-  }
+  .stock-item .stock-select { flex-direction: column; }
   .content {
-    padding: 12px;
+    padding: 0;
   }
   .dash-card {
     padding: 16px;
     min-height: auto;
   }
+  .financial-empty { min-height: 0; padding: 34px 24px; }
+  .financial-empty h2 { font-size: 27px; }
+  .empty-features { gap: 8px; }
+  .empty-feature { padding: 16px 10px; }
+  .empty-feature strong { font-size: 11px; line-height: 1.6; }
+  .state-card { min-height: 340px; padding: 38px 24px; }
+  .state-card h2 { font-size: 20px; }
+  .dashboard-heading h2 { font-size: 20px; line-height: 1.6; }
   .tab-container {
     flex-direction: column;
   }
@@ -429,23 +513,38 @@
     bottom: 24px;
   }
 }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
   </style>
 </head>
 <body>
+<header class="workspace-header">
+  <a class="workspace-brand" href="index.html" aria-label="懂才抱首頁">懂才抱<span>RESEARCH</span></a>
+  <nav aria-label="主要功能">
+    <a href="stock_integration.html">公司研究</a>
+    <a href="financial_statements.html" aria-current="page">財報分析</a>
+  </nav>
+</header>
 <div class="layout">
   <aside class="sidebar">
-    <h1>財報追蹤管理</h1>
+    <p class="sidebar-eyebrow">FINANCIAL WORKSPACE</p>
+    <h1>財報分析</h1>
+    <p class="sidebar-description">保存你的追蹤清單，掌握公司的財務變化。</p>
     <div class="plan">
-      目前身分：<span id="planName">載入中...</span><br>
-      可追蹤檔數上限：<span id="planLimit">-</span> 檔
+      <span id="planName">載入中...</span>
+      <span>追蹤上限 <strong><span id="planLimit">-</span> 檔</strong></span>
     </div>
 
-    <label for="symbolInput">新增追蹤股票（美股代號，例如 HIMS）</label>
-    <input id="symbolInput" placeholder="輸入股票代號（英文）" />
-    <button id="addBtn">新增追蹤</button>
-    <div id="trialHint" style="font-size:12px; margin-top:4px; color:#cbd5e1;">訪客可試用 1 檔完整財報，登入後可追蹤 5 檔。</div>
-    <p id="financialAuthEntry" hidden><a href="index.html?login=1" target="_blank" rel="noopener" style="color:#c7d2fe">登入／免費註冊</a></p>
+    <label for="symbolInput">新增追蹤股票</label>
+    <div class="tracking-entry">
+      <input id="symbolInput" placeholder="例如 AAPL、2330" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="go" aria-describedby="trialHint" />
+      <button id="addBtn" type="button">新增追蹤</button>
+    </div>
+    <div id="trialHint">訪客可試用 1 檔完整財報，登入後可追蹤 5 檔。</div>
+    <p id="financialAuthEntry" hidden><a href="index.html?login=1" target="_blank" rel="noopener">登入／免費註冊</a></p>
 
+    <div class="watchlist-heading"><h2>你的追蹤清單</h2><span id="trackedCount">0 檔</span></div>
     <div class="stock-list" id="stockList"></div>
   </aside>
 
@@ -587,8 +686,9 @@
 
   function renderStockList() {
     const listEl = document.getElementById("stockList");
+    document.getElementById('trackedCount').textContent = `${tracked.length} 檔`;
     if (tracked.length === 0) {
-      listEl.innerHTML = "<div style='padding:10px; color:#9ca3af;'>尚未追蹤任何股票</div>";
+      listEl.innerHTML = '<div class="stock-list-empty">還沒有追蹤股票，從上方新增一檔。</div>';
       return;
     }
     listEl.innerHTML = tracked
@@ -605,12 +705,12 @@
         const activeClass = s.id === selectedStockId ? "active" : "";
 
         return `
-          <div class="stock-item ${activeClass}" onclick="selectStock(${s.id})">
-            <span>
-              ${escapeFinancial(s.symbol)}
+          <div class="stock-item ${activeClass}">
+            <button class="stock-select" type="button" onclick="selectStock(${s.id})" aria-pressed="${s.id === selectedStockId}">
+              <span class="stock-symbol">${escapeFinancial(s.symbol)}</span>
               <span class="status-tag">${statusText}</span>
-            </span>
-            ${isGuest ? '<span class="status-tag">訪客試用</span>' : `<button onclick="event.stopPropagation(); removeStock(${s.id})">移除</button>`}
+            </button>
+            ${isGuest ? '<span class="status-tag">訪客試用</span>' : `<button class="stock-remove" type="button" aria-label="移除 ${escapeFinancial(s.symbol)}" onclick="removeStock(${s.id})">移除</button>`}
           </div>
         `;
       })
@@ -786,9 +886,17 @@ async function renderDashboards() {
     const container = document.getElementById("dashboards");
 
     if (tracked.length === 0 || !selectedStockId) {
-      container.innerHTML = isGuest
-        ? "<div class='dash-card'><h2>免費試用一份完整財報</h2><p>從左側輸入股票代碼，即可排入財報與 AI 分析流程，不需要註冊。</p><p>完成前可關閉頁面，之後使用同一瀏覽器回來查看。第二檔股票需登入免費會員。</p></div>"
-        : "<div style='text-align:center; color:#6b7280; padding-top:50px;'>請從左側選擇股票</div>";
+      container.innerHTML = `<div class="dash-card financial-empty">
+        <p class="empty-eyebrow">FINANCIAL ANALYSIS</p>
+        <h2>把財報，變成<br>看得懂的資訊。</h2>
+        <p class="empty-description">從營收、獲利到現金流，透過財務圖表與 AI 重點解讀，掌握公司的營運變化。</p>
+        <div class="empty-features">
+          <div class="empty-feature"><svg viewBox="0 0 100 52" fill="none" aria-hidden="true"><path d="M2 49H98" stroke="#d9e1ec"/><rect x="10" y="29" width="14" height="20" rx="2" fill="#c2cedd"/><rect x="33" y="20" width="14" height="29" rx="2" fill="#b4c4d4"/><rect x="56" y="25" width="14" height="24" rx="2" fill="#c2cedd"/><rect x="79" y="7" width="14" height="42" rx="2" fill="#a99abd"/></svg><strong>財務圖表</strong></div>
+          <div class="empty-feature"><svg viewBox="0 0 100 52" fill="none" aria-hidden="true"><rect x="5" y="5" width="90" height="42" rx="5" fill="#eeebf5"/><path d="M17 17H62M17 26H82M17 35H48" stroke="#b4a6ce" stroke-width="4" stroke-linecap="round"/></svg><strong>AI 重點解讀</strong></div>
+          <div class="empty-feature"><svg viewBox="0 0 100 52" fill="none" aria-hidden="true"><circle cx="50" cy="26" r="19" stroke="#e0e7ee" stroke-width="5"/><path d="M50 7A19 19 0 0 1 69 26" stroke="#9db8c5" stroke-width="5" stroke-linecap="round"/><path d="M50 16V27L59 32" stroke="#8c9eb5" stroke-width="2" stroke-linecap="round"/></svg><strong>保存追蹤清單</strong></div>
+        </div>
+        <p class="empty-hint">${isGuest ? '先從一檔股票開始，免註冊試用完整財報。完成前可離開頁面，使用同一瀏覽器回來查看。' : '在追蹤區輸入股票代碼，建立你的第一份財報分析。美股、台股皆可使用。'}</p>
+      </div>`;
       return;
     }
 
@@ -797,7 +905,7 @@ async function renderDashboards() {
     const isTw = isTaiwanStock(s.symbol);
 
     if (s.status === 'financial_error') {
-      container.innerHTML = `<div class="dash-card"><h2>${escapeFinancial(s.symbol)} 財報未完成</h2>
+      container.innerHTML = `<div class="dash-card state-card" role="status"><h2>${escapeFinancial(s.symbol)} 財報未完成</h2>
         <p>資料或 AI 服務暫時無法完成處理，請稍後重試。已保存的追蹤紀錄不會刪除。</p>
         <button id="retryFinancialBtn" type="button">重新生成</button></div>`;
       document.getElementById('retryFinancialBtn').addEventListener('click', async event => {
@@ -810,9 +918,9 @@ async function renderDashboards() {
     }
     if (['pending', 'financial_queued', 'financial_running'].includes(s.status)) {
       container.innerHTML = `
-        <div class="dash-card" style="text-align:center; padding: 60px;">
-          <div style="font-size:40px; margin-bottom:10px;">⏳</div>
-          <h2>AI 正在分析 ${escapeFinancial(s.symbol)} ...</h2>
+        <div class="dash-card state-card" role="status" aria-live="polite">
+          <span class="financial-loading-mark" aria-hidden="true"></span>
+          <h2>正在整理 ${escapeFinancial(s.symbol)} 的財報</h2>
           <p>${s.status === 'financial_queued'
             ? '後端已收到任務，正在等待處理。完成後此頁會自動更新。'
             : isTw ? '後端正在取得月營收、季報數據並生成台股分析，完成後此頁會自動更新。'
@@ -857,8 +965,8 @@ async function renderDashboards() {
 
     container.innerHTML = `
       <div class="dash-card">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <h2>${reportTitle}</h2>
+        <div class="dashboard-heading">
+          <div><p class="dashboard-eyebrow">FINANCIAL REPORT</p><h2>${reportTitle}</h2></div>
           <span class="status-badge">${['review', 'tw_review'].includes(s.status) ? "AI 分析待更新" : "已完成"}</span>
         </div>
 
