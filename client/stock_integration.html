@@ -5,7 +5,7 @@
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="shortcut icon" href="/favicon.ico" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>懂才抱．股票資訊整合系統</title>
+  <title>公司研究｜懂才抱</title>
 
   <meta name="description" content="客製化的股票資訊整合平台">
   <meta name="keyword" content="股票,財報狗,資訊整合平台">
@@ -16,16 +16,54 @@
 
 </head>
 
-<body>
-  <h1>輸入股票代碼</h1>
-
-  <input id="symbolInput" type="text" placeholder="例如：HIMS 或 NVDA" />
-  <button id="fetchBtn">產生公司介紹</button>
-
-  <p id="usageInfo"></p>
-  <p id="debug"></p>
-
-  <div id="result"></div>
+<body class="research-workspace" data-view="idle">
+  <header class="workspace-header">
+    <a class="workspace-brand" href="index.html" aria-label="懂才抱首頁">懂才抱<span>RESEARCH</span></a>
+    <nav aria-label="主要功能">
+      <a href="stock_integration.html" aria-current="page">公司研究</a>
+      <a href="financial_statements.html">財報分析</a>
+    </nav>
+  </header>
+  <main class="workspace-main">
+    <section class="research-entry" aria-labelledby="entryTitle">
+      <div class="entry-intro">
+        <p class="entry-eyebrow">COMPANY RESEARCH</p>
+        <h1 id="entryTitle">從一家公司，<br class="entry-mobile-break">開始你的研究。</h1>
+        <p class="entry-description">整理商業模式、營收結構與投資關鍵，建立研究起點。</p>
+      </div>
+      <div class="entry-search-area">
+        <label class="entry-label" for="symbolInput">股票代碼</label>
+        <div class="entry-search">
+          <svg class="entry-search-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg>
+          <input id="symbolInput" type="text" placeholder="例如 AAPL、NVDA" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="search" aria-describedby="usageInfo" />
+          <button id="fetchBtn" type="button">開始研究 <span aria-hidden="true">→</span></button>
+        </div>
+        <p id="usageInfo"></p>
+      </div>
+      <div class="entry-preview" aria-label="報告內容預覽">
+        <article class="entry-preview-card">
+          <div class="entry-mini-flow" aria-hidden="true"><i></i><span>→</span><i></i><span>→</span><i></i></div>
+          <span class="entry-card-number">01 / BUSINESS</span>
+          <h2>看懂公司的生意</h2>
+          <p>從產品、客群到獲利路徑，掌握企業如何創造價值。</p>
+        </article>
+        <article class="entry-preview-card">
+          <div class="entry-mini-bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+          <span class="entry-card-number">02 / COMPARISON</span>
+          <h2>拆解營收與競爭</h2>
+          <p>結合營收圖表與同業對照，理解公司的市場位置。</p>
+        </article>
+        <article class="entry-preview-card">
+          <div class="entry-mini-thesis" aria-hidden="true"><i></i><i></i><i></i></div>
+          <span class="entry-card-number">03 / THESIS & RISKS</span>
+          <h2>釐清論點與風險</h2>
+          <p>聚焦研究論點、反證條件，以及值得持續觀察的訊號。</p>
+        </article>
+      </div>
+    </section>
+    <p id="debug" role="status" aria-live="polite" aria-atomic="true"></p>
+    <div id="result" aria-busy="false"></div>
+  </main>
   <div id="planModal" class="dc-modal">
     <div class="dc-modal-backdrop" id="planModalBackdrop"></div>
     <div class="dc-modal-content">
@@ -657,6 +695,7 @@
     const resultEl = document.getElementById("result");
     const symbolInput = document.getElementById("symbolInput");
     const fetchBtn = document.getElementById("fetchBtn");
+    if (fetchBtn.disabled) return;
     
     const symbol = symbolInput.value.trim().toUpperCase();
     if (!symbol) {
@@ -664,23 +703,23 @@
       return;
     }
 
-    const { data: { session } } = await supabaseClient.auth.getSession();
-
-    
     fetchBtn.disabled = true;
-    fetchBtn.textContent = "正在分析數據...";
-    debugEl.textContent = "查詢中…正在分析數據...";
-    resultEl.innerHTML = "<p>正在整理業務、分部、歷程、團隊策略、產業競爭、研究論點與風險七個短章節。首次生成可能需要 1–3 分鐘。</p>";
+    fetchBtn.textContent = "研究中…";
+    document.body.dataset.view = "loading";
+    resultEl.setAttribute("aria-busy", "true");
+    debugEl.textContent = `正在研究 ${symbol}`;
+    resultEl.innerHTML = `<div class="research-loading"><span class="research-loading-mark" aria-hidden="true"></span><h2>正在建立公司研究報告</h2><p>整理業務、營收結構、同業比較與主要風險。首次生成可能需要 1–3 分鐘，完成後會自動顯示。</p></div>`;
     let stopAdoptionCard = () => {};
-    if (!session?.user || session.user.is_anonymous) {
-      const adoptionContainer = document.createElement('div');
-      resultEl.appendChild(adoptionContainer);
-      stopAdoptionCard = startAdoptionCard(adoptionContainer);
-    }
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 210000);
     try {
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if (!session?.user || session.user.is_anonymous) {
+        const adoptionContainer = document.createElement('div');
+        resultEl.appendChild(adoptionContainer);
+        stopAdoptionCard = startAdoptionCard(adoptionContainer);
+      }
       const response = await fetch(BACKEND_URL, {
         signal: controller.signal,
         method: "POST",
@@ -704,6 +743,7 @@
           showPlanModal(data.error || "已達使用上限。", data.loginRequired);
           debugEl.textContent = "已達使用上限 ⛔";
           resultEl.innerHTML = "";
+          document.body.dataset.view = "idle";
           return;
         }
         throw new Error((data.error || "伺服器發生錯誤") + (data.requestId ? `（查詢編號：${data.requestId}）` : ""));
@@ -733,6 +773,7 @@
         ${data.generatedAt ? `｜生成時間：${escapeHtml(new Date(data.generatedAt).toLocaleString('zh-TW'))}` : ""}
       </aside>` : "";
       resultElement.innerHTML = sourceNotice + renderCompanyReport(sections, symbol, chartHtml) + renderReportSources(data);
+      document.body.dataset.view = "report";
       const revenueContainer = document.getElementById('revenueCharts');
       if (typeof window.loadRevenueCharts === 'function') {
         window.loadRevenueCharts(revenueContainer, BACKEND_URL, symbol, data.revenueData, sections.compactReport?.segmentInsights);
@@ -748,20 +789,21 @@
 
     } catch (err) {
       console.error(err);
-      debugEl.textContent = "錯誤：" + err.message;
       const errorMessage = err.name === "AbortError"
         ? "報告等待時間過長，請稍後再試。"
         : /Request failed with status code 503/i.test(err.message)
         ? "上游資料服務暫時無法使用，請稍後重新產生報告。"
         : err.message || "報告生成失敗，請稍後再試。";
-      debugEl.textContent = "錯誤：" + errorMessage;
-      resultEl.innerHTML = `<p role="alert" style="color:#ffd0d6">${escapeHtml(errorMessage)}</p>`;
+      document.body.dataset.view = "error";
+      debugEl.textContent = "研究暫時未完成";
+      resultEl.innerHTML = `<div class="research-error" role="alert"><h2>這次未能完成報告</h2><p>${escapeHtml(errorMessage)}</p><p>你可以稍後再試，或輸入另一個股票代碼。</p></div>`;
     } finally {
       clearTimeout(timeout);
       stopAdoptionCard();
+      resultEl.setAttribute("aria-busy", "false");
     
       fetchBtn.disabled = false;
-      fetchBtn.textContent = "產生公司介紹";
+      fetchBtn.innerHTML = '開始研究 <span aria-hidden="true">→</span>';
     }
   });
 
