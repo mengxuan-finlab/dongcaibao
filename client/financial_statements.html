@@ -444,7 +444,7 @@
     <input id="symbolInput" placeholder="輸入股票代號（英文）" />
     <button id="addBtn">新增追蹤</button>
     <div id="trialHint" style="font-size:12px; margin-top:4px; color:#cbd5e1;">訪客可試用 1 檔完整財報，登入後可追蹤 5 檔。</div>
-    <p><a href="index.html?login=1" target="_blank" rel="noopener" style="color:#c7d2fe">登入／免費註冊</a></p>
+    <p id="financialAuthEntry" hidden><a href="index.html?login=1" target="_blank" rel="noopener" style="color:#c7d2fe">登入／免費註冊</a></p>
 
     <div class="stock-list" id="stockList"></div>
   </aside>
@@ -521,6 +521,7 @@
       // Create the anonymous identity only when the visitor starts their trial.
       currentUser = data.session?.user || null;
       isGuest = !currentUser || !!currentUser.is_anonymous;
+      document.getElementById('financialAuthEntry').hidden = !isGuest;
       currentLimit = isGuest ? 1 : FINANCIAL_TRACKING_LIMIT;
       document.getElementById("planName").textContent = isGuest ? "訪客試用" : "免費會員";
       document.getElementById("planLimit").textContent = currentLimit;
@@ -535,6 +536,7 @@
         renderDashboards();
       }
     } catch (error) {
+      document.getElementById('financialAuthEntry').hidden = false;
       document.getElementById("dashboards").textContent = "無法讀取財報，請重新整理後再試。";
       console.error(error);
     } finally {
@@ -816,9 +818,7 @@ async function renderDashboards() {
             : isTw ? '後端正在取得月營收、季報數據並生成台股分析，完成後此頁會自動更新。'
             : '後端正在取得官方文件、財務數據並生成分析，完成後此頁會自動更新。'}</p>
           ${s.status === 'pending' ? '<button type="button" id="startFinancialBtn">開始生成</button>' : ''}
-          <button type="button" id="pendingRefreshBtn">重新整理狀態</button>
         </div>`;
-      document.getElementById("pendingRefreshBtn").addEventListener("click", loadTrackedStocks);
       document.getElementById('startFinancialBtn')?.addEventListener('click', async event => {
         event.currentTarget.disabled = true;
         try { await startFinancialReport(s.id); await loadTrackedStocks(); }
@@ -862,10 +862,7 @@ async function renderDashboards() {
           <span class="status-badge">${['review', 'tw_review'].includes(s.status) ? "AI 分析待更新" : "已完成"}</span>
         </div>
 
-        <div style="margin:12px 0; display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
-          <button id="refreshReportBtn" type="button">重新整理狀態</button>
-          ${['review', 'tw_review'].includes(s.status) ? '<button id="resumeFinancialBtn" type="button">完成財報分析</button>' : ''}
-        </div>
+        ${['review', 'tw_review'].includes(s.status) ? '<div style="margin:12px 0;"><button id="resumeFinancialBtn" type="button">完成財報分析</button></div>' : ''}
 
         <div class="tab-container">
           <button id="btn-financial" class="tab-btn active" onclick="switchView('financial')">${financialTabText}</button>
@@ -882,7 +879,6 @@ async function renderDashboards() {
         ${renderFinancialSources(s.report_json)}
       </div>
     `;
-    document.getElementById("refreshReportBtn").addEventListener("click", loadTrackedStocks);
     document.getElementById('resumeFinancialBtn')?.addEventListener('click', async event => {
       event.currentTarget.disabled = true;
       try { await startFinancialReport(s.id); await loadTrackedStocks(); }
