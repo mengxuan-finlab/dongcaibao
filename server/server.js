@@ -14,6 +14,7 @@ const { getBasePrompt, normalizeSymbol, detectMarket } = require('./company-prom
 const { ADOPTION_API, createAdoptionFeed } = require('./adoption');
 const { createPeerFeed } = require('./peer-comparison');
 const { createFinancialGenerator, createFinancialWorker } = require('./financial-report');
+const { createCompanyLibrary } = require('./company-library');
 const KINDS = {
   product: 'revenue-product-segmentation',
   geographic: 'revenue-geographic-segmentation'
@@ -312,7 +313,7 @@ function generateContentStreamWithFallback(prompt, label) {
 }
 
 // 方案限制設定
-const PLAN_LIMIT = { free: 10, plus: 10, pro: Infinity };
+const companyLibrary = createCompanyLibrary(supabase);
 
 async function getReportIdentity(req) {
   if (!req.headers.authorization) return { user: null, plan: 'guest' };
@@ -327,6 +328,30 @@ async function getReportIdentity(req) {
   const { data: profile } = await supabase.from('profiles').select('plan').eq('id', user.id).single();
   return { user, plan: (profile?.plan || 'free').toLowerCase() };
 }
+
+function libraryRoute(action) {
+  return async (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    try {
+      const { user } = await getReportIdentity(req);
+      if (!user) return res.status(401).json({ error: '請登入後保存公司研究。', loginRequired: true });
+      const symbol = req.params.symbol;
+      if (symbol && !/^[A-Z0-9][A-Z0-9.^-]{0,19}$/i.test(symbol)) {
+        return res.status(400).json({ error: '股票代碼格式不正確。' });
+      }
+      res.json(await action(user.id, symbol ? normalizeSymbol(symbol) : null));
+    } catch (error) {
+      const failure = reportErrorResponse(error);
+      res.status(failure.status).json({ error: failure.message, code: failure.code });
+    }
+  };
+}
+app.get('/api/company-reports', libraryRoute(userId => companyLibrary.list(userId)));
+app.get('/api/company-reports/:symbol', libraryRoute((userId, symbol) => companyLibrary.read(userId, symbol)));
+app.delete('/api/company-reports/:symbol', libraryRoute(async (userId, symbol) => {
+  await companyLibrary.remove(userId, symbol);
+  return companyLibrary.list(userId);
+}));
 
 app.get('/api/guest-usage', (req, res) => {
   res.set('Cache-Control', 'no-store');
@@ -523,6 +548,7 @@ app.post('/api/analyze-stock', async (req, res) => {
   const { symbol } = req.body;
   const requestId = randomUUID();
   let settleGuest;
+  let reserved = false;
   
   try {
     if (typeof symbol !== 'string' || !/^[A-Z0-9][A-Z0-9.^-]{0,19}$/i.test(symbol.trim())) {
@@ -531,38 +557,12 @@ app.post('/api/analyze-stock', async (req, res) => {
     const { user, plan: userPlan } = await getReportIdentity(req);
     if (!user) settleGuest = guestAccess.reserve(req.ip, 'company_intro');
 
-    // ==========================================
-    // ★ 新增：限流攔截器 (放在搜尋之前)
-    // ==========================================
-    
-    // 1. 計算本週起始時間 (週日凌晨)
-    const startOfWeek = new Date();
-    startOfWeek.setHours(0, 0, 0, 0);
-    startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
-
-    // 2. 向 Supabase 查詢該用戶本週已使用次數
-    const { count: usedCount, error: countError } = user ? await supabase
-      .from("usage_logs")
-      .select("*", { count: 'exact', head: true })
-      .eq("user_id", user.id)
-      .eq("action", "company_intro")
-      .gte("created_at", startOfWeek.toISOString()) : { count: 0, error: null };
-
-    if (countError) throw new Error("無法讀取使用紀錄");
-
-    // 3. 檢查是否超過限制 (Pro 方案為 Infinity，永遠不會進入此 if)
-    const limit = PLAN_LIMIT[userPlan] ?? PLAN_LIMIT.free;
-    if (usedCount >= limit) {
-      return res.status(403).json({ 
-        error: `已達本週 ${limit} 份報告額度，請下週再試。`,
-        plan: 'free'
-      });
-    }
-    // ==========================================
-    // 往下才是原本的執行邏輯 (通過檢查才執行)
-    // ==========================================
-
     const normalizedSymbol = normalizeSymbol(symbol);
+    if (user) {
+      const saved = await companyLibrary.claim(user.id, normalizedSymbol, requestId);
+      if (saved) return res.json({ ...saved, requestId });
+      reserved = true;
+    }
     const market = detectMarket(normalizedSymbol);
 
     // 診斷用：請在部署後的 Log 觀察這裡輸出什麼
@@ -639,16 +639,19 @@ app.post('/api/analyze-stock', async (req, res) => {
 
     console.log('[公司報告結果]', { requestId, cacheTier: reportResult.cacheTier, model: reportResult.modelName,
       sourceValidation: reportResult.sourceValidation });
-    if (user) await supabase.from('usage_logs').insert({ user_id: user.id, action: 'company_intro' });
-    if (settleGuest) settleGuest(true);
-
     const { sourceValidation, ...publicReport } = reportResult;
-    res.json({ 
+    const responsePayload = {
       ...publicReport,
       requestId,
       plan: userPlan,
       reportMode: 'base',
-    });
+    };
+    if (user) {
+      await companyLibrary.finish(requestId, responsePayload);
+      reserved = false;
+    }
+    if (settleGuest) settleGuest(true);
+    res.json({ ...responsePayload, saved: !!user });
 
   } catch (err) {
     const failure = reportErrorResponse(err);
@@ -657,6 +660,7 @@ app.post('/api/analyze-stock', async (req, res) => {
       cause: err.cause ? safeErrorMessage(err.cause) : undefined });
     res.status(failure.status).json({ error: failure.message, code: failure.code, requestId, loginRequired: !!err.loginRequired });
   } finally {
+    if (reserved) await companyLibrary.release(requestId).catch(error => console.error('[公司研究保存]', error.message));
     if (settleGuest) settleGuest(false);
   }
 });

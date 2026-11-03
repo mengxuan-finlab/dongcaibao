@@ -24,7 +24,15 @@
       <a href="financial_statements.html">財報分析</a>
     </nav>
   </header>
-  <main class="workspace-main">
+  <main class="workspace-main research-library-layout">
+    <aside class="research-library" aria-label="已保存的公司研究">
+      <p class="library-eyebrow">RESEARCH LIBRARY</p>
+      <h2>你的公司研究 <span id="libraryCount">0 / 5</span></h2>
+      <p class="library-description">最多保存 5 檔，隨時切換查看。</p>
+      <div id="libraryList"><p class="library-message">登入後可保存研究報告。</p></div>
+      <p class="library-note">每週最多新增 5 份，查看已保存報告不扣額度。每週日台灣時間 00:00 重設；移除不退回已用次數。</p>
+    </aside>
+    <section class="research-main" aria-label="公司研究內容">
     <section class="research-entry" aria-labelledby="entryTitle">
       <div class="entry-intro">
         <p class="entry-eyebrow">COMPANY RESEARCH</p>
@@ -63,6 +71,7 @@
     </section>
     <p id="debug" role="status" aria-live="polite" aria-atomic="true"></p>
     <div id="result" aria-busy="false"></div>
+    </section>
   </main>
   <div id="planModal" class="dc-modal">
     <div class="dc-modal-backdrop" id="planModalBackdrop"></div>
@@ -229,11 +238,10 @@
   const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpsa2V4cGxzbGV6bnVlYmlnaHRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0MzAwNjUsImV4cCI6MjA4MTAwNjA2NX0.HPVn3jcN88M4U3-RCVW-YO-b65rDOKv6pxEaVWwbm68";
   const supabaseClient = supabase.createClient(supabaseUrl, supabaseAnonKey);
   
-  const PLAN_LIMIT = {
-    free: 10,
-    plus: 10,
-    pro: Infinity
-  };
+  let libraryUserId = null;
+  let libraryReports = [];
+  let selectedReportSymbol = null;
+  let reportBusy = false;
 
   const planModal = document.getElementById("planModal");
   const planModalBackdrop = document.getElementById("planModalBackdrop");
@@ -341,24 +349,30 @@
     return { user, plan: profile?.plan || "free" };
   }
 
-  async function getWeeklyUsage(userId) {
-    const startOfWeek = new Date();
-    startOfWeek.setHours(0, 0, 0, 0);
-    startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
-
-    const { count, error } = await supabaseClient
-      .from("usage_logs")
-      .select("*", { count: 'exact', head: true })
-      .eq("user_id", userId)
-      .eq("action", "company_intro")
-      .gte("created_at", startOfWeek.toISOString());
-
-    return error ? 0 : count;
+  function renderLibrary() {
+    document.getElementById('libraryCount').textContent = `${libraryReports.length} / 5`;
+    document.getElementById('libraryList').innerHTML = libraryReports.length
+      ? libraryReports.map(report => `<div class="library-item${selectedReportSymbol === report.symbol ? ' active' : ''}">
+          <button type="button" data-library-action="read" data-symbol="${escapeHtml(report.symbol)}" aria-pressed="${selectedReportSymbol === report.symbol}"${reportBusy ? ' disabled' : ''}>
+            <strong>${escapeHtml(report.symbol)}</strong><small>${escapeHtml(new Date(report.savedAt).toLocaleDateString('zh-TW'))}</small></button>
+          <button type="button" class="library-remove" data-library-action="remove" data-symbol="${escapeHtml(report.symbol)}" aria-label="移除 ${escapeHtml(report.symbol)}"${reportBusy ? ' disabled' : ''}>移除</button>
+        </div>`).join('')
+      : `<p class="library-message">${libraryUserId ? '尚未保存研究，輸入代碼開始。' : '登入後可保存研究報告。'}</p>`;
   }
 
-  async function updateUsageInfo(user, plan) {
+  async function updateUsageInfo(user, plan, restore = false) {
     const usageInfoEl = document.getElementById("usageInfo");
     if (!usageInfoEl) return;
+    const userId = user?.id || null;
+    if (libraryUserId !== userId) {
+      libraryUserId = userId;
+      libraryReports = [];
+      selectedReportSymbol = null;
+      document.getElementById('result').innerHTML = '';
+      document.getElementById('debug').textContent = '';
+      document.body.dataset.view = 'idle';
+    }
+    renderLibrary();
     if (!user) {
       usageInfoEl.innerHTML = '目前身分：訪客｜每日 1 份報告。<a href="index.html?login=1" target="_blank" rel="noopener">登入取得更多免費額度</a>';
       try {
@@ -372,26 +386,70 @@
       return;
     }
 
-    const limit = PLAN_LIMIT[plan] ?? PLAN_LIMIT["free"];
-    const limitText = limit === Infinity ? "無限" : limit;
-    
-    const used = await getWeeklyUsage(user.id);
-
-    usageInfoEl.innerHTML = `
-      目前身分：<span class="plan-tag plan-free">免費會員</span>
-      ｜ 本週報告：${used} / ${limitText} 次
-    `;
+    try {
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if (!session || session.user.id !== userId) return;
+      const response = await fetch(new URL('/api/company-reports', BACKEND_URL), {
+        headers: { Authorization: `Bearer ${session.access_token}` }, cache: 'no-store'
+      });
+      const state = await response.json();
+      if (libraryUserId !== userId) return;
+      if (!response.ok) throw new Error(state.error || '暫時無法讀取研究清單。');
+      libraryReports = Array.isArray(state.reports) ? state.reports : [];
+      usageInfoEl.textContent = `本週已新增 ${state.used} / 5 份 · 已保存 ${libraryReports.length} / 5 檔`;
+      renderLibrary();
+      if (restore && !reportBusy && libraryReports.length && !document.getElementById('result').children.length) {
+        void loadCompanyReport(libraryReports[0].symbol, true);
+      }
+    } catch (error) {
+      usageInfoEl.textContent = error.message || '暫時無法讀取研究清單。';
+    }
   }
 
   window.addEventListener("DOMContentLoaded", async () => {
     const { user, plan } = await getCurrentUserPlan();
-    await updateUsageInfo(user, plan);
+    await updateUsageInfo(user, plan, true);
   });
   supabaseClient.auth.onAuthStateChange(() => {
     setTimeout(async () => {
       const { user, plan } = await getCurrentUserPlan();
-      await updateUsageInfo(user, plan);
+      await updateUsageInfo(user, plan, true);
     }, 0);
+  });
+
+  document.getElementById('libraryList').addEventListener('click', async event => {
+    const button = event.target.closest('button[data-library-action]');
+    if (!button || reportBusy) return;
+    const symbol = button.dataset.symbol;
+    if (button.dataset.libraryAction === 'read') return loadCompanyReport(symbol, true);
+    if (!confirm(`移除 ${symbol} 的已保存研究？本週已用額度不會退回。`)) return;
+    reportBusy = true;
+    document.getElementById('fetchBtn').disabled = true;
+    renderLibrary();
+    try {
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if (!session) throw new Error('請重新登入。');
+      const response = await fetch(new URL(`/api/company-reports/${encodeURIComponent(symbol)}`, BACKEND_URL), {
+        method: 'DELETE', headers: { Authorization: `Bearer ${session.access_token}` }
+      });
+      const state = await response.json();
+      if (!response.ok) throw new Error(state.error || '移除未完成。');
+      if (libraryUserId !== session.user.id) return;
+      if (selectedReportSymbol === symbol) {
+        selectedReportSymbol = null;
+        document.getElementById('result').innerHTML = '';
+        document.getElementById('debug').textContent = '';
+        document.body.dataset.view = 'idle';
+      }
+      const { user, plan } = await getCurrentUserPlan();
+      await updateUsageInfo(user, plan);
+    } catch (error) {
+      alert(error.message);
+    } finally {
+      reportBusy = false;
+      document.getElementById('fetchBtn').disabled = false;
+      renderLibrary();
+    }
   });
 
   function isTaiwanStock(symbol) {
@@ -690,47 +748,53 @@
     if (!fetchBtn.disabled) fetchBtn.click();
   });
 
-  document.getElementById("fetchBtn").addEventListener("click", async () => {
+  async function loadCompanyReport(enteredSymbol, saved = false) {
     const debugEl = document.getElementById("debug");
     const resultEl = document.getElementById("result");
     const symbolInput = document.getElementById("symbolInput");
     const fetchBtn = document.getElementById("fetchBtn");
-    if (fetchBtn.disabled) return;
+    if (reportBusy) return;
     
-    const symbol = symbolInput.value.trim().toUpperCase();
+    const symbol = enteredSymbol.trim().toUpperCase();
     if (!symbol) {
       alert("請輸入股票代碼！");
       return;
     }
 
     fetchBtn.disabled = true;
-    fetchBtn.textContent = "研究中…";
+    reportBusy = true;
+    renderLibrary();
+    symbolInput.value = symbol;
+    fetchBtn.textContent = saved ? '讀取中…' : "研究中…";
     document.body.dataset.view = "loading";
     resultEl.setAttribute("aria-busy", "true");
-    debugEl.textContent = `正在研究 ${symbol}`;
-    resultEl.innerHTML = `<div class="research-loading"><span class="research-loading-mark" aria-hidden="true"></span><h2>正在建立公司研究報告</h2><p>整理業務、營收結構、同業比較與主要風險。首次生成可能需要 1–3 分鐘，完成後會自動顯示。</p></div>`;
+    debugEl.textContent = saved ? `正在讀取 ${symbol} 的已保存研究` : `正在研究 ${symbol}`;
+    resultEl.innerHTML = `<div class="research-loading"><span class="research-loading-mark" aria-hidden="true"></span><h2>${saved ? '正在讀取已保存報告' : '正在建立公司研究報告'}</h2><p>${saved ? '直接載入原本的研究內容，不重新呼叫 AI。' : '整理業務、營收結構、同業比較與主要風險。首次生成可能需要 1–3 分鐘，完成後會自動顯示。'}</p></div>`;
     let stopAdoptionCard = () => {};
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 210000);
     try {
       const { data: { session } } = await supabaseClient.auth.getSession();
-      if (!session?.user || session.user.is_anonymous) {
+      if (!saved && (!session?.user || session.user.is_anonymous)) {
         const adoptionContainer = document.createElement('div');
         resultEl.appendChild(adoptionContainer);
         stopAdoptionCard = startAdoptionCard(adoptionContainer);
       }
-      const response = await fetch(BACKEND_URL, {
+      const response = await fetch(saved ? new URL(`/api/company-reports/${encodeURIComponent(symbol)}`, BACKEND_URL) : BACKEND_URL, {
         signal: controller.signal,
-        method: "POST",
+        method: saved ? 'GET' : "POST",
+        cache: 'no-store',
         headers: {
           "Content-Type": "application/json",
           ...(session ? { "Authorization": `Bearer ${session.access_token}` } : {})
         },
-        body: JSON.stringify({ symbol: symbol })
+        ...(!saved ? { body: JSON.stringify({ symbol: symbol }) } : {})
       });
 
       const rawResponse = await response.text();
+      const { data: { session: latestSession } } = await supabaseClient.auth.getSession();
+      if ((latestSession?.user?.id || null) !== (session?.user?.id || null)) return;
       let data;
       try {
         data = JSON.parse(rawResponse);
@@ -769,10 +833,12 @@
       
       const sourceDocumentCount = collectReportSources(data).documentCount;
       const sourceNotice = data.sourceInfo ? `<aside class="report-data-status" role="status">
-        ${data.cached ? "已載入近 3 天內的公司報告" : "公司報告已生成"}${sourceDocumentCount > 0 ? `｜${data.sourceInfo.provider === 'google_search_url_context' ? 'Google 搜尋參考來源' : '搜尋資料'} ${sourceDocumentCount} 份文件` : ''}
+        ${data.saved ? '已保存的公司研究' : data.cached ? "已載入近 3 天內的公司報告" : "公司報告已生成"}${sourceDocumentCount > 0 ? `｜${data.sourceInfo.provider === 'google_search_url_context' ? 'Google 搜尋參考來源' : '搜尋資料'} ${sourceDocumentCount} 份文件` : ''}
         ${data.generatedAt ? `｜生成時間：${escapeHtml(new Date(data.generatedAt).toLocaleString('zh-TW'))}` : ""}
       </aside>` : "";
       resultElement.innerHTML = sourceNotice + renderCompanyReport(sections, symbol, chartHtml) + renderReportSources(data);
+      if (data.saved) libraryUserId = session?.user?.id || null;
+      selectedReportSymbol = data.saved ? (data.report?.company?.symbol || symbol) : null;
       document.body.dataset.view = "report";
       const revenueContainer = document.getElementById('revenueCharts');
       if (typeof window.loadRevenueCharts === 'function') {
@@ -800,12 +866,15 @@
     } finally {
       clearTimeout(timeout);
       stopAdoptionCard();
+      reportBusy = false;
+      renderLibrary();
       resultEl.setAttribute("aria-busy", "false");
     
       fetchBtn.disabled = false;
       fetchBtn.innerHTML = '開始研究 <span aria-hidden="true">→</span>';
     }
-  });
+  }
+  document.getElementById('fetchBtn').addEventListener('click', () => loadCompanyReport(document.getElementById('symbolInput').value));
 
 </script>
 </body>
