@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="zh-TW" class="research-home-root">
 <head>
   <meta charset="UTF-8" />
   <link rel="icon" href="/favicon.ico" sizes="any" />
@@ -55,11 +55,7 @@
 
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 </head>
-<body>
-  <div class="particle"></div>
-  <div class="particle"></div>
-  <div class="particle"></div>
-  <div class="particle"></div>
+<body class="research-home">
 
 
 <header class="top-logo">
@@ -124,37 +120,45 @@
   <section id="home">
       <div class="container">
           
-          <div class="pc-layout">
-              <div class="subtitle">從選股到賣出的股票資訊整合平台</div>
+          <div class="hero-copy">
+              <p class="hero-eyebrow">RESEARCH WITH CLARITY</p>
+              <h1 class="hero-title">看懂公司，<br><span>讀懂財報。</span></h1>
               <div class="content">
                   <p class="lead">
-                      懂才抱從選股、公司資訊整合，到財報追蹤與新聞監控一次包辦，打造屬於你的全方位股票研究流程
+                      整合公司業務、產業競爭與財務圖表，讓你更快掌握企業全貌與營運變化。
                   </p>
                   <div class="hero-actions">
-                      <!--<a href="#select" class="btn primary" id="link-select">選出屬於你的優質公司</a>-->
-                      <a href="#integration" class="btn secondary" id="link-integration">查看公司及產業報告</a>
-                      <a href="#service" class="btn primary" id="link-service">三大財報自動追蹤</a>
-                      <!--<a href="#news" class="btn secondary" id="link-news">公司新聞雷達</a>-->
+                      <a href="#integration" class="btn secondary" id="link-integration">查看公司研究</a>
+                      <a href="#service" class="btn primary" id="link-service">開始財報分析</a>
                   </div>
               </div>
-              <button class="cta-button" onclick="scrollDown()">
-                  <svg viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z" /></svg>
-              </button>
+              <div class="hero-topics"><span>商業模式</span><span>產業競爭</span><span>財務脈絡</span></div>
           </div>
-
-          <div class="mobile-hero-layout">
-              <div class="hero-brand">
-                  <div class="brand-logo">📈</div> 
-                  <h2>從選股到賣出的<br>美股資訊整合平台</h2>
+          <div class="research-preview" aria-hidden="true">
+              <svg class="preview-orbit" viewBox="0 0 600 500" fill="none"><path d="M-40 390C70 440 100 215 235 280S400 160 640 80" stroke="currentColor" stroke-width="1.5"/><path d="M-40 420C100 470 140 250 260 320S450 190 640 120" stroke="currentColor" stroke-opacity=".3"/></svg>
+              <div class="preview-report">
+                  <div class="preview-card-heading"><span class="preview-mark"></span><span>公司研究</span><span class="preview-tag">REPORT PREVIEW</span></div>
+                  <p class="preview-kicker">從生意本質，看見企業全貌</p>
+                  <div class="preview-divider"></div>
+                  <div class="preview-mix">
+                      <div class="preview-donut"><span>營收<br>結構</span></div>
+                      <div class="preview-breakdown"><span>核心業務</span><i></i><span>成長動能</span><i></i><span>市場布局</span><i></i></div>
+                  </div>
+                  <div class="preview-summary"><span>BUSINESS AT A GLANCE</span><div></div><div></div></div>
               </div>
-              <div class="mobile-feature-actions" aria-label="主要功能">
-                  <a href="stock_integration.html" class="btn secondary">查看公司及產業報告</a>
-                  <a href="financial_statements.html" class="btn primary">三大財報自動追蹤</a>
+              <div class="preview-financial">
+                  <div class="preview-card-heading"><span class="preview-dot"></span><span>財務脈絡</span><span class="preview-period">FINANCIALS</span></div>
+                  <svg class="preview-trend" viewBox="0 0 360 100" fill="none">
+                      <path d="M0 25H360M0 60H360M0 95H360" stroke="#ffffff" stroke-opacity=".07"/>
+                      <path d="M0 88C25 88 28 62 52 68S88 89 115 55S155 65 183 42S219 57 248 29S289 42 316 15S344 16 360 5V100H0Z" fill="#a99af6" fill-opacity=".09"/>
+                      <path d="M0 88C25 88 28 62 52 68S88 89 115 55S155 65 183 42S219 57 248 29S289 42 316 15S344 16 360 5" stroke="#bbadff" stroke-width="2.5"/>
+                  </svg>
+                  <div class="preview-legend"><span>營收</span><span>獲利</span><span>現金流</span></div>
               </div>
+              <p class="preview-caption">研究介面示意 · 非實際公司數據</p>
           </div>
-
       </div>
-      <div class="mountain-bg"></div>
+      <a class="hero-scroll" href="#integration" aria-label="往下了解公司研究">探索研究工具 <span aria-hidden="true">↓</span></a>
   </section>
 
   <!--<section id="select">
