@@ -27,7 +27,7 @@
     :is(a, button, input):focus-visible { outline: 3px solid #a296ce; outline-offset: 4px; }
     .layout {
       display: grid;
-      grid-template-columns: 280px minmax(0, 1fr);
+      grid-template-columns: minmax(0, 1fr);
       gap: 28px;
       max-width: 1440px;
       margin: 0 auto;
@@ -36,6 +36,10 @@
       align-items: start;
     }
     .sidebar {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(260px, 440px);
+      column-gap: 32px;
+      row-gap: 20px;
       background: #fff;
       color: #1c3048;
       padding: 24px;
@@ -43,13 +47,17 @@
       border-radius: 12px;
       min-width: 0;
     }
+    .tracking-overview, .tracking-form { min-width: 0; }
+    .tracking-entry { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; }
+    .tracking-entry #symbolInput { min-width: 0; }
+    .tracking-entry #addBtn { margin: 0; width: auto; padding: 12px 22px; }
     .sidebar-eyebrow { margin: 0 0 12px; color: #8273ac; font-size: 9px; letter-spacing: 2px; }
     .sidebar h1 {
       font-size: 23px;
       font-weight: 600;
       margin: 0 0 10px;
     }
-    .sidebar-description { margin: 0 0 24px; color: #7a8799; font-size: 12px; line-height: 1.8; }
+    .sidebar-description { margin: 0 0 16px; color: #7a8799; font-size: 12px; line-height: 1.8; }
     .sidebar .plan {
       display: flex;
       justify-content: space-between;
@@ -57,7 +65,8 @@
       gap: 12px;
       font-size: 12px;
       padding: 12px;
-      margin-bottom: 24px;
+      margin-bottom: 0;
+      max-width: 320px;
       border-radius: 7px;
       background: #f3f5f9;
       color: #6a7b90;
@@ -96,7 +105,12 @@
       cursor: not-allowed;
     }
     .stock-list {
-      margin-top: 12px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      grid-column: 1 / -1;
+      min-width: 0;
+      margin-top: 0;
       font-size: 14px;
     }
     .stock-item {
@@ -104,9 +118,11 @@
       justify-content: space-between;
       align-items: center;
       padding: 4px;
+      flex: 1 1 170px;
+      min-width: 0;
       border-radius: 8px;
-      margin-bottom: 6px;
-      border: 1px solid transparent;
+      margin-bottom: 0;
+      border: 1px solid #e3e8f0;
     }
     .stock-item:hover {
       background: #f5f7fa;
@@ -133,7 +149,7 @@
     .stock-item .stock-select { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 6px 9px; flex: 1; min-width: 0; width: auto; background: transparent; color: #3a506d; text-align: left; padding: 10px 8px; margin: 0; }
     .stock-symbol { font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
     .stock-item.active .stock-symbol { color: #66518c; }
-    .watchlist-heading { display: flex; align-items: center; justify-content: space-between; border-top: 1px solid #e7ebf1; padding-top: 22px; margin-top: 24px; }
+    .watchlist-heading { display: flex; grid-column: 1 / -1; align-items: center; justify-content: space-between; border-top: 1px solid #e7ebf1; padding-top: 18px; margin-top: 0; }
     .watchlist-heading h2 { font-size: 12px; font-weight: 500; margin: 0; color: #596b82; }
     #trackedCount { color: #8b96a6; font-size: 11px; }
     #trialHint { font-size: 11px; margin-top: 12px; color: #7b8798; line-height: 1.8; }
@@ -433,17 +449,20 @@
     min-height: calc(100vh - 66px);
   }
   .sidebar {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 16px;
     padding: 22px;
   }
   .sidebar-eyebrow, .sidebar-description { display: none; }
   .sidebar h1 { font-size: 21px; margin-bottom: 18px; }
-  .sidebar .plan { margin-bottom: 18px; }
+  .sidebar .plan { margin-bottom: 0; max-width: none; }
   .tracking-entry { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
   .tracking-entry #symbolInput { min-width: 0; }
   .tracking-entry #symbolInput::placeholder { font-size: 12px; }
   .tracking-entry #addBtn { margin: 0; width: auto; padding: 12px; font-size: 12px; }
-  .watchlist-heading { margin-top: 18px; padding-top: 18px; }
+  .watchlist-heading { margin-top: 0; padding-top: 18px; }
   .stock-list {
+    flex-wrap: nowrap;
     display: flex;
     overflow-x: auto;
     gap: 8px;
@@ -527,22 +546,25 @@
   </nav>
 </header>
 <div class="layout">
-  <aside class="sidebar">
-    <p class="sidebar-eyebrow">FINANCIAL WORKSPACE</p>
-    <h1>財報分析</h1>
-    <p class="sidebar-description">保存你的追蹤清單，掌握公司的財務變化。</p>
-    <div class="plan">
-      <span id="planName">載入中...</span>
-      <span>追蹤上限 <strong><span id="planLimit">-</span> 檔</strong></span>
+  <aside class="sidebar" aria-label="財報追蹤管理">
+    <div class="tracking-overview">
+      <p class="sidebar-eyebrow">FINANCIAL WORKSPACE</p>
+      <h1>財報分析</h1>
+      <p class="sidebar-description">保存你的追蹤清單，掌握公司的財務變化。</p>
+      <div class="plan">
+        <span id="planName">載入中...</span>
+        <span>追蹤上限 <strong><span id="planLimit">-</span> 檔</strong></span>
+      </div>
     </div>
-
-    <label for="symbolInput">新增追蹤股票</label>
-    <div class="tracking-entry">
-      <input id="symbolInput" placeholder="例如 AAPL、2330" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="go" aria-describedby="trialHint" />
-      <button id="addBtn" type="button">新增追蹤</button>
+    <div class="tracking-form">
+      <label for="symbolInput">新增追蹤股票</label>
+      <div class="tracking-entry">
+        <input id="symbolInput" placeholder="例如 AAPL、2330" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="go" aria-describedby="trialHint" />
+        <button id="addBtn" type="button">新增追蹤</button>
+      </div>
+      <div id="trialHint">訪客可試用 1 檔完整財報，登入後可追蹤 5 檔。</div>
+      <p id="financialAuthEntry" hidden><a href="index.html?login=1" target="_blank" rel="noopener">登入／免費註冊</a></p>
     </div>
-    <div id="trialHint">訪客可試用 1 檔完整財報，登入後可追蹤 5 檔。</div>
-    <p id="financialAuthEntry" hidden><a href="index.html?login=1" target="_blank" rel="noopener">登入／免費註冊</a></p>
 
     <div class="watchlist-heading"><h2>你的追蹤清單</h2><span id="trackedCount">0 檔</span></div>
     <div class="stock-list" id="stockList"></div>
