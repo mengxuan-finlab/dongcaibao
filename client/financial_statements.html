@@ -253,36 +253,33 @@
     }
 
     .report-deck {
-      --deck-accent: #b4a4ec;
       position: relative;
       overflow: hidden;
-      border-radius: 18px;
-      background: #0f172a;
-      color: #f8fafc;
+      border: 1px solid #dfe6ef;
+      border-radius: 12px;
+      background: #ffffff;
+      color: #34465b;
       box-shadow: none;
     }
     .report-slide {
       display: none;
-      grid-template-columns: minmax(0, 1.25fr) minmax(260px, 0.75fr);
-      min-height: 520px;
       animation: slideReveal 0.35s ease;
     }
     .report-slide.active {
-      display: grid;
+      display: block;
     }
     .report-slide-copy {
-      padding: 54px 48px 82px;
-      background:
-        radial-gradient(circle at 15% 10%, rgba(156,137,189,.15), transparent 45%),
-        linear-gradient(145deg, #172337, #0c1526);
+      padding: 32px 36px;
+      border-top: 3px solid #a99ac7;
+      background: linear-gradient(180deg, #f7f8fc, #ffffff 110px);
     }
     .report-kicker {
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      margin-bottom: 26px;
-      color: #c7d2fe;
-      font-size: 12px;
+      margin-bottom: 18px;
+      color: #7a879c;
+      font-size: 11px;
       font-weight: 700;
       letter-spacing: .14em;
       text-transform: uppercase;
@@ -291,19 +288,21 @@
       content: "";
       width: 28px;
       height: 2px;
-      background: #818cf8;
+      background: #a99ac7;
     }
     .report-slide h3 {
-      margin: 0 0 24px;
-      color: #ffffff;
-      font-size: clamp(28px, 4vw, 44px);
-      line-height: 1.18;
-      letter-spacing: -.03em;
+      margin: 0 0 20px;
+      color: #243e5b;
+      font-size: clamp(21px, 2.2vw, 27px);
+      line-height: 1.5;
+      letter-spacing: -.02em;
     }
     .report-slide-body {
-      color: #cbd5e1;
+      max-width: 78ch;
+      color: #526277;
       font-size: 16px;
-      line-height: 1.85;
+      line-height: 1.95;
+      overflow-wrap: anywhere;
     }
     .report-slide-body p {
       margin: 0 0 16px;
@@ -318,74 +317,48 @@
       padding-left: 4px;
     }
     .report-slide-body li::marker {
-      color: #818cf8;
+      color: #9684b8;
     }
     .report-slide-body strong {
-      color: #ffffff;
-    }
-    .report-visual {
-      position: relative;
-      display: grid;
-      place-items: center;
-      min-height: 360px;
-      padding: 34px;
-      overflow: hidden;
-      background: linear-gradient(145deg, #eae6f4, #f8fafc 55%, #e4edf3);
-    }
-    .report-visual::before,
-    .report-visual::after {
-      content: "";
-      position: absolute;
-      border-radius: 999px;
-      background: rgba(79, 70, 229, .1);
-    }
-    .report-visual::before {
-      width: 260px;
-      height: 260px;
-      right: -90px;
-      top: -80px;
-    }
-    .report-visual::after {
-      width: 180px;
-      height: 180px;
-      left: -70px;
-      bottom: -70px;
-    }
-    .report-visual svg {
-      position: relative;
-      z-index: 1;
-      width: min(100%, 360px);
-      height: auto;
-      filter: drop-shadow(0 20px 22px rgba(30, 41, 59, .16));
+      color: #29435e;
     }
     .report-deck-controls {
-      position: absolute;
-      left: 48px;
-      right: 48px;
-      bottom: 28px;
-      z-index: 3;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      pointer-events: none;
+      flex-wrap: wrap;
+      gap: 16px;
+      padding: 18px 36px;
+      border-top: 1px solid #e8ecf3;
+      background: #fafbfd;
     }
     .report-deck-nav,
     .report-deck-dots {
       display: flex;
       align-items: center;
       gap: 8px;
-      pointer-events: auto;
+    }
+    .report-deck-dots {
+      flex-wrap: wrap;
     }
     .report-deck button {
-      border: 1px solid rgba(255,255,255,.22);
-      background: rgba(15,23,42,.72);
-      color: #ffffff;
+      border: 1px solid #dfe5ee;
+      background: #ffffff;
+      color: #526277;
       cursor: pointer;
+    }
+    .report-deck button:hover:not(:disabled) {
+      background: #f0ecf7;
+      border-color: #c8bcdf;
+    }
+    .report-deck button:focus-visible {
+      outline: 2px solid #8c79ae;
+      outline-offset: 3px;
     }
     .report-nav-btn {
       width: 38px;
       height: 38px;
-      border-radius: 50%;
+      border-radius: 8px;
       font-size: 18px;
     }
     .report-nav-btn:disabled {
@@ -393,18 +366,21 @@
       cursor: default;
     }
     .report-dot {
-      width: 8px;
-      height: 8px;
-      padding: 0;
-      border-radius: 999px;
-      transition: width .2s, background .2s;
+      min-height: 34px;
+      padding: 7px 11px;
+      border-radius: 6px;
+      font: inherit;
+      font-size: 12px;
+      line-height: 1.5;
+      text-align: left;
     }
     .report-dot.active {
-      width: 25px;
-      background: #818cf8;
+      color: #6e548f;
+      background: #eee9f6;
+      border-color: #d8cde8;
     }
     .report-page {
-      color: #cbd5e1;
+      color: #7a879c;
       font-size: 12px;
       font-variant-numeric: tabular-nums;
     }
@@ -517,31 +493,17 @@
   iframe {
     height: 500px;
   }
-  .report-slide,
-  .report-slide.active {
-    grid-template-columns: 1fr;
-  }
   .report-slide-copy {
-    min-height: 390px;
-    padding: 36px 24px 88px;
+    padding: 24px 20px;
   }
   .report-slide h3 {
-    font-size: 28px;
+    font-size: 21px;
   }
   .report-slide-body {
     font-size: 15px;
   }
-  .report-visual {
-    min-height: 260px;
-    padding: 24px;
-  }
-  .report-visual svg {
-    max-height: 230px;
-  }
   .report-deck-controls {
-    left: 24px;
-    right: 24px;
-    bottom: 24px;
+    padding: 16px 20px;
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -792,49 +754,6 @@
     return /^\d{4}(\.TW|\.TWO)?$/.test(value);
   }
 
-  function getReportIllustration(index) {
-    const illustrations = [
-      `<svg viewBox="0 0 420 320" role="img" aria-label="官方財報摘要插圖">
-        <rect x="72" y="36" width="276" height="246" rx="24" fill="#fff"/>
-        <rect x="102" y="72" width="118" height="16" rx="8" fill="#c7d2fe"/>
-        <rect x="102" y="104" width="216" height="10" rx="5" fill="#e2e8f0"/>
-        <rect x="102" y="126" width="178" height="10" rx="5" fill="#e2e8f0"/>
-        <path d="M110 226 L156 188 L198 208 L252 142 L310 174" fill="none" stroke="#4f46e5" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
-        <circle cx="252" cy="142" r="12" fill="#818cf8"/>
-      </svg>`,
-      `<svg viewBox="0 0 420 320" role="img" aria-label="業務發展插圖">
-        <circle cx="210" cy="160" r="112" fill="#fff"/>
-        <rect x="116" y="174" width="48" height="72" rx="12" fill="#c7d2fe"/>
-        <rect x="186" y="132" width="48" height="114" rx="12" fill="#818cf8"/>
-        <rect x="256" y="88" width="48" height="158" rx="12" fill="#4f46e5"/>
-        <path d="M124 128 C178 114 224 88 292 48" fill="none" stroke="#0f172a" stroke-width="10" stroke-linecap="round"/>
-        <path d="M267 47 L296 46 L292 74" fill="none" stroke="#0f172a" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>`,
-      `<svg viewBox="0 0 420 320" role="img" aria-label="營運變動插圖">
-        <rect x="68" y="54" width="284" height="212" rx="26" fill="#fff"/>
-        <circle cx="142" cy="128" r="38" fill="#c7d2fe"/>
-        <path d="M142 104 V152 M118 128 H166" stroke="#4f46e5" stroke-width="11" stroke-linecap="round"/>
-        <rect x="202" y="102" width="108" height="14" rx="7" fill="#818cf8"/>
-        <rect x="202" y="130" width="76" height="10" rx="5" fill="#cbd5e1"/>
-        <path d="M112 218 C150 170 188 238 224 188 C252 150 278 190 310 158" fill="none" stroke="#0f172a" stroke-width="10" stroke-linecap="round"/>
-      </svg>`,
-      `<svg viewBox="0 0 420 320" role="img" aria-label="未來規劃插圖">
-        <circle cx="210" cy="160" r="116" fill="#fff"/>
-        <circle cx="210" cy="160" r="76" fill="#e0e7ff"/>
-        <circle cx="210" cy="160" r="34" fill="#818cf8"/>
-        <path d="M210 48 V88 M210 232 V272 M98 160 H138 M282 160 H322" stroke="#4f46e5" stroke-width="10" stroke-linecap="round"/>
-        <path d="M210 160 L294 76" stroke="#0f172a" stroke-width="13" stroke-linecap="round"/>
-        <path d="M269 76 H294 V101" fill="none" stroke="#0f172a" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>`,
-      `<svg viewBox="0 0 420 320" role="img" aria-label="風險管理插圖">
-        <path d="M210 42 L330 88 V164 C330 230 280 270 210 288 C140 270 90 230 90 164 V88 Z" fill="#fff"/>
-        <path d="M210 82 L292 112 V164 C292 207 261 235 210 252 C159 235 128 207 128 164 V112 Z" fill="#e0e7ff"/>
-        <path d="M210 122 V180" stroke="#4f46e5" stroke-width="14" stroke-linecap="round"/>
-        <circle cx="210" cy="211" r="9" fill="#4f46e5"/>
-      </svg>`
-    ];
-    return illustrations[index % illustrations.length];
-  }
 
   function buildReportDeck(markdown, symbol) {
     if (!markdown) {
@@ -882,21 +801,21 @@
     const slideHtml = slides.map((slide, index) => `
       <section class="report-slide ${index === 0 ? "active" : ""}" data-slide-index="${index}">
         <div class="report-slide-copy">
-          <div class="report-kicker">${escapeFinancial(symbol)} · Quarterly filing</div>
+          <div class="report-kicker">${escapeFinancial(symbol)} · 官方文件摘要</div>
           <h3>${escapeFinancial(slide.title)}</h3>
           <div class="report-slide-body">
             ${slide.content.join("") || "<p>本頁為報告章節封面，請繼續瀏覽下一頁。</p>"}
           </div>
         </div>
-        <div class="report-visual">${getReportIllustration(index)}</div>
       </section>
     `).join("");
 
-    const dotsHtml = slides.map((_, index) => `
+    const dotsHtml = slides.map((slide, index) => `
       <button class="report-dot ${index === 0 ? "active" : ""}"
         type="button"
-        aria-label="前往第 ${index + 1} 頁"
-        onclick="showReportSlide(${index})"></button>
+        aria-label="第 ${index + 1} 章：${escapeFinancial(slide.title)}"
+        aria-current="${index === 0 ? 'step' : 'false'}"
+        onclick="showReportSlide(${index})">${String(index + 1).padStart(2, '0')} ${escapeFinancial(slide.title.replace(/^\d+[.、]\s*/, ''))}</button>
     `).join("");
 
     return `
@@ -905,7 +824,7 @@
         <div class="report-deck-controls">
           <div class="report-deck-nav">
             <button class="report-nav-btn" id="reportPrev" type="button" aria-label="上一頁" onclick="moveReportSlide(-1)" disabled>‹</button>
-            <button class="report-nav-btn" id="reportNext" type="button" aria-label="下一頁" onclick="moveReportSlide(1)">›</button>
+            <button class="report-nav-btn" id="reportNext" type="button" aria-label="下一頁" onclick="moveReportSlide(1)" ${slides.length === 1 ? 'disabled' : ''}>›</button>
             <span class="report-page" id="reportPage">01 / ${String(slides.length).padStart(2, "0")}</span>
           </div>
           <div class="report-deck-dots">${dotsHtml}</div>
@@ -923,7 +842,10 @@
     const nextIndex = Math.max(0, Math.min(index, slides.length - 1));
 
     slides.forEach((slide, slideIndex) => slide.classList.toggle("active", slideIndex === nextIndex));
-    dots.forEach((dot, dotIndex) => dot.classList.toggle("active", dotIndex === nextIndex));
+    dots.forEach((dot, dotIndex) => {
+      dot.classList.toggle("active", dotIndex === nextIndex);
+      dot.setAttribute('aria-current', dotIndex === nextIndex ? 'step' : 'false');
+    });
     deck.dataset.currentSlide = String(nextIndex);
 
     document.getElementById("reportPrev").disabled = nextIndex === 0;
