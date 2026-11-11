@@ -657,7 +657,7 @@
       <div class="official-document-heading"><div><h3>官方財報原文</h3><p>${metadata.map(escapeFinancial).join(' · ')}</p></div>
         <a class="official-document-link" href="${escapeFinancial(url.href)}" target="_blank" rel="noopener noreferrer">閱讀官方完整原文 ↗</a></div>
       ${excerpt ? `<details><summary>展開官方原文文字摘錄</summary><div class="original-excerpt" lang="en" tabindex="0" role="region" aria-label="官方原文文字摘錄">${escapeFinancial(excerpt)}</div>
-        <p>此處為文件開頭的文字摘錄，非全文；完整排版、表格與後續章節請開啟官方原文。</p></details>` : ''}
+        <p>此處為文件開頭的文字摘錄；完整排版、表格與後續章節請開啟官方原文。</p></details>` : ''}
     </section>`;
   }
 
@@ -1040,7 +1040,7 @@ async function renderDashboards() {
 
         <div id="view-doc" class="view-section">
           ${officialHtml}
-          ${!isTw && s.summary ? '<div class="translation-heading"><h3>AI 中文重點摘要</h3><p>依可取得的官方資料整理，非原文逐字翻譯。</p></div>' : ''}
+          ${!isTw && s.summary ? '<div class="translation-heading"><h3>AI 中文重點摘要</h3></div>' : ''}
           ${summaryHtml}
         </div>
         ${renderFinancialSources(s.report_json)}
