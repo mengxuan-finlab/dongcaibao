@@ -141,10 +141,18 @@ function selectFiling(rows, symbol) {
 
 function extractFilingText(html) {
   if (/^\s*%PDF-/i.test(String(html))) return '';
-  return String(html).replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, ' ')
+  // Inline XBRL headers contain hidden taxonomy, context and unit data, not prose.
+  return String(html).replace(/<!--[\s\S]*?-->/g, ' ')
+    .replace(/<ix:(header|hidden|references|resources)\b[^>]*>[\s\S]*?<\/ix:\1\s*>/gi, ' ')
+    .replace(/<(?:xbrli:)?(context|unit)\b[^>]*>[\s\S]*?<\/(?:xbrli:)?\1\s*>/gi, ' ')
+    .replace(/<head\b[^>]*>[\s\S]*?<\/head\s*>/gi, ' ')
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, ' ')
     .replace(/<style\b[^>]*>[\s\S]*?<\/style\s*>/gi, ' ')
+    .replace(/<\/(?:p|div|section|tr|h[1-6])\s*>|<br\b[^>]*>/gi, '\n')
     .replace(/<[^>]*>/g, ' ').replace(/&nbsp;|&#160;/gi, ' ').replace(/&amp;/gi, '&')
-    .replace(/\s+/g, ' ').trim().slice(0, 65000);
+    .replace(/&quot;/gi, '"').replace(/&#39;|&apos;/gi, "'")
+    .replace(/[^\S\n]+/g, ' ').replace(/ *\n */g, '\n').replace(/\n{3,}/g, '\n\n')
+    .trim().slice(0, 65000);
 }
 
 function createFinancialGenerator({ fetchRows, fetchFiling, fetchTaiwanRows, generate, models, log = () => {}, now = Date.now,

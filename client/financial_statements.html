@@ -648,7 +648,10 @@
           || url.username || url.password || url.port || !url.pathname.startsWith('/Archives/')) return '';
     } catch { return ''; }
     const document = report.officialDocument;
-    const excerpt = document?.url === filing.url && typeof document.text === 'string' ? document.text.slice(0, 65000) : '';
+    const text = document?.url === filing.url && typeof document.text === 'string' ? document.text.slice(0, 65000) : '';
+    // Older cached extracts may contain hidden XBRL data that lost its HTML boundaries.
+    const hasXbrlNoise = /(?:fasb\.org\/us-gaap|xbrl\.sec\.gov\/country|\b(?:us-gaap|xbrli|iso4217):)/i.test(text);
+    const excerpt = hasXbrlNoise ? '' : text;
     const metadata = [filing.form, filing.filingDate ? `申報日期：${filing.filingDate}` : '', 'SEC 官方申報文件'].filter(Boolean);
     return `<section class="official-document" aria-label="官方原文">
       <div class="official-document-heading"><div><h3>官方財報原文</h3><p>${metadata.map(escapeFinancial).join(' · ')}</p></div>
