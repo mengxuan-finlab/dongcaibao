@@ -236,6 +236,10 @@ function createFinancialGenerator({ fetchRows, fetchFiling, fetchTaiwanRows, gen
           : readOfficial ? officialSummary(output.official) : null,
           report: { symbol: job.symbol, as_of: date, ...snapshot, ai: taiwan ? output.ai : safeAnalysisText(output.ai), analysis_mode: 'full',
             generation_provider: 'google_search_url_context', filing,
+            officialDocument: !taiwan && filing && filingText ? {
+              url: filing.url, form: filing.form, filingDate: filing.filingDate,
+              text: filingText, excerptOnly: true
+            } : null,
             sources: grounding.sources, searchEntryPointHtml: grounding.searchEntryPointHtml,
             research: { searchQueries: grounding.searchQueries, ...grounding.telemetry, officialSummaryAvailable: readOfficial } } };
       } catch (error) {

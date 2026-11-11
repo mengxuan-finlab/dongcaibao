@@ -415,6 +415,18 @@
       color: #64748b;
       text-align: center;
     }
+    .official-document { padding: 22px; border: 1px solid #dfe6ef; border-radius: 10px; background: #f7f9fc; margin-bottom: 24px; }
+    .official-document-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    .official-document h3 { margin: 0 0 8px; font-size: 17px; color: #29435e; }
+    .official-document p { color: #7b899c; font-size: 12px; line-height: 1.8; margin: 0; }
+    .official-document-link { display: inline-flex; align-items: center; min-height: 44px; padding: 10px 16px; border: 1px solid #d5ddea; border-radius: 7px; color: #354f6c; background: #fff; text-decoration: none; font-size: 13px; }
+    .official-document-link:hover { background: #eef2f8; }
+    .official-document details { margin-top: 18px; border-top: 1px solid #e0e6ef; padding-top: 16px; }
+    .official-document summary { color: #556b86; cursor: pointer; font-size: 13px; }
+    .official-document .original-excerpt { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 360px; overflow-y: auto; margin: 18px 0 12px; padding: 20px; background: #fff; border: 1px solid #e2e7ef; border-radius: 7px; font-size: 14px; line-height: 1.9; color: #46586c; }
+    .translation-heading { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin: 0 0 16px; }
+    .translation-heading h3 { color: #29435e; font-size: 17px; margin: 0; }
+    .translation-heading p { color: #8490a2; font-size: 12px; margin: 0; line-height: 1.8; }
 
     @keyframes slideReveal {
       from { opacity: 0; transform: translateX(12px); }
@@ -625,6 +637,25 @@
     const suggestions = typeof report.searchEntryPointHtml === 'string' && report.searchEntryPointHtml
       ? `<iframe title="Google 搜尋建議" sandbox="allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" style="width:100%;height:150px;border:0" srcdoc="${escapeFinancial(report.searchEntryPointHtml)}"></iframe>` : '';
     return sources.length || suggestions ? `<details style="margin-top:20px"><summary>研究來源</summary><ul>${sources.join('')}</ul>${suggestions}</details>` : '';
+  }
+
+  function renderOfficialDocument(report) {
+    const filing = report?.filing;
+    let url;
+    try {
+      url = new URL(filing?.url);
+      if (url.protocol !== 'https:' || !['www.sec.gov', 'sec.gov'].includes(url.hostname)
+          || url.username || url.password || url.port || !url.pathname.startsWith('/Archives/')) return '';
+    } catch { return ''; }
+    const document = report.officialDocument;
+    const excerpt = document?.url === filing.url && typeof document.text === 'string' ? document.text.slice(0, 65000) : '';
+    const metadata = [filing.form, filing.filingDate ? `申報日期：${filing.filingDate}` : '', 'SEC 官方申報文件'].filter(Boolean);
+    return `<section class="official-document" aria-label="官方原文">
+      <div class="official-document-heading"><div><h3>官方財報原文</h3><p>${metadata.map(escapeFinancial).join(' · ')}</p></div>
+        <a class="official-document-link" href="${escapeFinancial(url.href)}" target="_blank" rel="noopener noreferrer">閱讀官方完整原文 ↗</a></div>
+      ${excerpt ? `<details><summary>展開官方原文文字摘錄</summary><div class="original-excerpt" lang="en" tabindex="0" role="region" aria-label="官方原文文字摘錄">${escapeFinancial(excerpt)}</div>
+        <p>此處為文件開頭的文字摘錄，非全文；完整排版、表格與後續章節請開啟官方原文。</p></details>` : ''}
+    </section>`;
   }
 
   let currentUser = null;
@@ -976,6 +1007,7 @@ async function renderDashboards() {
     }
 
     const summaryHtml = buildReportDeck(s.summary, s.symbol);
+    const officialHtml = isTw ? '' : renderOfficialDocument(s.report_json);
     
     const iframeHtml = authenticatedUrl 
       ? `<iframe src="${escapeFinancial(authenticatedUrl)}" referrerpolicy="no-referrer" title="財務圖表"></iframe>`
@@ -983,7 +1015,7 @@ async function renderDashboards() {
 
     const reportTitle = isTw ? `${escapeFinancial(s.symbol)} 台股財務追蹤報告` : `${escapeFinancial(s.symbol)} 財務分析報告`;
     const financialTabText = isTw ? "月營收與季報追蹤" : "三大財報及估值分析";
-    const docTabText = isTw ? "台股月營收分析" : "最新官方財報文件";
+    const docTabText = isTw ? "台股月營收分析" : "官方原文與中文摘要";
 
     container.innerHTML = `
       <div class="dash-card">
@@ -1004,6 +1036,8 @@ async function renderDashboards() {
         </div>
 
         <div id="view-doc" class="view-section">
+          ${officialHtml}
+          ${!isTw && s.summary ? '<div class="translation-heading"><h3>AI 中文重點摘要</h3><p>依可取得的官方資料整理，非原文逐字翻譯。</p></div>' : ''}
           ${summaryHtml}
         </div>
         ${renderFinancialSources(s.report_json)}
