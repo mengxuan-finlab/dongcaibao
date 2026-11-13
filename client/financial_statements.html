@@ -1009,7 +1009,7 @@ async function renderDashboards() {
           <div><p class="dashboard-eyebrow">FINANCIAL REPORT</p><h2>${reportTitle}</h2></div>
           <span class="status-badge">${demo ? 'AAPL 固定示範' : ['review', 'tw_review'].includes(s.status) ? "AI 分析待更新" : "已完成"}</span>
         </div>
-        ${demo ? '<p>示範資料不會即時更新，資料日期見圖表與文件標示。<a href="index.html?login=1" target="_blank" rel="noopener">登入以分析自己的股票</a></p>' : ''}
+        ${demo ? '<p><a href="index.html?login=1" target="_blank" rel="noopener">登入以分析自己的股票</a></p>' : ''}
 
         ${['review', 'tw_review'].includes(s.status) ? '<div style="margin:12px 0;"><button id="resumeFinancialBtn" type="button">完成財報分析</button></div>' : ''}
 
