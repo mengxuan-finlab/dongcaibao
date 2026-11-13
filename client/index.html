@@ -102,11 +102,12 @@
   </div>
   <div class="field">
     <label for="auth-password">密碼</label>
-    <div style="position: relative;">
-      <input type="password" id="auth-password" placeholder="至少 6 碼" style="padding-right: 40px;" />
-      <span id="toggle-password" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); cursor: pointer; user-select: none;">
-        👁️
-      </span>
+    <div class="password-field">
+      <input type="password" id="auth-password" placeholder="至少 6 碼" />
+      <button id="toggle-password" class="password-toggle" type="button" aria-label="顯示密碼" aria-controls="auth-password" aria-pressed="false">
+        <svg class="password-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+        <svg class="password-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 3 18 18M10.6 5.1A12 12 0 0 1 12 5c6.5 0 10 7 10 7a18 18 0 0 1-3.1 3.9M6.2 6.2A20 20 0 0 0 2 12s3.5 7 10 7a12 12 0 0 0 5.8-1.7M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>
+      </button>
     </div>
   </div>
   <div class="panel-actions">

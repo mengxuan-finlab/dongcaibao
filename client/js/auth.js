@@ -69,7 +69,8 @@ const supabaseUrl = "https://zlkexplsleznuebighte.supabase.co";
       toggleBtn.addEventListener("click", () => {
         const isPassword = passwordInput.type === "password";
         passwordInput.type = isPassword ? "text" : "password";
-        toggleBtn.textContent = isPassword ? "🙈" : "👁️";
+        toggleBtn.setAttribute("aria-pressed", String(isPassword));
+        toggleBtn.setAttribute("aria-label", isPassword ? "隱藏密碼" : "顯示密碼");
       });
     }
   }

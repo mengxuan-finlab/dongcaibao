@@ -231,6 +231,29 @@ header.top-logo {
   font-weight: 500;
 }
 
+.password-field { position: relative; }
+.auth-panel .password-field input { padding-right: 48px; }
+.auth-panel .password-toggle {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 32px;
+  padding: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #8390a5;
+}
+.auth-panel .password-toggle:hover { color: #9b87c5; background: rgba(139, 121, 174, .1); }
+.auth-panel .password-toggle:focus-visible { outline: 2px solid #a99ac7; outline-offset: 1px; }
+.password-toggle svg { width: 21px; height: 21px; }
+.password-toggle .password-eye-off,
+.password-toggle[aria-pressed="true"] .password-eye { display: none; }
+.password-toggle[aria-pressed="true"] .password-eye-off { display: block; }
+
 .auth-panel .btn-login {
   background: linear-gradient(135deg, #6366f1, #a855f7);
   color: #f9fafb;
