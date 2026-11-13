@@ -48,7 +48,7 @@ const supabaseUrl = "https://zlkexplsleznuebighte.supabase.co";
     if (guestTrialLink) guestTrialLink.style.display = isMember ? "none" : "inline-flex";
 
     if (!isMember) {
-      authUserEl.textContent = "訪客｜登入可取得更多免費額度";
+      authUserEl.textContent = "訪客｜登入以研究自己的股票";
       authUserEl.style.display = "inline-flex";
       logoutBtn.style.display = "none";
       openPanelBtn.style.display = "inline-flex";
@@ -161,7 +161,7 @@ const supabaseUrl = "https://zlkexplsleznuebighte.supabase.co";
 
   async function handleCheckout(event) {
     event.preventDefault();
-    alert("目前提供訪客試用與免費會員，付費訂閱暫停開放。");
+    alert("目前提供示範報告與免費會員，付費訂閱暫停開放。");
   }
 
   document.querySelectorAll('.lemonsqueezy-button')
