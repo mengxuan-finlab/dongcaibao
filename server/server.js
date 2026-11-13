@@ -229,12 +229,13 @@ const financialWorker = createFinancialWorker({
 app.post('/api/financial-reports', async (req, res) => {
   res.set('Cache-Control', 'no-store');
   const token = req.headers.authorization?.match(/^Bearer (\S+)$/i)?.[1];
-  if (!token) return res.status(401).json({ error: '請先登入或建立訪客試用。' });
+  if (!token) return res.status(401).json({ error: '請先登入會員，訪客可瀏覽固定示範報告。' });
   const trackingId = String(req.body?.trackingId || '');
   if (!/^[A-Za-z0-9-]{1,64}$/.test(trackingId)) return res.status(400).json({ error: '財報任務編號不正確。' });
   try {
     const { data: { user }, error } = await supabase.auth.getUser(token);
     if (error || !user) return res.status(401).json({ error: '登入已失效，請重新登入。' });
+    if (user.is_anonymous) return res.status(401).json({ error: '請先登入會員，訪客可瀏覽固定示範報告。' });
     if (!process.env.GEMINI_API_KEY) return res.status(503).json({ error: '財報服務尚未設定完成。' });
     const result = await financialRpc('start_financial_report', { p_user: user.id, p_tracking: trackingId });
     financialWorker.wake();
@@ -347,6 +348,38 @@ function libraryRoute(action) {
   };
 }
 app.get('/api/company-reports', libraryRoute(userId => companyLibrary.list(userId)));
+
+// Published snapshots are independent of member records and never generate data.
+const demoSnapshots = new Map();
+const demoSnapshotReads = new Map();
+async function readDemoSnapshot(kind) {
+  const cached = demoSnapshots.get(kind);
+  if (cached?.expires > Date.now()) return cached.value;
+  if (demoSnapshotReads.has(kind)) return demoSnapshotReads.get(kind);
+  const task = (async () => {
+    const { data, error } = await supabase.from('demo_reports').select('payload, published_at')
+      .eq('kind', kind).eq('symbol', 'AAPL').maybeSingle();
+    if (error || !data) throw new Error('DEMO_UNAVAILABLE');
+    const value = { ...data.payload, demo: true, demoPublishedAt: data.published_at };
+    demoSnapshots.set(kind, { value, expires: Date.now() + 300000 });
+    return value;
+  })();
+  demoSnapshotReads.set(kind, task);
+  try { return await task; }
+  finally { demoSnapshotReads.delete(kind); }
+}
+app.get('/api/demo-reports/:kind', async (req, res) => {
+  const kind = req.params.kind;
+  if (!['company', 'financial'].includes(kind)) return res.status(404).json({ error: '找不到示範報告。' });
+  try {
+    const payload = await readDemoSnapshot(kind);
+    res.set('Cache-Control', 'public, max-age=300');
+    return res.json(payload);
+  } catch {
+    res.set('Cache-Control', 'no-store');
+    return res.status(503).json({ error: '示範報告尚未發布或暫時無法讀取，請稍後再試或登入會員。' });
+  }
+});
 app.get('/api/company-reports/:symbol', libraryRoute((userId, symbol) => companyLibrary.read(userId, symbol)));
 app.delete('/api/company-reports/:symbol', libraryRoute(async (userId, symbol) => {
   await companyLibrary.remove(userId, symbol);
@@ -547,7 +580,6 @@ ${searchContext}
 app.post('/api/analyze-stock', async (req, res) => {
   const { symbol } = req.body;
   const requestId = randomUUID();
-  let settleGuest;
   let reserved = false;
   
   try {
@@ -555,7 +587,7 @@ app.post('/api/analyze-stock', async (req, res) => {
       return res.status(400).json({ error: '請輸入有效股票代碼。' });
     }
     const { user, plan: userPlan } = await getReportIdentity(req);
-    if (!user) settleGuest = guestAccess.reserve(req.ip, 'company_intro');
+    if (!user) return res.status(401).json({ error: '請先登入會員，訪客可瀏覽固定示範報告。', loginRequired: true });
 
     const normalizedSymbol = normalizeSymbol(symbol);
     if (user) {
@@ -650,7 +682,6 @@ app.post('/api/analyze-stock', async (req, res) => {
       await companyLibrary.finish(requestId, responsePayload);
       reserved = false;
     }
-    if (settleGuest) settleGuest(true);
     res.json({ ...responsePayload, saved: !!user });
 
   } catch (err) {
@@ -661,20 +692,18 @@ app.post('/api/analyze-stock', async (req, res) => {
     res.status(failure.status).json({ error: failure.message, code: failure.code, requestId, loginRequired: !!err.loginRequired });
   } finally {
     if (reserved) await companyLibrary.release(requestId).catch(error => console.error('[公司研究保存]', error.message));
-    if (settleGuest) settleGuest(false);
   }
 });
 // ===== 新增：AI 深度追問 Endpoint =====
 app.post('/api/chat-with-report', async (req, res) => {
   const { symbol, searchContext, sectionTitle, sectionContext, userQuery } = req.body;
-  let settleGuest;
 
   try {
     if (typeof userQuery !== 'string' || !userQuery.trim() || userQuery.length > 2000) {
       return res.status(400).json({ error: '請輸入 2000 字以內的問題。' });
     }
     const { user, plan: userPlan } = await getReportIdentity(req);
-    if (!user) settleGuest = guestAccess.reserve(req.ip, 'chat_query');
+    if (!user) return res.status(401).json({ error: '請先登入會員。', loginRequired: true });
     
     // --- (保留原本的問答限流攔截器邏輯) ---
     if (user && userPlan !== 'pro') {
@@ -747,7 +776,6 @@ app.post('/api/chat-with-report', async (req, res) => {
 
     // 成功完成後紀錄行為
     if (user) await supabase.from('usage_logs').insert({ user_id: user.id, action: 'chat_query' });
-    if (settleGuest) settleGuest(true);
     
     // 正式結束 HTTP 連線
     res.end();
@@ -761,7 +789,6 @@ app.post('/api/chat-with-report', async (req, res) => {
       res.end();
     }
   } finally {
-    if (settleGuest) settleGuest(false);
   }
 });
 // === 額外：Stock Data Supabase（讀 core_metrics 用）===

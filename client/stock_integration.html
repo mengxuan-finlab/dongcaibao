@@ -374,17 +374,15 @@
     }
     renderLibrary();
     if (!user) {
-      usageInfoEl.innerHTML = '目前身分：訪客｜每日 1 份報告。<a href="index.html?login=1" target="_blank" rel="noopener">登入取得更多免費額度</a>';
-      try {
-        const response = await fetch(new URL("/api/guest-usage", BACKEND_URL));
-        if (!response.ok) return;
-        const usage = await response.json();
-        usageInfoEl.innerHTML = `目前身分：訪客｜今日報告：${Number(usage.used.company_intro)} / 1<br><a href="index.html?login=1" target="_blank" rel="noopener">登入取得更多免費額度</a>`;
-      } catch (error) {
-        console.debug("訪客額度暫時無法讀取。", error);
-      }
+      usageInfoEl.innerHTML = '訪客正在瀏覽 AAPL 固定示範報告，不會重新生成。<a href="index.html?login=1" target="_blank" rel="noopener">登入以研究其他股票</a>';
+      document.getElementById('symbolInput').disabled = true;
+      document.getElementById('symbolInput').value = 'AAPL';
+      document.getElementById('fetchBtn').textContent = '登入以研究其他股票';
+      if (restore && !reportBusy && !document.getElementById('result').children.length) void loadCompanyReport('AAPL', false, true);
       return;
     }
+    document.getElementById('symbolInput').disabled = false;
+    if (!reportBusy) document.getElementById('fetchBtn').innerHTML = '開始研究 <span aria-hidden="true">→</span>';
 
     try {
       const { data: { session } } = await supabaseClient.auth.getSession();
@@ -748,14 +746,20 @@
     if (!fetchBtn.disabled) fetchBtn.click();
   });
 
-  async function loadCompanyReport(enteredSymbol, saved = false) {
+  async function loadCompanyReport(enteredSymbol, saved = false, demo = false) {
     const debugEl = document.getElementById("debug");
     const resultEl = document.getElementById("result");
     const symbolInput = document.getElementById("symbolInput");
     const fetchBtn = document.getElementById("fetchBtn");
     if (reportBusy) return;
+    const { data: { session: initialSession } } = await supabaseClient.auth.getSession();
+    if (reportBusy) return;
+    if (!demo && (!initialSession?.user || initialSession.user.is_anonymous)) {
+      showPlanModal('登入會員後即可研究自己的股票，訪客可瀏覽 AAPL 示範報告。', true);
+      return;
+    }
     
-    const symbol = enteredSymbol.trim().toUpperCase();
+    const symbol = demo ? 'AAPL' : enteredSymbol.trim().toUpperCase();
     if (!symbol) {
       alert("請輸入股票代碼！");
       return;
@@ -765,31 +769,28 @@
     reportBusy = true;
     renderLibrary();
     symbolInput.value = symbol;
-    fetchBtn.textContent = saved ? '讀取中…' : "研究中…";
+    fetchBtn.textContent = demo || saved ? '讀取中…' : "研究中…";
     document.body.dataset.view = "loading";
     resultEl.setAttribute("aria-busy", "true");
-    debugEl.textContent = saved ? `正在讀取 ${symbol} 的已保存研究` : `正在研究 ${symbol}`;
-    resultEl.innerHTML = `<div class="research-loading"><span class="research-loading-mark" aria-hidden="true"></span><h2>${saved ? '正在讀取已保存報告' : '正在建立公司研究報告'}</h2><p>${saved ? '直接載入原本的研究內容，不重新呼叫 AI。' : '整理業務、營收結構、同業比較與主要風險。首次生成可能需要 1–3 分鐘，完成後會自動顯示。'}</p></div>`;
+    debugEl.textContent = demo ? '正在讀取 AAPL 示範報告' : saved ? `正在讀取 ${symbol} 的已保存研究` : `正在研究 ${symbol}`;
+    resultEl.innerHTML = `<div class="research-loading"><span class="research-loading-mark" aria-hidden="true"></span><h2>${demo ? '正在讀取固定示範報告' : saved ? '正在讀取已保存報告' : '正在建立公司研究報告'}</h2><p>${demo || saved ? '直接載入原本的研究內容，不重新呼叫 AI。' : '整理業務、營收結構、同業比較與主要風險。首次生成可能需要 1–3 分鐘，完成後會自動顯示。'}</p></div>`;
     let stopAdoptionCard = () => {};
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 210000);
     try {
       const { data: { session } } = await supabaseClient.auth.getSession();
-      if (!saved && (!session?.user || session.user.is_anonymous)) {
-        const adoptionContainer = document.createElement('div');
-        resultEl.appendChild(adoptionContainer);
-        stopAdoptionCard = startAdoptionCard(adoptionContainer);
-      }
-      const response = await fetch(saved ? new URL(`/api/company-reports/${encodeURIComponent(symbol)}`, BACKEND_URL) : BACKEND_URL, {
+      if ((session?.user?.id || null) !== (initialSession?.user?.id || null)) return;
+      const response = await fetch(demo ? new URL('/api/demo-reports/company', BACKEND_URL)
+        : saved ? new URL(`/api/company-reports/${encodeURIComponent(symbol)}`, BACKEND_URL) : BACKEND_URL, {
         signal: controller.signal,
-        method: saved ? 'GET' : "POST",
+        method: demo || saved ? 'GET' : "POST",
         cache: 'no-store',
         headers: {
           "Content-Type": "application/json",
-          ...(session ? { "Authorization": `Bearer ${session.access_token}` } : {})
+          ...(!demo && session ? { "Authorization": `Bearer ${session.access_token}` } : {})
         },
-        ...(!saved ? { body: JSON.stringify({ symbol: symbol }) } : {})
+        ...(!demo && !saved ? { body: JSON.stringify({ symbol: symbol }) } : {})
       });
 
       const rawResponse = await response.text();
@@ -818,7 +819,7 @@
 
    
       const sections = readCompanySections(data);
-      const chartHtml = isTaiwanStock(symbol)
+      const chartHtml = demo ? '' : isTaiwanStock(symbol)
         ? `
         <div style="margin-bottom:25px; padding:18px 20px; border-radius:12px; background:rgba(15,23,42,0.72); border:1px solid rgba(148,163,184,0.25); color:#cbd5e1;">
           台股圖表暫不嵌入 TradingView，本頁先聚焦公司與產業分析。
@@ -833,16 +834,16 @@
       
       const sourceDocumentCount = collectReportSources(data).documentCount;
       const sourceNotice = data.sourceInfo ? `<aside class="report-data-status" role="status">
-        ${data.saved ? '已保存的公司研究' : data.cached ? "已載入近 3 天內的公司報告" : "公司報告已生成"}${sourceDocumentCount > 0 ? `｜${data.sourceInfo.provider === 'google_search_url_context' ? 'Google 搜尋參考來源' : '搜尋資料'} ${sourceDocumentCount} 份文件` : ''}
+        ${demo ? 'AAPL 示範報告｜固定資料，非即時更新' : data.saved ? '已保存的公司研究' : data.cached ? "已載入近 3 天內的公司報告" : "公司報告已生成"}${sourceDocumentCount > 0 ? `｜${data.sourceInfo.provider === 'google_search_url_context' ? 'Google 搜尋參考來源' : '搜尋資料'} ${sourceDocumentCount} 份文件` : ''}
         ${data.generatedAt ? `｜生成時間：${escapeHtml(new Date(data.generatedAt).toLocaleString('zh-TW'))}` : ""}
-      </aside>` : "";
+      </aside>` : demo ? '<aside class="report-data-status">AAPL 示範報告｜固定資料，非即時更新</aside>' : "";
       resultElement.innerHTML = sourceNotice + renderCompanyReport(sections, symbol, chartHtml) + renderReportSources(data);
       if (data.saved) libraryUserId = session?.user?.id || null;
       selectedReportSymbol = data.saved ? (data.report?.company?.symbol || symbol) : null;
       document.body.dataset.view = "report";
       const revenueContainer = document.getElementById('revenueCharts');
       if (typeof window.loadRevenueCharts === 'function') {
-        window.loadRevenueCharts(revenueContainer, BACKEND_URL, symbol, data.revenueData, sections.compactReport?.segmentInsights);
+        window.loadRevenueCharts(revenueContainer, BACKEND_URL, symbol, demo ? (data.revenueData || {}) : data.revenueData, sections.compactReport?.segmentInsights);
       } else {
         revenueContainer.closest('.revenue-section').hidden = true;
       }
@@ -871,7 +872,7 @@
       resultEl.setAttribute("aria-busy", "false");
     
       fetchBtn.disabled = false;
-      fetchBtn.innerHTML = '開始研究 <span aria-hidden="true">→</span>';
+      fetchBtn.innerHTML = libraryUserId ? '開始研究 <span aria-hidden="true">→</span>' : '登入以研究其他股票';
     }
   }
   document.getElementById('fetchBtn').addEventListener('click', () => loadCompanyReport(document.getElementById('symbolInput').value));

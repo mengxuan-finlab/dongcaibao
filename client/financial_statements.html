@@ -551,7 +551,7 @@
         <input id="symbolInput" placeholder="例如 AAPL、2330" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="go" aria-describedby="trialHint" />
         <button id="addBtn" type="button">新增追蹤</button>
       </div>
-      <div id="trialHint">訪客可試用 1 檔完整財報，登入後可追蹤 5 檔。</div>
+      <div id="trialHint">訪客可瀏覽 AAPL 固定示範，登入後可追蹤 5 檔。</div>
       <p id="financialAuthEntry" hidden><a href="index.html?login=1" target="_blank" rel="noopener">登入／免費註冊</a></p>
     </div>
 
@@ -574,6 +574,7 @@
   let pollTimer = null;
   let loadingStocks = false;
   let addingStock = false;
+  let initVersion = 0;
   const startingReports = new Set();
 
   function escapeFinancial(value) {
@@ -585,7 +586,7 @@
     startingReports.add(id);
     try {
       const { data: { session } } = await supabaseClient.auth.getSession();
-      if (!session) throw new Error('登入已失效，請重新登入。');
+      if (!session || session.user.is_anonymous) throw new Error('請先登入會員，訪客可瀏覽固定示範報告。');
       const response = await fetch(`${FINANCIAL_BACKEND}/api/financial-reports`, {
         method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
         body: JSON.stringify({ trackingId: id }), signal: AbortSignal.timeout(20000)
@@ -597,7 +598,7 @@
 
   function scheduleFinancialPoll() {
     clearTimeout(pollTimer);
-    if (currentUser && tracked.some(s => ['pending', 'financial_queued', 'financial_running'].includes(s.status))) {
+    if (!isGuest && currentUser && tracked.some(s => ['pending', 'financial_queued', 'financial_running'].includes(s.status))) {
       pollTimer = setTimeout(loadTrackedStocks, 5000);
     }
   }
@@ -641,44 +642,66 @@
 
   let currentUser = null;
   let currentLimit = FINANCIAL_TRACKING_LIMIT;
-  let isGuest = false;
+  let isGuest = true;
   let tracked = [];
   let selectedStockId = null;
 
   async function init() {
+    const version = ++initVersion;
     clearTimeout(pollTimer);
     document.getElementById("addBtn").disabled = true;
     try {
       const { data, error } = await supabaseClient.auth.getSession();
       if (error) throw error;
-      // Create the anonymous identity only when the visitor starts their trial.
+      if (version !== initVersion) return;
+      const previousUserId = currentUser?.id;
+      const wasGuest = isGuest;
       currentUser = data.session?.user || null;
       isGuest = !currentUser || !!currentUser.is_anonymous;
       document.getElementById('financialAuthEntry').hidden = !isGuest;
-      currentLimit = isGuest ? 1 : FINANCIAL_TRACKING_LIMIT;
-      document.getElementById("planName").textContent = isGuest ? "訪客試用" : "免費會員";
-      document.getElementById("planLimit").textContent = currentLimit;
+      currentLimit = isGuest ? 0 : FINANCIAL_TRACKING_LIMIT;
+      document.getElementById('symbolInput').disabled = isGuest;
+      document.getElementById("planName").textContent = isGuest ? "訪客示範" : "免費會員";
+      document.getElementById("planLimit").textContent = isGuest ? '登入後 5' : currentLimit;
       document.getElementById("trialHint").textContent = isGuest
-        ? "可試用 1 檔完整財報。請保留此瀏覽器資料以找回報告；第二檔需登入。"
+        ? "瀏覽 AAPL 固定示範，登入後即可分析與追蹤自己的股票。"
         : "每位會員可保存 5 檔股票的財報追蹤清單。";
-      if (currentUser) await loadTrackedStocks();
+      if (!isGuest) {
+        if (wasGuest || previousUserId !== currentUser.id) {
+          tracked = [];
+          selectedStockId = null;
+          renderStockList();
+          document.getElementById('dashboards').textContent = '正在讀取財報…';
+        }
+        await loadTrackedStocks();
+      }
       else {
         tracked = [];
         selectedStockId = null;
         renderStockList();
-        renderDashboards();
+        document.getElementById('dashboards').textContent = '正在讀取 AAPL 示範報告…';
+        const response = await fetch(`${FINANCIAL_BACKEND}/api/demo-reports/financial`, { signal: AbortSignal.timeout(20000) });
+        const demo = await response.json();
+        if (version !== initVersion) return;
+        if (!response.ok) throw new Error(demo.error || '示範報告暫時無法讀取。');
+        if (demo.symbol !== 'AAPL' || demo.report_json?.symbol !== 'AAPL') throw new Error('示範報告資料不正確。');
+        tracked = [{ id: 0, symbol: 'AAPL', status: 'ready', demo: true, report_json: demo.report_json, summary: demo.summary }];
+        selectedStockId = 0;
+        renderStockList();
+        await renderDashboards();
       }
     } catch (error) {
+      if (version !== initVersion) return;
       document.getElementById('financialAuthEntry').hidden = false;
-      document.getElementById("dashboards").textContent = "無法讀取財報，請重新整理後再試。";
+      document.getElementById("dashboards").textContent = error.message || "無法讀取財報，請重新整理後再試。";
       console.error(error);
     } finally {
-      updateAddButtonState();
+      if (version === initVersion) updateAddButtonState();
     }
   }
 
   async function loadTrackedStocks() {
-    if (!currentUser || loadingStocks) return;
+    if (isGuest || !currentUser || loadingStocks) return;
     loadingStocks = true;
     const userId = currentUser.id;
     const before = JSON.stringify(tracked);
@@ -693,7 +716,7 @@
       console.error("讀取追蹤股票失敗：", error);
       return;
     }
-    if (currentUser?.id !== userId) return;
+    if (isGuest || currentUser?.id !== userId) return;
 
     tracked = data || [];
 
@@ -714,6 +737,10 @@
       console.error('更新財報狀態失敗：', error);
     } finally {
       loadingStocks = false;
+      if (!isGuest && currentUser && currentUser.id !== userId) {
+        void loadTrackedStocks();
+        return;
+      }
       scheduleFinancialPoll();
     }
   }
@@ -744,7 +771,7 @@
               <span class="stock-symbol">${escapeFinancial(s.symbol)}</span>
               <span class="status-tag">${statusText}</span>
             </button>
-            ${isGuest ? '<span class="status-tag">訪客試用</span>' : `<button class="stock-remove" type="button" aria-label="移除 ${escapeFinancial(s.symbol)}" onclick="removeStock(${s.id})">移除</button>`}
+            ${isGuest ? '<span class="status-tag">固定示範</span>' : `<button class="stock-remove" type="button" aria-label="移除 ${escapeFinancial(s.symbol)}" onclick="removeStock(${s.id})">移除</button>`}
           </div>
         `;
       })
@@ -895,7 +922,7 @@
 async function renderDashboards() {
     const container = document.getElementById("dashboards");
 
-    if (tracked.length === 0 || !selectedStockId) {
+    if (tracked.length === 0 || selectedStockId === null) {
       container.innerHTML = `<div class="dash-card financial-empty">
         <p class="empty-eyebrow">FINANCIAL ANALYSIS</p>
         <h2>把財報，變成<br>看得懂的資訊。</h2>
@@ -905,7 +932,7 @@ async function renderDashboards() {
           <div class="empty-feature"><svg viewBox="0 0 100 52" fill="none" aria-hidden="true"><rect x="5" y="5" width="90" height="42" rx="5" fill="#eeebf5"/><path d="M17 17H62M17 26H82M17 35H48" stroke="#b4a6ce" stroke-width="4" stroke-linecap="round"/></svg><strong>AI 重點解讀</strong></div>
           <div class="empty-feature"><svg viewBox="0 0 100 52" fill="none" aria-hidden="true"><circle cx="50" cy="26" r="19" stroke="#e0e7ee" stroke-width="5"/><path d="M50 7A19 19 0 0 1 69 26" stroke="#9db8c5" stroke-width="5" stroke-linecap="round"/><path d="M50 16V27L59 32" stroke="#8c9eb5" stroke-width="2" stroke-linecap="round"/></svg><strong>保存追蹤清單</strong></div>
         </div>
-        <p class="empty-hint">${isGuest ? '先從一檔股票開始，免註冊試用完整財報。完成前可離開頁面，使用同一瀏覽器回來查看。' : '在追蹤區輸入股票代碼，建立你的第一份財報分析。美股、台股皆可使用。'}</p>
+        <p class="empty-hint">${isGuest ? '登入後即可建立自己的財報分析。' : '在追蹤區輸入股票代碼，建立你的第一份財報分析。美股、台股皆可使用。'}</p>
       </div>`;
       return;
     }
@@ -946,13 +973,15 @@ async function renderDashboards() {
       return;
     }
 
+    const demo = isGuest && s.demo === true;
+    const version = initVersion;
     const { data: { session } } = await supabaseClient.auth.getSession();
     const accessToken = session?.access_token || "";
     const refreshToken = session?.refresh_token || "";
 
-    if (selectedStockId !== s.id || currentUser?.id !== session?.user?.id) return;
-    let authenticatedUrl = null;
-    if (s.report_url) {
+    if (version !== initVersion || selectedStockId !== s.id || currentUser?.id !== session?.user?.id) return;
+    let authenticatedUrl = demo ? 'https://hims-chart.vercel.app/?demo=1' : null;
+    if (!demo && s.report_url) {
       try {
         const url = new URL(s.report_url);
         if (url.origin === 'https://hims-chart.vercel.app') {
@@ -978,8 +1007,9 @@ async function renderDashboards() {
       <div class="dash-card">
         <div class="dashboard-heading">
           <div><p class="dashboard-eyebrow">FINANCIAL REPORT</p><h2>${reportTitle}</h2></div>
-          <span class="status-badge">${['review', 'tw_review'].includes(s.status) ? "AI 分析待更新" : "已完成"}</span>
+          <span class="status-badge">${demo ? 'AAPL 固定示範' : ['review', 'tw_review'].includes(s.status) ? "AI 分析待更新" : "已完成"}</span>
         </div>
+        ${demo ? '<p>示範資料不會即時更新，資料日期見圖表與文件標示。<a href="index.html?login=1" target="_blank" rel="noopener">登入以分析自己的股票</a></p>' : ''}
 
         ${['review', 'tw_review'].includes(s.status) ? '<div style="margin:12px 0;"><button id="resumeFinancialBtn" type="button">完成財報分析</button></div>' : ''}
 
@@ -1011,9 +1041,14 @@ async function renderDashboards() {
   function updateAddButtonState() {
     const addBtn = document.getElementById("addBtn");
     if (addingStock) { addBtn.disabled = true; return; }
+    if (isGuest) {
+      addBtn.disabled = false;
+      addBtn.textContent = '登入以分析其他股票';
+      return;
+    }
     if (tracked.length >= currentLimit) {
-      addBtn.disabled = !isGuest;
-      addBtn.textContent = isGuest ? "登入以追蹤更多" : "已達 5 檔追蹤上限";
+      addBtn.disabled = true;
+      addBtn.textContent = "已達 5 檔追蹤上限";
     } else {
       addBtn.disabled = false;
       addBtn.textContent = "新增追蹤";
@@ -1022,7 +1057,7 @@ async function renderDashboards() {
 
   async function addStock() {
     if (addingStock) return;
-    if (isGuest && tracked.length >= 1) {
+    if (isGuest) {
       window.open("index.html?login=1", "_blank", "noopener");
       return;
     }
@@ -1041,18 +1076,7 @@ async function renderDashboards() {
     addingStock = true;
     addBtn.disabled = true;
     try {
-      if (isGuest) {
-        const { data: ready, error: readinessError } = await supabaseClient.rpc("guest_financial_trial_ready");
-        if (readinessError || ready !== true) throw new Error("訪客財報試用尚未開放，請先登入免費會員。");
-      }
-      if (!currentUser) {
-        const { data, error } = await supabaseClient.auth.signInAnonymously();
-        if (error) throw new Error("訪客試用暫時無法建立，請稍後再試或登入免費會員。");
-        currentUser = data.user;
-        // Recover any task created in another tab before attempting an insert.
-        await loadTrackedStocks();
-        if (tracked.length) return;
-      }
+      if (!currentUser || currentUser.is_anonymous) throw new Error('請先登入會員。');
       const row = {
         user_id: currentUser.id,
         symbol: symbolRaw,
@@ -1060,8 +1084,7 @@ async function renderDashboards() {
         summary: null
       };
       const query = supabaseClient.from("tracked_stocks");
-      const { data: inserted, error } = isGuest ? await query.insert(row).select('id').single()
-        : await query.upsert(row, { onConflict: 'user_id, symbol' }).select('id').single();
+      const { data: inserted, error } = await query.upsert(row, { onConflict: 'user_id, symbol' }).select('id').single();
       if (error) throw error;
       input.value = "";
       await loadTrackedStocks();
