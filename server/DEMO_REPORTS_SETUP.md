@@ -44,6 +44,16 @@ member session, saved reports and generation must still work.
 
 Demo payloads do not expire after three days and do not follow edits/deletions of
 the original member report. Re-running the migration does not replace an already
-published snapshot. To publish a new version, deliberately review and replace the
-two `demo_reports` rows as administrator. The API may cache responses for five
-minutes. Source dates remain visible so visitors do not mistake them for live data.
+published snapshot. To publish a new version:
+
+1. Generate and review the two replacement AAPL reports in the same member account.
+   Viewing a saved report is not regeneration; check its source/generation dates.
+2. Run `sql/publish-demo-reports.sql` in Supabase SQL Editor as administrator.
+   This replaces both snapshots together, or preserves both old versions on error.
+   It does not invoke AI, change member reports or rerun the access migration.
+3. Confirm the two returned `published_at` values, then check both pages logged out.
+
+Content-only publishing does not require a new deployment. The backend and browser
+each cache demo responses for up to five minutes; allow up to ten minutes for both
+layers to refresh. Source dates remain visible so visitors do not mistake them
+for live data. A layout/code change still requires the relevant app deployment.
