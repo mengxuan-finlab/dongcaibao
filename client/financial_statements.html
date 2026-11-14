@@ -551,7 +551,7 @@
         <input id="symbolInput" placeholder="例如 AAPL、2330" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="go" aria-describedby="trialHint" />
         <button id="addBtn" type="button">新增追蹤</button>
       </div>
-      <div id="trialHint">訪客可瀏覽 AAPL 固定示範，登入後可追蹤 5 檔。</div>
+      <div id="trialHint">訪客可瀏覽 AAPL 固定示範，免費會員可追蹤 3 檔。</div>
       <p id="financialAuthEntry" hidden><a href="index.html?login=1" target="_blank" rel="noopener">登入／免費註冊</a></p>
     </div>
 
@@ -569,7 +569,7 @@
   const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpsa2V4cGxzbGV6bnVlYmlnaHRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0MzAwNjUsImV4cCI6MjA4MTAwNjA2NX0.HPVn3jcN88M4U3-RCVW-YO-b65rDOKv6pxEaVWwbm68";
   const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
 
-  const FINANCIAL_TRACKING_LIMIT = 5;
+  const FINANCIAL_TRACKING_LIMIT = 3;
   const FINANCIAL_BACKEND = 'https://dongcaibao.onrender.com';
   let pollTimer = null;
   let loadingStocks = false;
@@ -675,12 +675,21 @@
       isGuest = !currentUser || !!currentUser.is_anonymous;
       document.getElementById('financialAuthEntry').hidden = !isGuest;
       currentLimit = isGuest ? 0 : FINANCIAL_TRACKING_LIMIT;
+      let memberPlan = 'free';
+      if (!isGuest) {
+        const { data: profile, error: profileError } = await supabaseClient.from('profiles')
+          .select('plan').eq('id', currentUser.id).maybeSingle();
+        if (profileError) throw profileError;
+        if (version !== initVersion) return;
+        memberPlan = String(profile?.plan || 'free').toLowerCase();
+        if (['plus', 'pro'].includes(memberPlan)) currentLimit = 5;
+      }
       document.getElementById('symbolInput').disabled = isGuest;
-      document.getElementById("planName").textContent = isGuest ? "訪客示範" : "免費會員";
-      document.getElementById("planLimit").textContent = isGuest ? '登入後 5' : currentLimit;
+      document.getElementById("planName").textContent = isGuest ? "訪客示範" : memberPlan === 'free' ? '免費會員' : memberPlan.toUpperCase() + ' 會員';
+      document.getElementById("planLimit").textContent = isGuest ? '免費會員 3' : currentLimit;
       document.getElementById("trialHint").textContent = isGuest
         ? "瀏覽 AAPL 固定示範，登入後即可分析與追蹤自己的股票。"
-        : "每位會員可保存 5 檔股票的財報追蹤清單。";
+        : `目前方案可保存 ${currentLimit} 檔股票的財報追蹤清單。`;
       if (!isGuest) {
         if (wasGuest || previousUserId !== currentUser.id) {
           tracked = [];
@@ -1067,7 +1076,7 @@ async function renderDashboards() {
     }
     if (tracked.length >= currentLimit) {
       addBtn.disabled = true;
-      addBtn.textContent = "已達 5 檔追蹤上限";
+      addBtn.textContent = `已達 ${currentLimit} 檔追蹤上限`;
     } else {
       addBtn.disabled = false;
       addBtn.textContent = "新增追蹤";

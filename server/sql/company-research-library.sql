@@ -27,7 +27,7 @@ $$;
 
 create or replace function public.company_library_state(p_user_id uuid)
 returns jsonb language sql stable set search_path = public as $$
-  select jsonb_build_object('limit', 5, 'weeklyLimit', 5,
+  select jsonb_build_object('limit', (case when exists (select 1 from public.profiles where id = p_user_id and lower(plan) in ('plus', 'pro')) then 5 else 3 end), 'weeklyLimit', (case when exists (select 1 from public.profiles where id = p_user_id and lower(plan) in ('plus', 'pro')) then 5 else 3 end),
     'used', (select count(*) from public.usage_logs where user_id = p_user_id and action = 'company_intro' and created_at >= public.company_research_week_start()),
     'reports', coalesce((select jsonb_agg(jsonb_build_object('symbol', symbol, 'savedAt', saved_at) order by saved_at desc)
       from public.company_saved_reports where user_id = p_user_id), '[]'::jsonb));
@@ -35,7 +35,7 @@ $$;
 
 create or replace function public.company_library_claim(p_user_id uuid, p_symbol text, p_request_id uuid)
 returns jsonb language plpgsql set search_path = public as $$
-declare v_payload jsonb; v_saved integer; v_pending integer; v_used integer;
+declare v_payload jsonb; v_saved integer; v_pending integer; v_used integer; v_limit integer;
 begin
   perform pg_advisory_xact_lock(hashtextextended('company-library:' || p_user_id::text, 0));
   select payload into v_payload from public.company_saved_reports where user_id = p_user_id and symbol = p_symbol;
@@ -47,8 +47,9 @@ begin
   select count(*) into v_saved from public.company_saved_reports where user_id = p_user_id;
   select count(*) into v_pending from public.company_report_reservations where user_id = p_user_id;
   select count(*) into v_used from public.usage_logs where user_id = p_user_id and action = 'company_intro' and created_at >= public.company_research_week_start();
-  if v_saved + v_pending >= 5 then return jsonb_build_object('status', 'full'); end if;
-  if v_used + v_pending >= 5 then return jsonb_build_object('status', 'quota'); end if;
+  v_limit := (case when exists (select 1 from public.profiles where id = p_user_id and lower(plan) in ('plus', 'pro')) then 5 else 3 end);
+  if v_saved + v_pending >= v_limit then return jsonb_build_object('status', 'full', 'limit', v_limit); end if;
+  if v_used + v_pending >= v_limit then return jsonb_build_object('status', 'quota', 'limit', v_limit); end if;
   insert into public.company_report_reservations(request_id, user_id, symbol) values (p_request_id, p_user_id, p_symbol);
   return jsonb_build_object('status', 'reserved');
 end;

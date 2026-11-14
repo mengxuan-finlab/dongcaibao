@@ -25,9 +25,10 @@ function createCompanyLibrary(supabase) {
       const claim = await rpc('company_library_claim', { p_user_id: userId, p_symbol: symbol, p_request_id: requestId });
       if (claim?.status === 'saved') return { ...claim.payload, saved: true };
       if (claim?.status === 'reserved') return null;
+      const limit = claim?.limit === 5 ? 5 : 3;
       const messages = {
-        full: '最多可保存 5 檔公司研究，請先移除一檔再新增。移除不會退回本週額度。',
-        quota: '已達本週 5 份研究額度（含處理中的請求），已保存的報告仍可免費查看。',
+        full: `最多可保存 ${limit} 檔公司研究，請先移除一檔再新增。移除不會退回本週額度。`,
+        quota: `已達本週 ${limit} 份研究額度（含處理中的請求），已保存的報告仍可免費查看。`,
         busy: '這檔股票正在生成研究報告，請稍後從保存清單查看。'
       };
       throw libraryError(messages[claim?.status] || '公司研究保存服務暫時無法使用。',

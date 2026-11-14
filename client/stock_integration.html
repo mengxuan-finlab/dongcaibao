@@ -27,10 +27,10 @@
   <main class="workspace-main research-library-layout">
     <aside class="research-library" aria-label="已保存的公司研究">
       <p class="library-eyebrow">RESEARCH LIBRARY</p>
-      <h2>你的公司研究 <span id="libraryCount">0 / 5</span></h2>
-      <p class="library-description">最多保存 5 檔，隨時切換查看。</p>
+      <h2>你的公司研究 <span id="libraryCount">0 / 3</span></h2>
+      <p class="library-description">免費會員最多保存 3 檔，隨時切換查看。</p>
       <div id="libraryList"><p class="library-message">登入後可保存研究報告。</p></div>
-      <p class="library-note">每週最多新增 5 份，查看已保存報告不扣額度。每週日台灣時間 00:00 重設；移除不退回已用次數。</p>
+      <p class="library-note">免費會員每週最多新增 3 份，查看已保存報告不扣額度。每週日台灣時間 00:00 重設；移除不退回已用次數。</p>
     </aside>
     <section class="research-main" aria-label="公司研究內容">
     <section class="research-entry" aria-labelledby="entryTitle">
@@ -243,6 +243,7 @@
   
   let libraryUserId = null;
   let libraryReports = [];
+  let libraryLimit = 3;
   let selectedReportSymbol = null;
   let reportBusy = false;
 
@@ -353,7 +354,7 @@
   }
 
   function renderLibrary() {
-    document.getElementById('libraryCount').textContent = `${libraryReports.length} / 5`;
+    document.getElementById('libraryCount').textContent = `${libraryReports.length} / ${libraryLimit}`;
     document.getElementById('libraryList').innerHTML = libraryReports.length
       ? libraryReports.map(report => `<div class="library-item${selectedReportSymbol === report.symbol ? ' active' : ''}">
           <button type="button" data-library-action="read" data-symbol="${escapeHtml(report.symbol)}" aria-pressed="${selectedReportSymbol === report.symbol}"${reportBusy ? ' disabled' : ''}>
@@ -370,6 +371,7 @@
     if (libraryUserId !== userId) {
       libraryUserId = userId;
       libraryReports = [];
+      libraryLimit = 3;
       selectedReportSymbol = null;
       document.getElementById('result').innerHTML = '';
       document.getElementById('debug').textContent = '';
@@ -397,7 +399,8 @@
       if (libraryUserId !== userId) return;
       if (!response.ok) throw new Error(state.error || '暫時無法讀取研究清單。');
       libraryReports = Array.isArray(state.reports) ? state.reports : [];
-      usageInfoEl.textContent = `本週已新增 ${state.used} / 5 份 · 已保存 ${libraryReports.length} / 5 檔`;
+      libraryLimit = state.limit;
+      usageInfoEl.textContent = `本週已新增 ${state.used} / ${state.weeklyLimit} 份 · 已保存 ${libraryReports.length} / ${state.limit} 檔`;
       renderLibrary();
       if (restore && !reportBusy && libraryReports.length && !document.getElementById('result').children.length) {
         void loadCompanyReport(libraryReports[0].symbol, true);

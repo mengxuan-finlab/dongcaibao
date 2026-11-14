@@ -47,7 +47,7 @@ begin
   ready_status := case when stock.symbol ~ '^[0-9]{4}(\.TW|\.TWO)?$' then 'tw_ready' else 'ready' end;
   target_url := 'https://hims-chart.vercel.app/' || case when ready_status = 'tw_ready' then 'tw_report.html' else '' end
     || '?symbol=' || stock.symbol;
-  if (select count(*) from public.tracked_stocks where user_id = p_user) > 5 then
+  if (select count(*) from public.tracked_stocks where user_id = p_user) > (case when exists (select 1 from public.profiles where id = p_user and lower(plan) in ('plus', 'pro')) then 5 else 3 end) then
     raise exception 'TRACKING_LIMIT';
   end if;
   if stock.status in ('ready', 'tw_ready') and stock.report_json is not null
