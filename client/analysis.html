@@ -102,7 +102,7 @@ function requireProOrShowCard() {
 
 async function getAccessToken() {
   const { data } = await sbAuth.auth.getSession();
-  return data?.session?.access_token || null;
+  return data?.session?.user?.is_anonymous ? null : data?.session?.access_token || null;
 }
 
 function fmtPct100(x, digits=1){
@@ -283,8 +283,10 @@ function getApiBase(){
 }
 
 async function fetchIncomeStatementFY(sym) {
+  const token = await getAccessToken();
+  if (!token) throw new Error('請先登入會員。');
   const url = `${getApiBase()}/api/fmp/income-statement?symbol=${encodeURIComponent(sym)}`;
-  const res = await fetch(url);
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
   if (!res.ok) throw new Error(`API income HTTP ${res.status}`);
   const json = await res.json();
   if (!Array.isArray(json)) return [];
@@ -301,8 +303,10 @@ async function fetchIncomeStatementFY(sym) {
 }
 
 async function fetchCashFlowFY(sym) {
+  const token = await getAccessToken();
+  if (!token) throw new Error('請先登入會員。');
   const url = `${getApiBase()}/api/fmp/cash-flow-statement?symbol=${encodeURIComponent(sym)}`;
-  const res = await fetch(url);
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
   if (!res.ok) throw new Error(`API cashflow HTTP ${res.status}`);
   const json = await res.json();
   if (!Array.isArray(json)) return [];

@@ -15,6 +15,7 @@ const { ADOPTION_API, createAdoptionFeed } = require('./adoption');
 const { createPeerFeed } = require('./peer-comparison');
 const { createFinancialGenerator, createFinancialWorker } = require('./financial-report');
 const { createCompanyLibrary } = require('./company-library');
+const { createFmpAccess } = require('./fmp-access');
 const KINDS = {
   product: 'revenue-product-segmentation',
   geographic: 'revenue-geographic-segmentation'
@@ -96,7 +97,6 @@ const getRevenueSegments = createRevenueFeed({
     return response.data;
   }
 });
-const revenueRequests = new Map();
 const getPeerComparison = createPeerFeed({
   discoverPeers: async ({ symbol, profile, existing, signal }) => {
     const result = await callGemini({
@@ -813,30 +813,35 @@ async function getUserAndPlanFromToken(token) {
   return { user, plan: profile?.plan || 'free' };
 }
 
-// ===== Pro-only 指標 API =====
+const memberFmp = createFmpAccess({
+  auth: supabase.auth,
+  fetchRows: async (endpoint, symbol) => {
+    if (!process.env.FMP_API_KEY) throw Object.assign(new Error('FMP_NOT_CONFIGURED'), { statusCode: 503 });
+    const response = await axios.get(`https://financialmodelingprep.com/stable/${endpoint}`, {
+      params: { symbol, period: 'annual', limit: 5, apikey: process.env.FMP_API_KEY },
+      timeout: 15000
+    });
+    return response.data;
+  }
+});
+app.use(['/api/pro-metrics', '/api/fmp/revenue-segmentation',
+  '/api/fmp/income-statement', '/api/fmp/cash-flow-statement'], memberFmp.requireMember);
+
+// ===== Member-only 指標 API =====
 // 後端 (server.js)
 app.get('/api/pro-metrics', async (req, res) => {
   try {
-    const { symbol } = req.query;
-    const authHeader = req.headers.authorization;
-    const FMP_KEY = process.env.FMP_API_KEY;
-
-    if (!authHeader) return res.status(401).json({ error: "未登入" });
-
-    // Personal financial tools remain available to authenticated members.
-    const token = authHeader.split(" ")[1];
-    const { data: { user }, error: authErr } = await supabase.auth.getUser(token);
-    if (authErr || !user) return res.status(401).json({ error: "登入已失效，請重新登入。" });
+    const symbol = req.fmpSymbol;
 
     // 2. 抓取五年歷史數據 (使用 Stable 端點)
-    const [kmRes, ratioRes] = await Promise.all([
-      axios.get(`https://financialmodelingprep.com/stable/key-metrics?symbol=${symbol}&apikey=${FMP_KEY}`),
-      axios.get(`https://financialmodelingprep.com/stable/ratios?symbol=${symbol}&apikey=${FMP_KEY}`)
+    const [metrics, ratios] = await Promise.all([
+      memberFmp.readRows('key-metrics', symbol),
+      memberFmp.readRows('ratios', symbol)
     ]);
 
     // 1. 先進行降序排序 (最新的日期在 index 0)
-    const sortedKm = kmRes.data.sort((a, b) => new Date(b.date) - new Date(a.date));
-    const sortedRatio = ratioRes.data.sort((a, b) => new Date(b.date) - new Date(a.date));
+    const sortedKm = metrics.slice().sort((a, b) => new Date(b.date) - new Date(a.date));
+    const sortedRatio = ratios.slice().sort((a, b) => new Date(b.date) - new Date(a.date));
 
     // 2. 取前 5 筆最新的資料
     // 3. 使用 reverse() 轉回 2021 -> 2025 的順序，供圖表從左到右繪製
@@ -887,27 +892,14 @@ app.get('/api/pro-metrics', async (req, res) => {
     });
   } catch (e) {
     console.error("[Pro API Error]", e.message);
-    res.status(500).json({ error: "抓取數據失敗，請確認 API Key 有效性" });
+    if (e.statusCode === 429) res.set('Retry-After', '5');
+    res.status(e.statusCode || 502).json({ error: '指標資料暫時無法讀取，請稍後再試。' });
   }
 });
 
 app.get('/api/fmp/revenue-segmentation', async (req, res) => {
   res.set('Cache-Control', 'no-store');
-  const symbol = normalizeSymbol(req.query.symbol);
-  if (!/^[A-Z][A-Z0-9.\-]{0,19}$/.test(symbol)) {
-    return res.status(400).json({ error: '此圖表目前僅支援有效美股代碼。' });
-  }
-  const now = Date.now();
-  for (const [ip, entry] of revenueRequests) {
-    if (entry.until <= now) revenueRequests.delete(ip);
-  }
-  const entry = revenueRequests.get(req.ip) || { count: 0, until: now + 60000 };
-  if (entry.count >= 20 || (!revenueRequests.has(req.ip) && revenueRequests.size >= 10000)) {
-    res.set('Retry-After', '60');
-    return res.status(429).json({ error: '圖表查詢過於頻繁，請稍後再試。' });
-  }
-  entry.count += 1;
-  revenueRequests.set(req.ip, entry);
+  const symbol = req.fmpSymbol;
   if (!process.env.FMP_API_KEY) {
     return res.status(503).json({ error: '營收圖表資料服務尚未設定。' });
   }
@@ -920,35 +912,19 @@ app.get('/api/fmp/revenue-segmentation', async (req, res) => {
 
 app.get("/api/fmp/income-statement", async (req, res) => {
   try {
-    const symbol = String(req.query.symbol || "").toUpperCase();
-    if (!/^[A-Z.\-]{1,10}$/.test(symbol)) {
-      return res.status(400).json({ error: "Bad symbol" });
-    }
-
-    const url = `https://financialmodelingprep.com/stable/income-statement?symbol=${encodeURIComponent(symbol)}&apikey=${encodeURIComponent(process.env.FMP_API_KEY)}`;
-    const r = await fetch(url);
-    const data = await r.json();
-
-    return res.status(r.ok ? 200 : r.status).json(data);
+    return res.json(await memberFmp.readRows('income-statement', req.fmpSymbol));
   } catch (e) {
-    return res.status(500).json({ error: "Server error" });
+    if (e.statusCode === 429) res.set('Retry-After', '5');
+    return res.status(e.statusCode || 502).json({ error: '損益表暫時無法讀取，請稍後再試。' });
   }
 });
 
 app.get("/api/fmp/cash-flow-statement", async (req, res) => {
   try {
-    const symbol = String(req.query.symbol || "").toUpperCase();
-    if (!/^[A-Z.\-]{1,10}$/.test(symbol)) {
-      return res.status(400).json({ error: "Bad symbol" });
-    }
-
-    const url = `https://financialmodelingprep.com/stable/cash-flow-statement?symbol=${encodeURIComponent(symbol)}&apikey=${encodeURIComponent(process.env.FMP_API_KEY)}`;
-    const r = await fetch(url);
-    const data = await r.json();
-
-    return res.status(r.ok ? 200 : r.status).json(data);
+    return res.json(await memberFmp.readRows('cash-flow-statement', req.fmpSymbol));
   } catch (e) {
-    return res.status(500).json({ error: "Server error" });
+    if (e.statusCode === 429) res.set('Retry-After', '5');
+    return res.status(e.statusCode || 502).json({ error: '現金流資料暫時無法讀取，請稍後再試。' });
   }
 });
 
@@ -1027,68 +1003,10 @@ ${JSON.stringify(newsItems, null, 2)}
   }
 });
 
-app.post('/lemonsqueezy-webhook', express.json(), async (req, res) => {
-  try {
-    const eventName = req.body.meta?.event_name;
-    console.log("📩 收到事件:", eventName);
-
-    const customData = req.body.meta?.custom_data;
-    console.log("📦 custom_data 原始:", customData);
-
-    let userId = null;
-
-    // ✅ 情況 1：custom_data 是物件（你現在就是這個）
-    if (customData && typeof customData === "object") {
-      userId = customData.user_id;
-    }
-
-    // ✅ 情況 2：custom_data 是字串（保留相容）
-    if (!userId && typeof customData === "string") {
-      try {
-        userId = JSON.parse(customData).user_id;
-      } catch (e) {
-        console.log("❌ custom_data JSON parse 失敗");
-      }
-    }
-
-    console.log("👤 解析出的 user_id:", userId);
-
-    if (!userId) {
-      console.log("❌ 沒有 user_id，停止處理");
-      return res.sendStatus(200);
-    }
-
-    const subscriptionId = req.body.data?.id;
-    const status = req.body.data?.attributes?.status;
-
-    console.log("📄 subscriptionId:", subscriptionId);
-    console.log("📊 status:", status);
-
-    const { data, error } = await supabase
-      .from('profiles')
-      .update({
-        plan: status === 'active' ? 'pro' : 'free',
-        subscription_id: subscriptionId,
-        subscription_status: status
-      })
-      .eq('id', userId)
-      .select('id,email,plan,subscription_id,subscription_status');
-
-    console.log("🧾 Supabase update data:", data);
-    console.log("🧾 Supabase update error:", error);
-
-    if (!data || data.length === 0) {
-      console.log("⚠️ 沒有任何資料列被更新 (可能 userId 不存在或連到錯專案)");
-    } else {
-      console.log("✅ Supabase 已成功更新方案");
-    }
-
-    return res.sendStatus(200);
-
-  } catch (err) {
-    console.error("❌ Webhook 錯誤:", err);
-    return res.sendStatus(500);
-  }
+// Billing is disabled. Never change member entitlements from incoming webhooks.
+app.post('/lemonsqueezy-webhook', (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  return res.status(410).json({ error: '付費訂閱通知功能已停用。' });
 });
 
 const PORT = process.env.PORT || 3000;

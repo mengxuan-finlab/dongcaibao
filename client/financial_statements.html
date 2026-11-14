@@ -575,7 +575,21 @@
   let loadingStocks = false;
   let addingStock = false;
   let initVersion = 0;
+  const CHART_ORIGIN = 'https://hims-chart.vercel.app';
+  let activeChartContext = null;
   const startingReports = new Set();
+
+  window.addEventListener('message', event => {
+    const context = activeChartContext;
+    const data = event.data;
+    if (!context?.frame || event.origin !== CHART_ORIGIN || event.source !== context.frame.contentWindow
+        || !context.frame.isConnected || context.version !== initVersion
+        || selectedStockId !== context.stockId || isGuest || currentUser?.id !== context.userId
+        || !data || data.type !== 'dcb:chart-ready' || data.version !== 1
+        || data.channel !== context.channel || data.symbol !== context.report.symbol) return;
+    context.frame.contentWindow.postMessage({ type: 'dcb:financial-report', version: 1,
+      channel: context.channel, report: context.report }, CHART_ORIGIN);
+  });
 
   function escapeFinancial(value) {
     return String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -648,6 +662,7 @@
 
   async function init() {
     const version = ++initVersion;
+    activeChartContext = null;
     clearTimeout(pollTimer);
     document.getElementById("addBtn").disabled = true;
     try {
@@ -920,6 +935,7 @@
   }
 
 async function renderDashboards() {
+    activeChartContext = null;
     const container = document.getElementById("dashboards");
 
     if (tracked.length === 0 || selectedStockId === null) {
@@ -976,27 +992,28 @@ async function renderDashboards() {
     const demo = isGuest && s.demo === true;
     const version = initVersion;
     const { data: { session } } = await supabaseClient.auth.getSession();
-    const accessToken = session?.access_token || "";
-    const refreshToken = session?.refresh_token || "";
-
     if (version !== initVersion || selectedStockId !== s.id || currentUser?.id !== session?.user?.id) return;
-    let authenticatedUrl = demo ? 'https://hims-chart.vercel.app/?demo=1' : null;
-    if (!demo && s.report_url) {
-      try {
-        const url = new URL(s.report_url);
-        if (url.origin === 'https://hims-chart.vercel.app') {
-          url.searchParams.set('access_token', accessToken);
-          url.searchParams.set('refresh_token', refreshToken);
-          authenticatedUrl = url.href;
-        }
-      } catch { /* Never send session credentials to an arbitrary report URL. */ }
+    let chartUrl = demo ? `${CHART_ORIGIN}/?demo=1` : null;
+    let channel = null;
+    let chartReport = null;
+    if (!demo && session?.user && !session.user.is_anonymous && s.report_json?.symbol === s.symbol
+        && s.report_json.data && s.report_json.ai) {
+      channel = crypto.randomUUID();
+      const url = new URL(isTw ? '/tw_report.html' : '/', CHART_ORIGIN);
+      url.searchParams.set('symbol', s.symbol);
+      url.searchParams.set('channel', channel);
+      url.searchParams.set('parentOrigin', window.location.origin);
+      chartUrl = url.href;
+      const report = s.report_json;
+      chartReport = { symbol: report.symbol, as_of: report.as_of, ai_generated_at: report.ai_generated_at,
+        data: report.data, ai: report.ai, currency: report.currency, periods: report.periods };
     }
 
     const summaryHtml = buildReportDeck(s.summary, s.symbol);
     const officialHtml = isTw ? '' : renderOfficialDocument(s.report_json);
     
-    const iframeHtml = authenticatedUrl 
-      ? `<iframe src="${escapeFinancial(authenticatedUrl)}" referrerpolicy="no-referrer" title="財務圖表"></iframe>`
+    const iframeHtml = chartUrl
+      ? `<iframe id="financialChart" src="${escapeFinancial(chartUrl)}" referrerpolicy="no-referrer" title="財務圖表"></iframe>`
       : `<div style="text-align:center; padding:40px; background:#f9fafb; border-radius:8px;">尚未連結圖表數據</div>`;
 
     const reportTitle = isTw ? `${escapeFinancial(s.symbol)} 台股財務追蹤報告` : `${escapeFinancial(s.symbol)} 財務分析報告`;
@@ -1030,6 +1047,8 @@ async function renderDashboards() {
         ${renderFinancialSources(s.report_json)}
       </div>
     `;
+    if (chartReport) activeChartContext = { frame: document.getElementById('financialChart'),
+      channel, report: chartReport, version, stockId: s.id, userId: session.user.id };
     document.getElementById('resumeFinancialBtn')?.addEventListener('click', async event => {
       event.currentTarget.disabled = true;
       try { await startFinancialReport(s.id); await loadTrackedStocks(); }
@@ -1120,10 +1139,17 @@ async function renderDashboards() {
     event.preventDefault();
     document.getElementById('addBtn').click();
   });
-  window.addEventListener('pagehide', () => clearTimeout(pollTimer));
+  window.addEventListener('pagehide', () => {
+    activeChartContext = null;
+    clearTimeout(pollTimer);
+  });
   window.addEventListener('pageshow', event => { if (event.persisted) void loadTrackedStocks(); });
   supabaseClient.auth.onAuthStateChange((event) => {
-    if (["SIGNED_IN", "SIGNED_OUT", "USER_UPDATED"].includes(event)) setTimeout(init, 0);
+    if (["SIGNED_IN", "SIGNED_OUT", "USER_UPDATED"].includes(event)) {
+      activeChartContext = null;
+      ++initVersion;
+      setTimeout(init, 0);
+    }
   });
   init();
 </script>

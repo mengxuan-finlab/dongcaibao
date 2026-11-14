@@ -208,9 +208,12 @@
     try {
       let data = snapshot;
       if (!data) {
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        if (!session || session.user.is_anonymous) return;
         const url = new URL('/api/fmp/revenue-segmentation', backendUrl);
         url.searchParams.set('symbol', symbol);
-        const response = await fetch(url, { signal: controller.signal });
+        const response = await fetch(url, { signal: controller.signal,
+          headers: { Authorization: `Bearer ${session.access_token}` } });
         if (!response.ok) throw new Error('Revenue data unavailable');
         data = await response.json();
       }
