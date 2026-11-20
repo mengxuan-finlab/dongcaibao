@@ -197,7 +197,7 @@ const generateFinancialReport = createFinancialGenerator({
     if (!process.env.FMP_API_KEY) throw new Error('FMP_API_KEY_NOT_CONFIGURED');
     const response = await axios.get(`https://financialmodelingprep.com/stable/${endpoint}`, {
       params: { symbol, apikey: process.env.FMP_API_KEY, ...(period ? { period } : {}),
-        limit: endpoint === 'sec-filings-search/symbol' ? 50 : 5,
+        limit: endpoint === 'sec-filings-search/symbol' ? 50 : period === 'quarter' ? 11 : 5,
         ...(endpoint === 'sec-filings-search/symbol' ? {
           from: new Date(Date.now() - 550 * 86400000).toISOString().slice(0, 10),
           to: new Date().toISOString().slice(0, 10)

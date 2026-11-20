@@ -548,7 +548,7 @@
     <div class="tracking-form">
       <label for="symbolInput">新增追蹤股票</label>
       <div class="tracking-entry">
-        <input id="symbolInput" placeholder="例如 AAPL、2330" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="go" aria-describedby="trialHint" />
+        <input id="symbolInput" placeholder="例如 AAPL、NVDA" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="go" aria-describedby="trialHint" />
         <button id="addBtn" type="button">新增追蹤</button>
       </div>
       <div id="trialHint">訪客可瀏覽 AAPL 固定示範，免費會員可追蹤 3 檔。</div>
@@ -1015,7 +1015,8 @@ async function renderDashboards() {
       chartUrl = url.href;
       const report = s.report_json;
       chartReport = { symbol: report.symbol, as_of: report.as_of, ai_generated_at: report.ai_generated_at,
-        data: report.data, ai: report.ai, currency: report.currency, periods: report.periods };
+        data: report.data, ai: report.ai, currency: report.currency, periods: report.periods,
+        views: report.views, financialFormat: report.financialFormat };
     }
 
     const summaryHtml = buildReportDeck(s.summary, s.symbol);

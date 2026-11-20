@@ -43,7 +43,7 @@ begin
       'generatedAt', 'sourceInfo', 'grounding', 'searchContext', 'reportMode');
   select jsonb_object_agg(key, value) into financial from jsonb_each(financial)
     where key in ('symbol', 'data', 'ai', 'as_of', 'ai_generated_at', 'currency', 'periods',
-      'filing', 'officialDocument', 'sources', 'generation_provider', 'searchEntryPointHtml');
+      'filing', 'officialDocument', 'sources', 'generation_provider', 'searchEntryPointHtml', 'views', 'financialFormat');
   insert into public.demo_reports(kind, symbol, payload) values
     ('company', 'AAPL', company),
     ('financial', 'AAPL', jsonb_build_object('symbol', 'AAPL', 'report_json', financial, 'summary', financial_summary))
